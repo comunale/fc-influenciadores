@@ -25,10 +25,9 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Rotas admin exigem autenticação (/setup e /login são públicas)
+  // Rotas admin exigem autenticação (/login é pública; /setup está fora de /admin)
   const isAdminRoute = request.nextUrl.pathname.startsWith('/admin') &&
-    !request.nextUrl.pathname.startsWith('/admin/login') &&
-    !request.nextUrl.pathname.startsWith('/admin/setup')
+    !request.nextUrl.pathname.startsWith('/admin/login')
 
   if (isAdminRoute && !user) {
     return NextResponse.redirect(new URL('/admin/login', request.url))
