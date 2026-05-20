@@ -30,7 +30,7 @@ export default function AdminLoginPage() {
     }
 
     toast.success('Login realizado!')
-    router.push('/admin/validar')
+    router.push('/admin')
     router.refresh()
   }
 
