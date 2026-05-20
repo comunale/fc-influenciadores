@@ -52,27 +52,43 @@ export default function SetupPage() {
       password: form.password,
     })
 
-    if (error || !data.user) {
+    // "User already registered" → tenta logar e recuperar o id
+    let userId = data.user?.id
+    let session = data.session
+
+    if (error?.message?.includes('already registered') || error?.message?.includes('already been registered')) {
+      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+        email: form.email,
+        password: form.password,
+      })
+      if (loginError || !loginData.user) {
+        toast.error('Usuário já existe. Faça login em /admin/login.')
+        setLoading(false)
+        return
+      }
+      userId = loginData.user.id
+      session = loginData.session
+    } else if (error || !userId) {
       toast.error(error?.message || 'Erro ao criar usuário.')
       setLoading(false)
       return
     }
 
-    // Criar perfil admin
-    const { error: profileError } = await supabase.from('admin_profiles').insert({
-      id: data.user.id,
+    // Criar/atualizar perfil admin
+    const { error: profileError } = await supabase.from('admin_profiles').upsert({
+      id: userId,
       name: form.name,
       role: 'admin',
     })
 
     if (profileError) {
-      toast.error('Usuário criado mas erro no perfil: ' + profileError.message)
+      toast.error('Erro no perfil: ' + profileError.message)
       setLoading(false)
       return
     }
 
     setDone(true)
-    const needsConfirm = !data.session
+    const needsConfirm = !session
     toast.success(needsConfirm ? 'Admin criado! Confirme seu e-mail.' : 'Admin criado com sucesso!')
     if (!needsConfirm) {
       setTimeout(() => router.push('/admin/login'), 2000)
