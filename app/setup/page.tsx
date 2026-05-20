@@ -72,8 +72,11 @@ export default function SetupPage() {
     }
 
     setDone(true)
-    toast.success('Admin criado com sucesso!')
-    setTimeout(() => router.push('/admin/login'), 2000)
+    const needsConfirm = !data.session
+    toast.success(needsConfirm ? 'Admin criado! Confirme seu e-mail.' : 'Admin criado com sucesso!')
+    if (!needsConfirm) {
+      setTimeout(() => router.push('/admin/login'), 2000)
+    }
   }
 
   if (done) {
@@ -82,7 +85,14 @@ export default function SetupPage() {
         <div className="text-center">
           <div className="text-[#00ff87] text-5xl mb-4">✓</div>
           <h1 className="text-white text-2xl font-bold">Admin criado!</h1>
-          <p className="text-gray-400 mt-2">Redirecionando para o login...</p>
+          <p className="text-gray-400 mt-2">
+            Verifique seu e-mail para confirmar a conta, depois acesse{' '}
+            <a href="/admin/login" className="text-[#00ff87] underline">/admin/login</a>.
+            <br />
+            <span className="text-xs text-gray-600 mt-2 block">
+              (Se a confirmação de e-mail estiver desativada no Supabase, você será redirecionado automaticamente.)
+            </span>
+          </p>
         </div>
       </main>
     )
