@@ -22,8 +22,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
       <AdminNav
-        userName={profile?.name || user.email || ''}
-        userRole={profile?.role || 'store'}
+        userEmail={user.email || profile?.name || ''}
+        userRole={profile?.role || 'moderator'}
       />
       <main className="min-h-[calc(100vh-3.5rem)]">
         {children}

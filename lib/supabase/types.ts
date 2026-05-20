@@ -20,6 +20,7 @@ export type Database = {
           id: string
           name: string
           role: string
+          store_name: string | null
         }
         Insert: {
           active?: boolean
@@ -28,6 +29,7 @@ export type Database = {
           id: string
           name: string
           role?: string
+          store_name?: string | null
         }
         Update: {
           active?: boolean
@@ -36,12 +38,14 @@ export type Database = {
           id?: string
           name?: string
           role?: string
+          store_name?: string | null
         }
         Relationships: []
       }
       app_settings: {
         Row: {
           company_name: string
+          contact_phone: string | null
           email_body: string
           email_subject: string
           id: number
@@ -51,6 +55,7 @@ export type Database = {
         }
         Insert: {
           company_name?: string
+          contact_phone?: string | null
           email_body?: string
           email_subject?: string
           id?: number
@@ -60,6 +65,7 @@ export type Database = {
         }
         Update: {
           company_name?: string
+          contact_phone?: string | null
           email_body?: string
           email_subject?: string
           id?: number
