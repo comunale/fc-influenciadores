@@ -10,9 +10,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const { data: profile } = await supabase
     .from('admin_profiles')
-    .select('role, name')
+    .select('role, name, active')
     .eq('id', user.id)
     .single()
+
+  if (profile && profile.active === false) {
+    await supabase.auth.signOut()
+    redirect('/admin/login')
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0a0a]">

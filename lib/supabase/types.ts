@@ -14,22 +14,58 @@ export type Database = {
     Tables: {
       admin_profiles: {
         Row: {
+          active: boolean
           created_at: string
+          email: string | null
           id: string
           name: string
           role: string
         }
         Insert: {
+          active?: boolean
           created_at?: string
+          email?: string | null
           id: string
           name: string
           role?: string
         }
         Update: {
+          active?: boolean
           created_at?: string
+          email?: string | null
           id?: string
           name?: string
           role?: string
+        }
+        Relationships: []
+      }
+      app_settings: {
+        Row: {
+          company_name: string
+          email_body: string
+          email_subject: string
+          id: number
+          sender_email: string
+          updated_at: string
+          whatsapp_text: string
+        }
+        Insert: {
+          company_name?: string
+          email_body?: string
+          email_subject?: string
+          id?: number
+          sender_email?: string
+          updated_at?: string
+          whatsapp_text?: string
+        }
+        Update: {
+          company_name?: string
+          email_body?: string
+          email_subject?: string
+          id?: number
+          sender_email?: string
+          updated_at?: string
+          whatsapp_text?: string
         }
         Relationships: []
       }

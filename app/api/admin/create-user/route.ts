@@ -46,6 +46,7 @@ export async function POST(request: Request) {
     const { error: profileError } = await supabase.from('admin_profiles').insert({
       id: newUser.user.id,
       name: name.trim(),
+      email: email.toLowerCase().trim(),
       role,
     })
 
