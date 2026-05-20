@@ -34,9 +34,10 @@ export async function proxy(request: NextRequest) {
 
   const isAdminRoute = pathname.startsWith('/admin') && pathname !== '/admin/login'
 
-  // Não autenticado → login
+  // Não autenticado → login (preserva destino via ?next=)
   if (isAdminRoute && !user) {
-    return NextResponse.redirect(new URL('/admin/login', request.url))
+    const next = encodeURIComponent(request.nextUrl.pathname + request.nextUrl.search)
+    return NextResponse.redirect(new URL(`/admin/login?next=${next}`, request.url))
   }
 
   // Já logado tentando acessar /admin/login → vai pro dashboard

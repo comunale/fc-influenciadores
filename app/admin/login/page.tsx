@@ -1,15 +1,17 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/supabase/client'
 import { FoxLogo } from '@/components/FoxLogo'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
-export default function AdminLoginPage() {
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const next = searchParams.get('next') || '/admin'
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ email: '', password: '' })
 
@@ -30,10 +32,43 @@ export default function AdminLoginPage() {
     }
 
     toast.success('Login realizado!')
-    router.push('/admin')
+    router.push(next)
     router.refresh()
   }
 
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="bg-[#141414] border border-[#1e1e1e] rounded-2xl p-6 flex flex-col gap-4"
+    >
+      <Input
+        label="E-mail"
+        type="email"
+        placeholder="admin@foxcycles.com.br"
+        value={form.email}
+        onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+        autoComplete="email"
+        required
+        disabled={loading}
+      />
+      <Input
+        label="Senha"
+        type="password"
+        placeholder="••••••••"
+        value={form.password}
+        onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+        autoComplete="current-password"
+        required
+        disabled={loading}
+      />
+      <Button type="submit" size="lg" loading={loading} className="mt-2 w-full">
+        {loading ? 'Entrando...' : 'Entrar'}
+      </Button>
+    </form>
+  )
+}
+
+export default function AdminLoginPage() {
   return (
     <main className="min-h-screen bg-[#0a0a0a] flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
@@ -43,34 +78,9 @@ export default function AdminLoginPage() {
           <p className="text-gray-500 text-sm mt-1">FoxCycles · Sistema de Cupons</p>
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="bg-[#141414] border border-[#1e1e1e] rounded-2xl p-6 flex flex-col gap-4"
-        >
-          <Input
-            label="E-mail"
-            type="email"
-            placeholder="admin@foxcycles.com.br"
-            value={form.email}
-            onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-            autoComplete="email"
-            required
-            disabled={loading}
-          />
-          <Input
-            label="Senha"
-            type="password"
-            placeholder="••••••••"
-            value={form.password}
-            onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-            autoComplete="current-password"
-            required
-            disabled={loading}
-          />
-          <Button type="submit" size="lg" loading={loading} className="mt-2 w-full">
-            {loading ? 'Entrando...' : 'Entrar'}
-          </Button>
-        </form>
+        <Suspense fallback={null}>
+          <LoginForm />
+        </Suspense>
       </div>
     </main>
   )
