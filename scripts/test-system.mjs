@@ -23,6 +23,18 @@ try {
 
 const ANON_KEY = envVars['NEXT_PUBLIC_SUPABASE_ANON_KEY'] || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+// ─── gera CPF válido aleatório para não conflitar entre execuções ────────────
+function generateValidCPF() {
+  const n = Array.from({ length: 9 }, () => Math.floor(Math.random() * 9))
+  let s = n.reduce((a, v, i) => a + v * (10 - i), 0)
+  let d1 = 11 - (s % 11); if (d1 >= 10) d1 = 0; n.push(d1)
+  s = n.reduce((a, v, i) => a + v * (11 - i), 0)
+  let d2 = 11 - (s % 11); if (d2 >= 10) d2 = 0; n.push(d2)
+  return n.join('')
+}
+const TEST_CPF   = generateValidCPF()
+const TEST_EMAIL = `teste.auto.${Date.now()}@foxcycles.com.br`
+
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 let passed = 0, failed = 0, warnings = 0
@@ -107,9 +119,9 @@ async function testCouponCreation() {
   const payload = {
     influencer_code: 'PRIIVALIM',
     customer_name: 'Teste Automatizado',
-    customer_cpf: '52998224725',   // CPF válido gerado algoritmicamente
+    customer_cpf: TEST_CPF,
     customer_phone: '(19) 99999-0000',
-    customer_email: 'teste.automatizado@foxcycles.com.br',
+    customer_email: TEST_EMAIL,
   }
 
   const res = await post('/api/coupons', payload)
@@ -135,8 +147,14 @@ async function testDuplicateCPF() {
     customer_email: 'teste.dup@foxcycles.com.br',
   }
 
-  // Testa com mesmo influencer (mesma campanha) — deve bloquear
-  const payload2 = { ...payload, influencer_code: 'PRIIVALIM' }
+  // Testa com mesmo CPF + mesmo influencer (mesma campanha) — deve bloquear
+  const payload2 = {
+    influencer_code: 'PRIIVALIM',
+    customer_name: 'Duplicado',
+    customer_cpf: TEST_CPF,
+    customer_phone: '(19) 99999-0002',
+    customer_email: `dup.${TEST_EMAIL}`,
+  }
   const res2 = await post('/api/coupons', payload2)
   const data2 = await res2.json().catch(() => ({}))
   if (res2.status === 409 || (res2.status === 400 && data2.error)) {
@@ -253,8 +271,9 @@ async function testDatabaseState() {
     ok('app_settings', 'sem acesso anônimo — correto (requer autenticação)')
   }
 
-  // Coupons — deve estar vazio (test cleanup)
-  const coupons = await supabaseQuery('coupons', 'customer_email=eq.teste.automatizado%40foxcycles.com.br')
+  // Coupons de teste — cleanup via service role não disponível no script;
+  // cada execução usa CPF+email únicos então não conflitam
+  const coupons = await supabaseQuery('coupons', `customer_email=eq.${encodeURIComponent(TEST_EMAIL)}`)
   if (coupons && coupons.length > 0) {
     warn('limpeza test coupon', `${coupons.length} cupom(s) de teste encontrado(s) — removendo...`)
     for (const c of coupons) {
