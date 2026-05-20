@@ -17,12 +17,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
       <AdminNav
-        userEmail={user.email || ''}
-        userName={profile?.name || ''}
+        userName={profile?.name || user.email || ''}
         userRole={profile?.role || 'store'}
       />
-      {/* Conteúdo: deslocado pela sidebar no desktop, padding-bottom no mobile p/ bottom nav */}
-      <main className="md:ml-56 pb-20 md:pb-0 min-h-screen">
+      <main className="min-h-[calc(100vh-3.5rem)]">
         {children}
       </main>
     </div>
