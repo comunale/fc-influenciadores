@@ -1,0 +1,239 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
+  public: {
+    Tables: {
+      admin_profiles: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          role: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          name: string
+          role?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          role?: string
+        }
+        Relationships: []
+      }
+      campaigns: {
+        Row: {
+          active: boolean
+          coupon_description: string
+          coupon_title: string
+          created_at: string
+          discount_type: string
+          discount_value: number
+          id: string
+          name: string
+          updated_at: string
+          validity_days: number
+        }
+        Insert: {
+          active?: boolean
+          coupon_description?: string
+          coupon_title?: string
+          created_at?: string
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          name: string
+          updated_at?: string
+          validity_days?: number
+        }
+        Update: {
+          active?: boolean
+          coupon_description?: string
+          coupon_title?: string
+          created_at?: string
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          name?: string
+          updated_at?: string
+          validity_days?: number
+        }
+        Relationships: []
+      }
+      coupons: {
+        Row: {
+          campaign_id: string
+          coupon_number: string
+          created_at: string
+          customer_cpf: string
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          expires_at: string
+          id: string
+          influencer_id: string
+          status: string
+          used_at: string | null
+          used_by_admin: string | null
+        }
+        Insert: {
+          campaign_id: string
+          coupon_number: string
+          created_at?: string
+          customer_cpf: string
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          expires_at: string
+          id?: string
+          influencer_id: string
+          status?: string
+          used_at?: string | null
+          used_by_admin?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          coupon_number?: string
+          created_at?: string
+          customer_cpf?: string
+          customer_email?: string
+          customer_name?: string
+          customer_phone?: string
+          expires_at?: string
+          id?: string
+          influencer_id?: string
+          status?: string
+          used_at?: string | null
+          used_by_admin?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupons_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupons_influencer_id_fkey"
+            columns: ["influencer_id"]
+            isOneToOne: false
+            referencedRelation: "influencers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      influencers: {
+        Row: {
+          active: boolean
+          campaign_id: string
+          commission_per_sale: number
+          commission_starts_at: number
+          coupon_code: string
+          created_at: string
+          fee_amount: number
+          id: string
+          instagram_handle: string
+          name: string
+        }
+        Insert: {
+          active?: boolean
+          campaign_id: string
+          commission_per_sale?: number
+          commission_starts_at?: number
+          coupon_code: string
+          created_at?: string
+          fee_amount?: number
+          id?: string
+          instagram_handle: string
+          name: string
+        }
+        Update: {
+          active?: boolean
+          campaign_id?: string
+          commission_per_sale?: number
+          commission_starts_at?: number
+          coupon_code?: string
+          created_at?: string
+          fee_amount?: number
+          id?: string
+          instagram_handle?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "influencers_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+// Aliases de conveniência
+export type Campaign = Database['public']['Tables']['campaigns']['Row']
+export type Influencer = Database['public']['Tables']['influencers']['Row']
+export type Coupon = Database['public']['Tables']['coupons']['Row']
+export type AdminProfile = Database['public']['Tables']['admin_profiles']['Row']
+
+export type CouponStatus = 'pending' | 'used' | 'expired' | 'cancelled'
