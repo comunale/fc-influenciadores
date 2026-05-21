@@ -46,7 +46,9 @@ export function CuponsTable({
     return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
   }
 
-  function exportCSV() {
+  async function exportXLS() {
+    const { utils, writeFile } = await import('xlsx')
+
     const headers = ['Código', 'Data', 'Cliente', 'CPF', 'Telefone', 'Email', 'Influencer', 'Status', 'Desconto', 'Validade', 'Usado em', 'Validado por']
     const rows = coupons.map((c) => [
       c.coupon_number,
@@ -63,14 +65,14 @@ export function CuponsTable({
       c.used_by_admin ?? '',
     ])
 
-    const csv = [headers, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `cupons-${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    const ws = utils.aoa_to_sheet([headers, ...rows])
+
+    // Larguras de coluna
+    ws['!cols'] = [14, 18, 24, 16, 16, 28, 18, 12, 12, 14, 18, 20].map((w) => ({ wch: w }))
+
+    const wb = utils.book_new()
+    utils.book_append_sheet(wb, ws, 'Cupons')
+    writeFile(wb, `cupons-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
   return (
@@ -82,13 +84,13 @@ export function CuponsTable({
           <p className="text-gray-500 text-sm mt-0.5">{coupons.length} resultado{coupons.length !== 1 ? 's' : ''}</p>
         </div>
         <button
-          onClick={exportCSV}
+          onClick={exportXLS}
           className="flex items-center gap-2 text-sm border border-[#2a2a2a] text-gray-300 hover:text-white hover:border-[#00ff87] px-4 py-2 rounded-lg transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
-          Exportar CSV
+          Exportar XLS
         </button>
       </div>
 
