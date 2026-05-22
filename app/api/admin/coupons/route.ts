@@ -35,11 +35,19 @@ export async function PATCH(request: Request) {
   const { id, ...data } = body
   if (!id) return NextResponse.json({ error: 'id obrigatório' }, { status: 400 })
 
-  const allowed = ['status', 'customer_name', 'customer_phone', 'customer_email', 'customer_cpf']
-  const update: Record<string, string> = {}
-  for (const key of allowed) {
-    if (data[key] !== undefined) update[key] = String(data[key]).trim()
-  }
+  const update: {
+    status?: string
+    customer_name?: string
+    customer_phone?: string
+    customer_email?: string
+    customer_cpf?: string
+  } = {}
+
+  if (data.status !== undefined)         update.status         = String(data.status).trim()
+  if (data.customer_name !== undefined)  update.customer_name  = String(data.customer_name).trim()
+  if (data.customer_phone !== undefined) update.customer_phone = String(data.customer_phone).trim()
+  if (data.customer_email !== undefined) update.customer_email = String(data.customer_email).trim()
+  if (data.customer_cpf !== undefined)   update.customer_cpf   = String(data.customer_cpf).trim()
 
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: 'Nenhum campo válido para atualizar' }, { status: 400 })
