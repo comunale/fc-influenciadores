@@ -1,14 +1,10 @@
 import { createClient, getUserRole } from '@/lib/supabase/server'
 import { InfluencersList } from '@/components/admin/InfluencersList'
-import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
 export default async function InfluencersPage() {
-  const role = await getUserRole()
-  if (role !== 'admin') redirect('/admin/validar')
-
-  const supabase = await createClient()
+  const [role, supabase] = await Promise.all([getUserRole(), createClient()])
 
   const [{ data: influencers }, { data: campaigns }] = await Promise.all([
     supabase
@@ -31,7 +27,7 @@ export default async function InfluencersPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
-      <InfluencersList influencers={enriched} campaigns={campaigns || []} />
+      <InfluencersList influencers={enriched} campaigns={campaigns || []} canEdit={role === 'admin'} />
     </div>
   )
 }

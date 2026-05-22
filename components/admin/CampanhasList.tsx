@@ -19,7 +19,7 @@ const emptyForm = {
   active: true,
 }
 
-export function CampanhasList({ campaigns: initial }: { campaigns: Campaign[] }) {
+export function CampanhasList({ campaigns: initial, canEdit = false }: { campaigns: Campaign[]; canEdit?: boolean }) {
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<Campaign | null>(null)
@@ -90,7 +90,7 @@ export function CampanhasList({ campaigns: initial }: { campaigns: Campaign[] })
           <h1 className="text-2xl font-bold text-white">Campanhas</h1>
           <p className="text-gray-500 text-sm mt-0.5">{initial.length} campanha{initial.length !== 1 ? 's' : ''}</p>
         </div>
-        <Button onClick={openCreate} size="sm">+ Nova Campanha</Button>
+        {canEdit && <Button onClick={openCreate} size="sm">+ Nova Campanha</Button>}
       </div>
 
       {/* Modal */}
@@ -188,12 +188,14 @@ export function CampanhasList({ campaigns: initial }: { campaigns: Campaign[] })
                 </div>
                 <p className="text-gray-400 text-sm leading-relaxed">{c.coupon_description}</p>
               </div>
-              <button
-                onClick={() => openEdit(c)}
-                className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
-              >
-                Editar
-              </button>
+              {canEdit && (
+                <button
+                  onClick={() => openEdit(c)}
+                  className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
+                >
+                  Editar
+                </button>
+              )}
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
@@ -217,18 +219,20 @@ export function CampanhasList({ campaigns: initial }: { campaigns: Campaign[] })
               </div>
             </div>
 
-            <div className="flex justify-end">
-              <button
-                onClick={() => handleToggle(c)}
-                className={`text-xs px-4 py-1.5 rounded-lg transition-colors border ${
-                  c.active
-                    ? 'border-red-800 text-red-400 hover:bg-red-950'
-                    : 'border-[#00ff87]/30 text-[#00ff87] hover:bg-[#00ff87]/10'
-                }`}
-              >
-                {c.active ? 'Desativar campanha' : 'Ativar campanha'}
-              </button>
-            </div>
+            {canEdit && (
+              <div className="flex justify-end">
+                <button
+                  onClick={() => handleToggle(c)}
+                  className={`text-xs px-4 py-1.5 rounded-lg transition-colors border ${
+                    c.active
+                      ? 'border-red-800 text-red-400 hover:bg-red-950'
+                      : 'border-[#00ff87]/30 text-[#00ff87] hover:bg-[#00ff87]/10'
+                  }`}
+                >
+                  {c.active ? 'Desativar campanha' : 'Ativar campanha'}
+                </button>
+              </div>
+            )}
           </div>
         ))}
 

@@ -31,6 +31,7 @@ interface Campaign { id: string; name: string }
 interface Props {
   influencers: InfluencerRow[]
   campaigns: Campaign[]
+  canEdit?: boolean
 }
 
 const emptyForm = {
@@ -44,7 +45,7 @@ const emptyForm = {
   active: true,
 }
 
-export function InfluencersList({ influencers: initial, campaigns }: Props) {
+export function InfluencersList({ influencers: initial, campaigns, canEdit = false }: Props) {
   const router = useRouter()
   const [influencers, setInfluencers] = useState(initial)
   const [showForm, setShowForm] = useState(false)
@@ -135,7 +136,7 @@ export function InfluencersList({ influencers: initial, campaigns }: Props) {
           <h1 className="text-2xl font-bold text-white">Influencers</h1>
           <p className="text-gray-500 text-sm mt-0.5">{influencers.length} cadastrados</p>
         </div>
-        <Button onClick={openCreate} size="sm">+ Novo Influencer</Button>
+        {canEdit && <Button onClick={openCreate} size="sm">+ Novo Influencer</Button>}
       </div>
 
       {/* Modal criar/editar */}
@@ -229,12 +230,14 @@ export function InfluencersList({ influencers: initial, campaigns }: Props) {
                   <span className="font-mono text-gray-300">{inf.coupon_code}</span>
                 </div>
               </div>
-              <button
-                onClick={() => openEdit(inf)}
-                className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
-              >
-                Editar
-              </button>
+              {canEdit && (
+                <button
+                  onClick={() => openEdit(inf)}
+                  className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
+                >
+                  Editar
+                </button>
+              )}
             </div>
 
             {/* Linha 2: métricas */}
@@ -268,12 +271,14 @@ export function InfluencersList({ influencers: initial, campaigns }: Props) {
               >
                 Copiar Link
               </button>
-              <button
-                onClick={() => handleToggleActive(inf)}
-                className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
-              >
-                {inf.active ? 'Desativar' : 'Ativar'}
-              </button>
+              {canEdit && (
+                <button
+                  onClick={() => handleToggleActive(inf)}
+                  className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
+                >
+                  {inf.active ? 'Desativar' : 'Ativar'}
+                </button>
+              )}
             </div>
           </div>
         ))}
