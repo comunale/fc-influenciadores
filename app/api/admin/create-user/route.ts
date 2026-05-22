@@ -1,10 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
 
+    // Verifica que o chamador é admin
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
 
@@ -34,22 +35,57 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Nome da loja é obrigatório para moderadores.' }, { status: 400 })
     }
 
-    const { data: newUser, error: signUpError } = await supabase.auth.signUp({ email, password })
+    // Tenta usar service role key (solução correta: não troca sessão, bypassa RLS)
+    const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY
 
-    if (signUpError || !newUser.user) {
-      return NextResponse.json({ error: signUpError?.message || 'Erro ao criar usuário.' }, { status: 400 })
-    }
+    let newUserId: string
 
-    const { error: profileError } = await supabase.from('admin_profiles').insert({
-      id: newUser.user.id,
-      name: name.trim(),
-      email: email.toLowerCase().trim(),
-      role,
-      store_name: role === 'moderator' ? (store_name?.trim() || null) : null,
-    })
+    if (hasServiceKey) {
+      const adminClient = createAdminClient()
+      const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+      })
+      if (createError || !newUser.user) {
+        return NextResponse.json({ error: createError?.message || 'Erro ao criar usuário.' }, { status: 400 })
+      }
+      newUserId = newUser.user.id
 
-    if (profileError) {
-      return NextResponse.json({ error: 'Usuário criado mas erro no perfil: ' + profileError.message }, { status: 500 })
+      const { error: profileError } = await adminClient.from('admin_profiles').insert({
+        id: newUserId,
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
+        role,
+        store_name: role === 'moderator' ? (store_name?.trim() || null) : null,
+        active: true,
+      })
+      if (profileError) {
+        // Limpa o auth user se o perfil falhou
+        await adminClient.auth.admin.deleteUser(newUserId)
+        return NextResponse.json({ error: 'Erro ao criar perfil: ' + profileError.message }, { status: 500 })
+      }
+    } else {
+      // Fallback: signUp (troca a sessão, mas a RLS foi ajustada para permitir auto-insert)
+      const { data: newUser, error: signUpError } = await supabase.auth.signUp({ email, password })
+      if (signUpError || !newUser.user) {
+        return NextResponse.json({ error: signUpError?.message || 'Erro ao criar usuário.' }, { status: 400 })
+      }
+      newUserId = newUser.user.id
+
+      // Cria um novo client após o signUp (sessão pode ter mudado)
+      const supabaseAfter = await createClient()
+      const { error: profileError } = await supabaseAfter.from('admin_profiles').insert({
+        id: newUserId,
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
+        role,
+        store_name: role === 'moderator' ? (store_name?.trim() || null) : null,
+        active: true,
+      })
+      if (profileError) {
+        return NextResponse.json({ error: 'Usuário criado mas erro no perfil: ' + profileError.message }, { status: 500 })
+      }
     }
 
     return NextResponse.json({ success: true, user: { email, name, role } }, { status: 201 })
