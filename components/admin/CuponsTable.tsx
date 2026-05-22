@@ -165,6 +165,8 @@ export function CuponsTable({
     ])
     const ws = utils.aoa_to_sheet([headers, ...rows])
     ws['!cols'] = [14, 18, 24, 16, 16, 28, 18, 12, 12, 14, 18, 20].map((w) => ({ wch: w }))
+    ws['!freeze'] = { xSplit: 0, ySplit: 1 }
+    ws['!autofilter'] = { ref: ws['!ref'] ?? 'A1' }
     const wb = utils.book_new()
     utils.book_append_sheet(wb, ws, 'Cupons')
     writeFile(wb, `cupons-${new Date().toISOString().slice(0, 10)}.xlsx`)

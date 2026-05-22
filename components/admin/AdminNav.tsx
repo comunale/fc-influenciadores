@@ -13,12 +13,13 @@ interface AdminNavProps {
 }
 
 const ALL_NAV = [
-  { href: '/admin',              label: 'Dashboard',     exact: true,  roles: ['admin'] },
-  { href: '/admin/validar',      label: 'Validar',       exact: false, roles: ['admin', 'moderator'] },
-  { href: '/admin/cupons',       label: 'Cupons',        exact: false, roles: ['admin', 'moderator'] },
-  { href: '/admin/influencers',  label: 'Influencers',   exact: false, roles: ['admin'] },
-  { href: '/admin/campanhas',    label: 'Campanhas',     exact: false, roles: ['admin'] },
-  { href: '/admin/configuracoes',label: 'Configurações', exact: false, roles: ['admin'] },
+  { href: '/admin',                 label: 'Dashboard',     exact: true,  roles: ['admin'] },
+  { href: '/admin/validar',         label: 'Validar',       exact: false, roles: ['admin', 'moderator'] },
+  { href: '/admin/participantes',   label: 'Participantes', exact: false, roles: ['admin', 'moderator'] },
+  { href: '/admin/cupons',          label: 'Cupons',        exact: false, roles: ['admin', 'moderator'] },
+  { href: '/admin/influencers',     label: 'Influencers',   exact: false, roles: ['admin'] },
+  { href: '/admin/campanhas',       label: 'Campanhas',     exact: false, roles: ['admin'] },
+  { href: '/admin/configuracoes',   label: 'Configurações', exact: false, roles: ['admin'] },
 ]
 
 export function AdminNav({ userEmail, userRole }: AdminNavProps) {
