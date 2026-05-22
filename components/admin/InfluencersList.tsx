@@ -47,7 +47,6 @@ const emptyForm = {
 
 export function InfluencersList({ influencers: initial, campaigns, canEdit = false }: Props) {
   const router = useRouter()
-  const [influencers, setInfluencers] = useState(initial)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<InfluencerRow | null>(null)
   const [loading, setLoading] = useState(false)
@@ -134,7 +133,7 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white">Influencers</h1>
-          <p className="text-gray-500 text-sm mt-0.5">{influencers.length} cadastrados</p>
+          <p className="text-gray-500 text-sm mt-0.5">{initial.length} cadastrados</p>
         </div>
         {canEdit && <Button onClick={openCreate} size="sm">+ Novo Influencer</Button>}
       </div>
@@ -212,7 +211,7 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
 
       {/* Lista */}
       <div className="flex flex-col gap-3">
-        {influencers.map((inf) => (
+        {initial.map((inf) => (
           <div key={inf.id}
             className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-4 flex flex-col gap-3">
             {/* Linha 1: nome + status */}
