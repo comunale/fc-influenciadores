@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
+import toast from 'react-hot-toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { Coupon, Influencer, Campaign } from '@/lib/supabase/types'
 
@@ -36,30 +37,38 @@ export function CouponCard({ coupon }: CouponCardProps) {
   const isExpired = new Date(coupon.expires_at) < new Date()
   const isUsed = coupon.status === 'used'
 
-  async function captureAsCanvas() {
+  async function captureAsJpeg(): Promise<string> {
     if (!couponRef.current) throw new Error('ref missing')
-    const html2canvas = (await import('html2canvas')).default
-    return html2canvas(couponRef.current, {
+    const { toJpeg } = await import('html-to-image')
+    return toJpeg(couponRef.current, {
+      quality: 0.92,
+      pixelRatio: 2.5,
       backgroundColor: '#0a0a0a',
-      scale: 2.5,
-      useCORS: true,
-      allowTaint: false,
-      logging: false,
-      removeContainer: true,
+    })
+  }
+
+  async function captureAsPng(): Promise<string> {
+    if (!couponRef.current) throw new Error('ref missing')
+    const { toPng } = await import('html-to-image')
+    return toPng(couponRef.current, {
+      pixelRatio: 2.5,
+      backgroundColor: '#0a0a0a',
     })
   }
 
   async function handleSaveJpg() {
     setBusy('jpg')
     try {
-      const canvas = await captureAsCanvas()
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.92)
+      const dataUrl = await captureAsJpeg()
       const link = document.createElement('a')
       link.href = dataUrl
       link.download = `cupom-${coupon.coupon_number}.jpg`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
+    } catch (err) {
+      console.error('Erro ao salvar JPG:', err)
+      toast.error('Não foi possível salvar a imagem. Tente novamente.')
     } finally {
       setBusy(null)
     }
@@ -68,8 +77,7 @@ export function CouponCard({ coupon }: CouponCardProps) {
   async function handlePrint() {
     setBusy('print')
     try {
-      const canvas = await captureAsCanvas()
-      const dataUrl = canvas.toDataURL('image/png')
+      const dataUrl = await captureAsPng()
 
       const win = window.open('', '_blank', 'width=540,height=800')
       if (!win) { window.print(); return }
@@ -94,6 +102,9 @@ export function CouponCard({ coupon }: CouponCardProps) {
 </body>
 </html>`)
       win.document.close()
+    } catch (err) {
+      console.error('Erro ao gerar impressão:', err)
+      toast.error('Não foi possível gerar a impressão.')
     } finally {
       setBusy(null)
     }
