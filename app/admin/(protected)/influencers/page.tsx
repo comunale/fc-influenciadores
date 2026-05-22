@@ -1,7 +1,13 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUserRole } from '@/lib/supabase/server'
 import { InfluencersList } from '@/components/admin/InfluencersList'
+import { redirect } from 'next/navigation'
+
+export const dynamic = 'force-dynamic'
 
 export default async function InfluencersPage() {
+  const role = await getUserRole()
+  if (role !== 'admin') redirect('/admin/validar')
+
   const supabase = await createClient()
 
   const [{ data: influencers }, { data: campaigns }] = await Promise.all([

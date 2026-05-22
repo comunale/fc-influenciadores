@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUserRole } from '@/lib/supabase/server'
 import { ParticipantesTable } from '@/components/admin/ParticipantesTable'
 
 interface SearchParams {
@@ -14,7 +14,7 @@ export default async function ParticipantesPage({
   searchParams: Promise<SearchParams>
 }) {
   const params = await searchParams
-  const supabase = await createClient()
+  const [role, supabase] = await Promise.all([getUserRole(), createClient()])
 
   const [couponsRes, influencersRes] = await Promise.all([
     supabase
@@ -46,6 +46,7 @@ export default async function ParticipantesPage({
         rows={rows as Parameters<typeof ParticipantesTable>[0]['rows']}
         influencers={influencersRes.data || []}
         filters={params}
+        canEdit={role === 'admin'}
       />
     </div>
   )

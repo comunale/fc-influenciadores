@@ -42,10 +42,12 @@ export function CuponsTable({
   coupons,
   influencers,
   filters,
+  canEdit = false,
 }: {
   coupons: CouponRow[]
   influencers: Influencer[]
   filters: Record<string, string | undefined>
+  canEdit?: boolean
 }) {
   const router = useRouter()
   const formRef = useRef<HTMLFormElement>(null)
@@ -186,7 +188,7 @@ export function CuponsTable({
           <p className="text-gray-500 text-sm mt-0.5">{coupons.length} resultado{coupons.length !== 1 ? 's' : ''}</p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
-          {someSelected && (
+          {canEdit && someSelected && (
             <button
               onClick={() => confirmDelete(Array.from(selected), `${selected.size} cupom(ns) selecionado(s)`)}
               disabled={deleting}
@@ -261,16 +263,18 @@ export function CuponsTable({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#1e1e1e] text-left">
-                  {/* Checkbox select-all */}
-                  <th className="px-4 py-3 w-10">
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      onChange={toggleAll}
-                      className="accent-[#00ff87] w-4 h-4 cursor-pointer"
-                    />
-                  </th>
-                  {['Código', 'Data', 'Cliente', 'Influencer', 'Status', 'Desconto', ''].map((h) => (
+                  {/* Checkbox select-all — apenas para admins */}
+                  {canEdit && (
+                    <th className="px-4 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={toggleAll}
+                        className="accent-[#00ff87] w-4 h-4 cursor-pointer"
+                      />
+                    </th>
+                  )}
+                  {['Código', 'Data', 'Cliente', 'Influencer', 'Status', 'Desconto', ...(canEdit ? [''] : [])].map((h) => (
                     <th key={h} className="px-4 py-3 text-gray-500 font-medium whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -287,15 +291,17 @@ export function CuponsTable({
                         key={c.id}
                         className={`border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors ${isChecked ? 'bg-[#1a1a1a]' : ''}`}
                       >
-                        {/* Checkbox individual */}
-                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => toggleOne(c.id)}
-                            className="accent-[#00ff87] w-4 h-4 cursor-pointer"
-                          />
-                        </td>
+                        {/* Checkbox individual — apenas para admins */}
+                        {canEdit && (
+                          <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleOne(c.id)}
+                              className="accent-[#00ff87] w-4 h-4 cursor-pointer"
+                            />
+                          </td>
+                        )}
                         <td
                           className="px-4 py-3 font-mono text-[#00ff87] font-bold whitespace-nowrap cursor-pointer"
                           onClick={() => setExpanded(isExpanded ? null : c.id)}
@@ -328,24 +334,26 @@ export function CuponsTable({
                               : `${c.campaigns.discount_value}%`
                             : '—'}
                         </td>
-                        {/* Ações rápidas */}
-                        <td className="px-3 py-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex gap-1">
-                            <button
-                              onClick={() => openEdit(c)}
-                              className="text-xs px-2.5 py-1 rounded-md border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] transition-colors"
-                            >
-                              Editar
-                            </button>
-                            <button
-                              onClick={() => confirmDelete([c.id], `o cupom ${c.coupon_number}`)}
-                              disabled={deleting}
-                              className="text-xs px-2.5 py-1 rounded-md border border-red-900 text-red-400 hover:bg-red-950 transition-colors disabled:opacity-50"
-                            >
-                              Excluir
-                            </button>
-                          </div>
-                        </td>
+                        {/* Ações rápidas — apenas para admins */}
+                        {canEdit && (
+                          <td className="px-3 py-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => openEdit(c)}
+                                className="text-xs px-2.5 py-1 rounded-md border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] transition-colors"
+                              >
+                                Editar
+                              </button>
+                              <button
+                                onClick={() => confirmDelete([c.id], `o cupom ${c.coupon_number}`)}
+                                disabled={deleting}
+                                className="text-xs px-2.5 py-1 rounded-md border border-red-900 text-red-400 hover:bg-red-950 transition-colors disabled:opacity-50"
+                              >
+                                Excluir
+                              </button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
 
                       {/* Linha expandida com detalhes */}

@@ -3,6 +3,24 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import type { Database } from './types'
 
+// Retorna o role do usuário logado ou null se não autenticado/sem perfil
+export async function getUserRole(): Promise<string | null> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+    const { data: profile } = await supabase
+      .from('admin_profiles')
+      .select('role, active')
+      .eq('id', user.id)
+      .single()
+    if (!profile?.active) return null
+    return profile.role
+  } catch {
+    return null
+  }
+}
+
 // Cliente admin com service role — bypassa RLS completamente.
 // Requer SUPABASE_SERVICE_ROLE_KEY nas env vars.
 export function createAdminClient() {

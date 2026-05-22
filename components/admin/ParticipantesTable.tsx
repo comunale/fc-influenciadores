@@ -42,10 +42,12 @@ export function ParticipantesTable({
   rows,
   influencers,
   filters,
+  canEdit = false,
 }: {
   rows: Row[]
   influencers: Influencer[]
   filters: Record<string, string | undefined>
+  canEdit?: boolean
 }) {
   const router = useRouter()
   const formRef = useRef<HTMLFormElement>(null)
@@ -187,7 +189,7 @@ export function ParticipantesTable({
           </p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
-          {selected.size > 0 && (
+          {canEdit && selected.size > 0 && (
             <button
               onClick={() => confirmDelete(Array.from(selected), `${selected.size} participante(s) selecionado(s)`)}
               disabled={deleting}
@@ -255,11 +257,13 @@ export function ParticipantesTable({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#1e1e1e] text-left">
-                  <th className="px-4 py-3 w-10">
-                    <input type="checkbox" checked={allSelected} onChange={toggleAll}
-                      className="accent-[#00ff87] w-4 h-4 cursor-pointer" />
-                  </th>
-                  {['Nome', 'CPF', 'Telefone', 'E-mail', 'Influencer', 'Cupom', 'Status', 'Cadastro', ''].map((h) => (
+                  {canEdit && (
+                    <th className="px-4 py-3 w-10">
+                      <input type="checkbox" checked={allSelected} onChange={toggleAll}
+                        className="accent-[#00ff87] w-4 h-4 cursor-pointer" />
+                    </th>
+                  )}
+                  {['Nome', 'CPF', 'Telefone', 'E-mail', 'Influencer', 'Cupom', 'Status', 'Cadastro', ...(canEdit ? [''] : [])].map((h) => (
                     <th key={h} className="px-4 py-3 text-gray-500 font-medium whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -270,10 +274,12 @@ export function ParticipantesTable({
                   const isChecked = selected.has(r.id)
                   return (
                     <tr key={r.id} className={`border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors ${isChecked ? 'bg-[#1a1a1a]' : ''}`}>
-                      <td className="px-4 py-3">
-                        <input type="checkbox" checked={isChecked} onChange={() => toggleOne(r.id)}
-                          className="accent-[#00ff87] w-4 h-4 cursor-pointer" />
-                      </td>
+                      {canEdit && (
+                        <td className="px-4 py-3">
+                          <input type="checkbox" checked={isChecked} onChange={() => toggleOne(r.id)}
+                            className="accent-[#00ff87] w-4 h-4 cursor-pointer" />
+                        </td>
+                      )}
                       <td className="px-4 py-3">
                         <div className="text-white font-medium">{r.customer_name}</div>
                       </td>
@@ -296,23 +302,25 @@ export function ParticipantesTable({
                       <td className="px-4 py-3 text-gray-500 whitespace-nowrap text-xs">
                         {formatDate(r.created_at)}
                       </td>
-                      <td className="px-3 py-3 whitespace-nowrap">
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => openEdit(r)}
-                            className="text-xs px-2.5 py-1 rounded-md border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] transition-colors"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => confirmDelete([r.id], `o participante ${r.customer_name}`)}
-                            disabled={deleting}
-                            className="text-xs px-2.5 py-1 rounded-md border border-red-900 text-red-400 hover:bg-red-950 transition-colors disabled:opacity-50"
-                          >
-                            Excluir
-                          </button>
-                        </div>
-                      </td>
+                      {canEdit && (
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => openEdit(r)}
+                              className="text-xs px-2.5 py-1 rounded-md border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] transition-colors"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              onClick={() => confirmDelete([r.id], `o participante ${r.customer_name}`)}
+                              disabled={deleting}
+                              className="text-xs px-2.5 py-1 rounded-md border border-red-900 text-red-400 hover:bg-red-950 transition-colors disabled:opacity-50"
+                            >
+                              Excluir
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
