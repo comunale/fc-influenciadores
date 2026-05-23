@@ -36,6 +36,8 @@ export function UserManagement({
   const [createForm, setCreateForm] = useState({ name: '', email: '', password: '', role: 'moderator', store_name: '' })
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ name: '', role: 'moderator', store_name: '' })
+  const [passwordId, setPasswordId] = useState<string | null>(null)
+  const [newPassword, setNewPassword] = useState('')
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -90,14 +92,26 @@ export function UserManagement({
     router.refresh()
   }
 
-  async function handleResetPassword(email: string | null) {
-    if (!email) { toast.error('Email não cadastrado para este usuário.'); return }
-    const supabase = createClient()
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/admin/login`,
+  function openChangePassword(id: string) {
+    setPasswordId(id)
+    setNewPassword('')
+    setEditingId(null)
+  }
+
+  async function handleChangePassword(id: string) {
+    if (newPassword.length < 8) { toast.error('Senha deve ter ao menos 8 caracteres.'); return }
+    setLoading(true)
+    const res = await fetch('/api/admin/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: id, password: newPassword }),
     })
-    if (error) { toast.error(error.message); return }
-    toast.success(`Link de redefinição enviado para ${email}`)
+    const data = await res.json()
+    setLoading(false)
+    if (!res.ok) { toast.error(data.error || 'Erro ao alterar senha.'); return }
+    toast.success('Senha alterada com sucesso!')
+    setPasswordId(null)
+    setNewPassword('')
   }
 
   return (
@@ -185,6 +199,23 @@ export function UserManagement({
                   <Button size="sm" variant="outline" onClick={() => setEditingId(null)} disabled={loading}>Cancelar</Button>
                 </div>
               </div>
+            ) : passwordId === u.id ? (
+              <div className="flex flex-col gap-3">
+                <p className="text-sm text-gray-300">Alterar senha de <span className="text-white font-medium">{u.name}</span></p>
+                <div className="flex gap-2 items-end">
+                  <Input
+                    label="Nova senha (mín. 8 caracteres)"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="••••••••"
+                    disabled={loading}
+                    className="flex-1"
+                  />
+                  <Button size="sm" loading={loading} onClick={() => handleChangePassword(u.id)}>Salvar</Button>
+                  <Button size="sm" variant="outline" onClick={() => setPasswordId(null)} disabled={loading}>Cancelar</Button>
+                </div>
+              </div>
             ) : (
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
@@ -213,9 +244,9 @@ export function UserManagement({
                     className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] px-3 py-1.5 rounded-lg transition-colors">
                     Editar
                   </button>
-                  <button onClick={() => handleResetPassword(u.email)}
+                  <button onClick={() => openChangePassword(u.id)}
                     className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white px-3 py-1.5 rounded-lg transition-colors">
-                    Resetar senha
+                    Alterar senha
                   </button>
                   {u.id !== currentUserId && (
                     <button onClick={() => handleToggleActive(u)}
