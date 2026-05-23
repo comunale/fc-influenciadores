@@ -1,12 +1,10 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// Rotas que moderadores NÃO podem acessar
-const MODERATOR_BLOCKED = [
-  '/admin',               // dashboard (exact)
-  '/admin/influencers',
-  '/admin/campanhas',
+// Sub-rotas bloqueadas para moderadores (além do dashboard /admin exato)
+const MODERATOR_BLOCKED_PREFIXES = [
   '/admin/configuracoes',
+  '/admin/usuarios',
 ]
 
 export async function proxy(request: NextRequest) {
@@ -61,10 +59,11 @@ export async function proxy(request: NextRequest) {
 
     // Moderador não pode acessar rotas de admin pleno
     if (profile?.role === 'moderator') {
-      const blocked = MODERATOR_BLOCKED.some(
+      const isDashboard = pathname === '/admin'
+      const isBlockedPrefix = MODERATOR_BLOCKED_PREFIXES.some(
         (p) => pathname === p || pathname.startsWith(p + '/')
       )
-      if (blocked) {
+      if (isDashboard || isBlockedPrefix) {
         return NextResponse.redirect(new URL('/admin/validar', request.url))
       }
     }
