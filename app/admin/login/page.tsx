@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/supabase/client'
 import { FoxLogo } from '@/components/FoxLogo'
@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
 function LoginForm() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const next = searchParams.get('next') || '/admin'
   const [loading, setLoading] = useState(false)
@@ -32,8 +31,7 @@ function LoginForm() {
     }
 
     toast.success('Login realizado!')
-    router.push(next)
-    router.refresh()
+    window.location.href = next
   }
 
   return (
