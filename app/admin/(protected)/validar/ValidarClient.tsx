@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
+import { formatCPF, formatPhone } from '@/lib/validators/cpf'
 
 interface CouponData {
   id: string
@@ -20,6 +21,23 @@ interface CouponData {
   campaigns: { name: string; discount_value: number; discount_type: string; coupon_title: string }
 }
 
+interface InfluencerData {
+  id: string
+  name: string
+  instagram_handle: string
+  coupon_code: string
+  campaign_id: string
+  campaigns: {
+    id: string
+    name: string
+    discount_value: number
+    discount_type: string
+    coupon_title: string
+    validity_days: number
+    active: boolean
+  }
+}
+
 const statusConfig = {
   pending: { label: 'VÁLIDO — pode usar', color: 'text-[#00ff87]', bg: 'bg-[#00ff87]/10 border-[#00ff87]/40' },
   used: { label: 'JÁ UTILIZADO', color: 'text-gray-400', bg: 'bg-gray-800/50 border-gray-700' },
@@ -27,29 +45,65 @@ const statusConfig = {
   cancelled: { label: 'CANCELADO', color: 'text-red-400', bg: 'bg-red-950/50 border-red-800' },
 }
 
+const emptyExpress = { name: '', cpf: '', phone: '', email: '' }
+
+function normalize(raw: string): { type: 'coupon' | 'influencer'; value: string } {
+  const v = raw.trim().replace(/^@/, '').toUpperCase()
+  return { type: v.startsWith('FOX-') ? 'coupon' : 'influencer', value: v }
+}
+
+function formatDiscount(campaigns: { discount_type: string; discount_value: number }) {
+  return campaigns.discount_type === 'fixed'
+    ? formatCurrency(campaigns.discount_value)
+    : `${campaigns.discount_value}%`
+}
+
 export function ValidarClient({ initialCode = '' }: { initialCode?: string }) {
   const [code, setCode] = useState(initialCode)
   const [loading, setLoading] = useState(false)
-  const [validating, setValidating] = useState(false)
-  const [coupon, setCoupon] = useState<CouponData | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const didAutoSearch = useRef(false)
 
+  // Fluxo 1: cupom existente
+  const [coupon, setCoupon] = useState<CouponData | null>(null)
+  const [validating, setValidating] = useState(false)
+
+  // Fluxo 2: cadastro express via handle
+  const [influencer, setInfluencer] = useState<InfluencerData | null>(null)
+  const [expressForm, setExpressForm] = useState(emptyExpress)
+  const [expressError, setExpressError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [successCoupon, setSuccessCoupon] = useState<CouponData | null>(null)
+
   useEffect(() => {
     if (initialCode && !didAutoSearch.current) {
       didAutoSearch.current = true
-      searchCoupon(initialCode)
+      const { type, value } = normalize(initialCode)
+      if (type === 'coupon') searchCoupon(value)
+      else searchInfluencer(value)
     }
   }, [initialCode])
 
+  function resetAll() {
+    setCoupon(null)
+    setInfluencer(null)
+    setSuccessCoupon(null)
+    setErrorMsg('')
+    setExpressError('')
+    setCode('')
+    setExpressForm(emptyExpress)
+    setTimeout(() => inputRef.current?.focus(), 100)
+  }
+
   async function searchCoupon(value: string) {
-    if (!value.trim()) return
     setLoading(true)
     setErrorMsg('')
     setCoupon(null)
+    setInfluencer(null)
+    setSuccessCoupon(null)
     try {
-      const res = await fetch(`/api/coupons/validate?code=${encodeURIComponent(value.trim())}`)
+      const res = await fetch(`/api/coupons/validate?code=${encodeURIComponent(value)}`)
       const data = await res.json()
       if (!res.ok) {
         setErrorMsg(data.error || 'Cupom não encontrado.')
@@ -64,9 +118,35 @@ export function ValidarClient({ initialCode = '' }: { initialCode?: string }) {
     }
   }
 
+  async function searchInfluencer(handle: string) {
+    setLoading(true)
+    setErrorMsg('')
+    setCoupon(null)
+    setInfluencer(null)
+    setSuccessCoupon(null)
+    try {
+      const res = await fetch(`/api/admin/influencer-lookup?handle=${encodeURIComponent(handle)}`)
+      const data = await res.json()
+      if (!res.ok) {
+        setErrorMsg(data.error || 'Influencer ou cupom não encontrado.')
+      } else {
+        setInfluencer(data.influencer)
+        setExpressForm(emptyExpress)
+        setExpressError('')
+      }
+    } catch {
+      setErrorMsg('Erro de conexão. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault()
-    searchCoupon(code)
+    if (!code.trim()) return
+    const { type, value } = normalize(code)
+    if (type === 'coupon') await searchCoupon(value)
+    else await searchInfluencer(value)
   }
 
   async function handleValidate() {
@@ -92,61 +172,92 @@ export function ValidarClient({ initialCode = '' }: { initialCode?: string }) {
     }
   }
 
-  function handleReset() {
-    setCoupon(null)
-    setErrorMsg('')
-    setCode('')
-    setTimeout(() => inputRef.current?.focus(), 100)
+  async function handleExpressSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!influencer) return
+    setExpressError('')
+    setSaving(true)
+    try {
+      const res = await fetch('/api/admin/coupon-express', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          influencer_id: influencer.id,
+          campaign_id: influencer.campaign_id,
+          customer_name: expressForm.name,
+          customer_cpf: expressForm.cpf,
+          customer_phone: expressForm.phone,
+          customer_email: expressForm.email,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setExpressError(data.error || 'Erro ao cadastrar.')
+        return
+      }
+      setInfluencer(null)
+      setSuccessCoupon(data.coupon)
+    } catch {
+      setExpressError('Erro de conexão. Tente novamente.')
+    } finally {
+      setSaving(false)
+    }
   }
+
+  const hasResult = !!coupon || !!influencer || !!successCoupon
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6 flex flex-col gap-6">
 
-      {/* Explicação da página */}
-      {!coupon && !errorMsg && (
+      {/* Explicação — só na tela inicial */}
+      {!hasResult && !errorMsg && (
         <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-5">
           <h1 className="text-white font-bold text-lg mb-1">Validar Cupom na Loja</h1>
           <p className="text-gray-400 text-sm leading-relaxed">
-            O cliente apresenta o código do cupom (ex: <span className="font-mono text-[#00ff87]">FOX-AB12CD</span>) ou mostra o QR Code.
-            Digite o código abaixo para ver os dados e aplicar o desconto.
+            Digite o código do cupom (ex: <span className="font-mono text-[#00ff87]">FOX-AB12CD</span>) ou o{' '}
+            <span className="text-[#00ff87]">@</span> do influencer que indicou o cliente.
           </p>
         </div>
       )}
 
-      {/* Busca */}
-      <form onSubmit={handleSearch} className="flex flex-col gap-3">
-        <label className="text-sm font-medium text-gray-300">
-          Código do cupom
-        </label>
-        <input
-          ref={inputRef}
-          type="text"
-          value={code}
-          onChange={(e) => setCode(e.target.value.toUpperCase())}
-          placeholder="FOX-XXXXXX"
-          autoComplete="off"
-          autoFocus
-          className="h-16 w-full rounded-xl border border-[#2a2a2a] bg-[#1e1e1e] px-5 text-2xl font-mono font-bold text-[#00ff87] placeholder:text-gray-600 placeholder:text-lg placeholder:font-normal tracking-widest focus:border-[#00ff87] focus:outline-none focus:ring-1 focus:ring-[#00ff87] text-center uppercase"
-        />
-        <Button type="submit" size="lg" loading={loading} className="w-full h-14 text-base font-bold">
-          {loading ? 'Buscando...' : 'Buscar Cupom'}
-        </Button>
-      </form>
+      {/* Campo de busca — sempre visível enquanto não há resultado */}
+      {!hasResult && (
+        <form onSubmit={handleSearch} className="flex flex-col gap-3">
+          <label className="text-sm font-medium text-gray-300">
+            Código do cupom ou @ do influencer
+          </label>
+          <input
+            ref={inputRef}
+            type="text"
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            placeholder="FOX-XXXXXX ou @INFLUENCER"
+            autoComplete="off"
+            autoFocus
+            className="h-16 w-full rounded-xl border border-[#2a2a2a] bg-[#1e1e1e] px-5 text-2xl font-mono font-bold text-[#00ff87] placeholder:text-gray-600 placeholder:text-lg placeholder:font-normal tracking-widest focus:border-[#00ff87] focus:outline-none focus:ring-1 focus:ring-[#00ff87] text-center uppercase"
+          />
+          <p className="text-gray-600 text-xs text-center">
+            Digite o código do cupom OU o @ do influencer que indicou
+          </p>
+          <Button type="submit" size="lg" loading={loading} className="w-full h-14 text-base font-bold">
+            {loading ? 'Buscando...' : 'Buscar'}
+          </Button>
+        </form>
+      )}
 
-      {/* Erro sem cupom */}
-      {errorMsg && !coupon && (
+      {/* Erro sem resultado */}
+      {errorMsg && !coupon && !influencer && (
         <div className="bg-red-950 border border-red-800 rounded-xl p-4 text-center">
           <p className="text-red-400 font-semibold">{errorMsg}</p>
-          <button onClick={handleReset} className="text-red-300 text-sm mt-2 underline">
-            Tentar outro código
+          <button onClick={resetAll} className="text-red-300 text-sm mt-2 underline">
+            Tentar novamente
           </button>
         </div>
       )}
 
-      {/* Resultado */}
+      {/* ─── FLUXO 1: Cupom existente ─── */}
       {coupon && (
         <div className="flex flex-col gap-4">
-          {/* Status */}
           {(() => {
             const s = statusConfig[coupon.status] ?? statusConfig.pending
             return (
@@ -162,7 +273,6 @@ export function ValidarClient({ initialCode = '' }: { initialCode?: string }) {
             )
           })()}
 
-          {/* Dados do cupom */}
           <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-5 flex flex-col gap-4">
             <div className="text-center">
               <div className="text-xs text-gray-500 uppercase tracking-wider">Código</div>
@@ -170,7 +280,6 @@ export function ValidarClient({ initialCode = '' }: { initialCode?: string }) {
                 {coupon.coupon_number}
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <div className="text-xs text-gray-500">Cliente</div>
@@ -178,11 +287,7 @@ export function ValidarClient({ initialCode = '' }: { initialCode?: string }) {
               </div>
               <div>
                 <div className="text-xs text-gray-500">Desconto</div>
-                <div className="text-[#00ff87] font-bold text-sm">
-                  {coupon.campaigns.discount_type === 'fixed'
-                    ? formatCurrency(coupon.campaigns.discount_value)
-                    : `${coupon.campaigns.discount_value}%`}
-                </div>
+                <div className="text-[#00ff87] font-bold text-sm">{formatDiscount(coupon.campaigns)}</div>
               </div>
               <div>
                 <div className="text-xs text-gray-500">Válido até</div>
@@ -193,7 +298,6 @@ export function ValidarClient({ initialCode = '' }: { initialCode?: string }) {
                 <div className="text-white text-sm">{coupon.influencers.instagram_handle}</div>
               </div>
             </div>
-
             <div className="border-t border-[#2a2a2a] pt-3 flex flex-col gap-1">
               <div className="flex gap-2 text-xs">
                 <span className="text-gray-500 w-16">CPF</span>
@@ -208,7 +312,6 @@ export function ValidarClient({ initialCode = '' }: { initialCode?: string }) {
             </div>
           </div>
 
-          {/* Botão principal */}
           {coupon.status === 'pending' && (
             <Button
               onClick={handleValidate}
@@ -222,11 +325,152 @@ export function ValidarClient({ initialCode = '' }: { initialCode?: string }) {
           )}
 
           <button
-            onClick={handleReset}
+            onClick={resetAll}
             className="text-gray-500 text-sm text-center hover:text-gray-300 transition-colors py-2"
           >
             ← Buscar outro cupom
           </button>
+        </div>
+      )}
+
+      {/* ─── FLUXO 2: Cadastro express via handle ─── */}
+      {influencer && !successCoupon && (
+        <div className="flex flex-col gap-4">
+          {/* Card do influencer */}
+          <div className="bg-[#141414] border border-[#00ff87]/30 rounded-xl p-5">
+            <div className="text-xs text-[#00ff87] font-bold uppercase tracking-wider mb-2">
+              Cadastro Rápido — Indicado por
+            </div>
+            <div className="text-white font-bold text-xl">
+              @{influencer.instagram_handle || influencer.coupon_code.toLowerCase()}
+            </div>
+            {influencer.name && (
+              <div className="text-gray-400 text-sm mt-0.5">{influencer.name}</div>
+            )}
+            <div className="mt-4 pt-3 border-t border-[#2a2a2a] flex gap-8">
+              <div>
+                <div className="text-xs text-gray-500">Desconto</div>
+                <div className="text-[#00ff87] font-black text-2xl">
+                  {formatDiscount(influencer.campaigns)}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">Validade do cupom</div>
+                <div className="text-white font-semibold">{influencer.campaigns.validity_days} dias</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Formulário */}
+          <form onSubmit={handleExpressSubmit} className="flex flex-col gap-3">
+            <h3 className="text-white font-semibold text-sm uppercase tracking-wider">Dados do cliente</h3>
+
+            <input
+              type="text"
+              placeholder="Nome completo *"
+              value={expressForm.name}
+              onChange={(e) => setExpressForm((p) => ({ ...p, name: e.target.value }))}
+              required
+              disabled={saving}
+              className="h-14 w-full rounded-xl border border-[#2a2a2a] bg-[#1e1e1e] px-4 text-white placeholder:text-gray-600 focus:border-[#00ff87] focus:outline-none focus:ring-1 focus:ring-[#00ff87] text-base"
+            />
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="CPF * (000.000.000-00)"
+              value={expressForm.cpf}
+              onChange={(e) => setExpressForm((p) => ({ ...p, cpf: formatCPF(e.target.value) }))}
+              required
+              disabled={saving}
+              maxLength={14}
+              className="h-14 w-full rounded-xl border border-[#2a2a2a] bg-[#1e1e1e] px-4 text-white placeholder:text-gray-600 focus:border-[#00ff87] focus:outline-none focus:ring-1 focus:ring-[#00ff87] text-base font-mono"
+            />
+            <input
+              type="tel"
+              placeholder="Telefone * (com DDD)"
+              value={expressForm.phone}
+              onChange={(e) => setExpressForm((p) => ({ ...p, phone: formatPhone(e.target.value) }))}
+              required
+              disabled={saving}
+              className="h-14 w-full rounded-xl border border-[#2a2a2a] bg-[#1e1e1e] px-4 text-white placeholder:text-gray-600 focus:border-[#00ff87] focus:outline-none focus:ring-1 focus:ring-[#00ff87] text-base"
+            />
+            <input
+              type="email"
+              placeholder="E-mail *"
+              value={expressForm.email}
+              onChange={(e) => setExpressForm((p) => ({ ...p, email: e.target.value }))}
+              required
+              disabled={saving}
+              className="h-14 w-full rounded-xl border border-[#2a2a2a] bg-[#1e1e1e] px-4 text-white placeholder:text-gray-600 focus:border-[#00ff87] focus:outline-none focus:ring-1 focus:ring-[#00ff87] text-base"
+            />
+
+            {expressError && (
+              <div className="bg-red-950 border border-red-800 rounded-xl p-3 text-red-400 text-sm text-center">
+                {expressError}
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              size="xl"
+              loading={saving}
+              className="w-full font-black text-black text-lg rounded-2xl mt-1"
+              style={{ minHeight: '72px' }}
+            >
+              {saving ? 'Cadastrando...' : '✓ CADASTRAR E VALIDAR CUPOM'}
+            </Button>
+          </form>
+
+          <button
+            onClick={resetAll}
+            className="text-gray-500 text-sm text-center hover:text-gray-300 transition-colors py-2"
+          >
+            ← Buscar outro
+          </button>
+        </div>
+      )}
+
+      {/* ─── SUCESSO EXPRESS ─── */}
+      {successCoupon && (
+        <div className="flex flex-col gap-4">
+          <div className="bg-[#00ff87]/10 border border-[#00ff87]/40 rounded-xl p-6 text-center">
+            <div className="text-[#00ff87] text-5xl font-black">✓</div>
+            <div className="text-[#00ff87] font-bold text-xl mt-2">Cupom validado com sucesso!</div>
+            <div className="text-white font-mono font-black text-3xl mt-3 tracking-widest">
+              {successCoupon.coupon_number}
+            </div>
+            <div className="text-[#00ff87] font-black text-3xl mt-2">
+              {formatDiscount(successCoupon.campaigns)}
+            </div>
+            <div className="text-gray-400 text-sm mt-1">de desconto aplicado</div>
+          </div>
+
+          <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-5">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <div className="text-xs text-gray-500">Cliente</div>
+                <div className="text-white font-semibold">{successCoupon.customer_name}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">Indicado por</div>
+                <div className="text-white">@{successCoupon.influencers.instagram_handle}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">CPF</div>
+                <div className="text-gray-300 font-mono text-xs">
+                  {successCoupon.customer_cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">Telefone</div>
+                <div className="text-gray-300 text-xs">{successCoupon.customer_phone}</div>
+              </div>
+            </div>
+          </div>
+
+          <Button onClick={resetAll} size="lg" className="w-full h-14 font-bold">
+            Validar outro cupom
+          </Button>
         </div>
       )}
     </div>
