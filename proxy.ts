@@ -8,6 +8,18 @@ const MODERATOR_BLOCKED_PREFIXES = [
 ]
 
 export async function proxy(request: NextRequest) {
+  // Redireciona domínio legado Vercel → domínio customizado (301 permanente)
+  const customDomain = process.env.NEXT_PUBLIC_SITE_URL
+    ? new URL(process.env.NEXT_PUBLIC_SITE_URL).hostname
+    : null
+  const currentHost = request.headers.get('host') || ''
+  if (customDomain && currentHost !== customDomain && currentHost.includes('vercel.app')) {
+    const target = new URL(request.url)
+    target.hostname = customDomain
+    target.protocol = 'https:'
+    return NextResponse.redirect(target.toString(), { status: 301 })
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -73,5 +85,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: ['/admin/:path*', '/c/:path*'],
 }

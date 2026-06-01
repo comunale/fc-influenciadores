@@ -17,7 +17,7 @@ export function CouponCard({ coupon }: CouponCardProps) {
   const couponRef = useRef<HTMLDivElement>(null)
   const [qrDataUrl, setQrDataUrl] = useState<string>('')
   const [busy, setBusy] = useState<'jpg' | 'print' | null>(null)
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fc-influenciadores.vercel.app'
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://influenciadores.foxcycles.com.br'
   const qrUrl = `${siteUrl}/admin/validar?codigo=${coupon.coupon_number}`
 
   // Gera QR Code como data URL (mais compatível com html2canvas que <canvas>)

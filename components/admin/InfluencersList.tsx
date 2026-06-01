@@ -8,7 +8,7 @@ import { formatCurrency } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://fc-influenciadores.vercel.app'
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://influenciadores.foxcycles.com.br'
 
 interface InfluencerRow {
   id: string
