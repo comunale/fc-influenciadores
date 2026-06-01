@@ -11,9 +11,42 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { coupon_code } = await params
+  const supabase = await createClient()
+
+  const { data: influencer } = await supabase
+    .from('influencers')
+    .select('instagram_handle, campaigns(discount_value, discount_type, coupon_title, coupon_description)')
+    .eq('coupon_code', coupon_code.toUpperCase())
+    .eq('active', true)
+    .single()
+
+  if (!influencer) {
+    return { title: 'FoxCycles | Cupom de Desconto' }
+  }
+
+  const campaign = influencer.campaigns as {
+    discount_value: number
+    discount_type: string
+    coupon_title: string
+    coupon_description: string
+  }
+
+  const discountLabel = campaign.discount_type === 'fixed'
+    ? formatCurrency(campaign.discount_value)
+    : `${campaign.discount_value}%`
+
+  const title = `FoxCycles | ${discountLabel} OFF — Indicado por @${influencer.instagram_handle}`
+  const description = campaign.coupon_description || campaign.coupon_title || `Cupom exclusivo para desconto na FoxCycles.`
+
   return {
-    title: `FoxCycles | Cupom ${coupon_code.toUpperCase()}`,
-    description: 'Cadastre-se e garanta seu desconto exclusivo FoxCycles.',
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      siteName: 'FoxCycles',
+      type: 'website',
+    },
   }
 }
 
