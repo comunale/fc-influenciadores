@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { UserManagement } from './UserManagement'
-import { AppSettingsGeral, AppSettingsEmail } from './AppSettings'
+import { AppSettingsGeral } from './AppSettings'
 
 interface UserProfile {
   id: string
@@ -23,10 +23,14 @@ interface Settings {
   contact_phone?: string
 }
 
+// A aba "Email" foi escondida: o sistema não envia e-mail (o Resend nunca foi ligado),
+// então deixar o template editável passava a impressão de que o cliente recebia o cupom
+// por e-mail. O componente AppSettingsEmail continua no código — para trazer a aba de
+// volta, basta reinserir { id: 'email', label: 'Email' } aqui e o bloco correspondente
+// abaixo. As colunas email_subject/email_body seguem intactas no banco.
 const TABS = [
   { id: 'usuarios', label: 'Usuários' },
   { id: 'geral', label: 'Geral' },
-  { id: 'email', label: 'Email' },
 ]
 
 export function ConfigTabs({
@@ -72,13 +76,6 @@ export function ConfigTabs({
         </div>
       )}
 
-      {activeTab === 'email' && (
-        <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-6">
-          <h2 className="text-white font-semibold mb-1">Template do Email</h2>
-          <p className="text-gray-500 text-xs mb-5">Email enviado ao cliente após gerar o cupom.</p>
-          <AppSettingsEmail initial={settings} />
-        </div>
-      )}
     </div>
   )
 }
