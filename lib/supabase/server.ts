@@ -21,6 +21,27 @@ export async function getUserRole(): Promise<string | null> {
   }
 }
 
+// Garante que quem chamou a rota é um admin ativo.
+// Retorna { userId } em caso de sucesso ou { error, status } para devolver na resposta.
+export async function requireAdmin(): Promise<
+  { userId: string; error?: never } | { userId?: never; error: string; status: number }
+> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autorizado.', status: 401 }
+
+  const { data: profile } = await supabase
+    .from('admin_profiles')
+    .select('role, active')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile?.active) return { error: 'Conta inativa.', status: 403 }
+  if (profile.role !== 'admin') return { error: 'Apenas admins podem executar esta ação.', status: 403 }
+
+  return { userId: user.id }
+}
+
 // Cliente admin com service role — bypassa RLS completamente.
 // Requer SUPABASE_SERVICE_ROLE_KEY nas env vars.
 export function createAdminClient() {

@@ -35,9 +35,10 @@ export function UserManagement({
   const [showCreate, setShowCreate] = useState(false)
   const [createForm, setCreateForm] = useState({ name: '', email: '', password: '', role: 'moderator', store_name: '' })
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ name: '', role: 'moderator', store_name: '' })
+  const [editForm, setEditForm] = useState({ name: '', email: '', role: 'moderator', store_name: '' })
   const [passwordId, setPasswordId] = useState<string | null>(null)
   const [newPassword, setNewPassword] = useState('')
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -58,25 +59,38 @@ export function UserManagement({
 
   function openEdit(u: UserProfile) {
     setEditingId(u.id)
-    setEditForm({ name: u.name, role: u.role, store_name: u.store_name || '' })
+    setPasswordId(null)
+    setDeletingId(null)
+    setEditForm({ name: u.name, email: u.email || '', role: u.role, store_name: u.store_name || '' })
   }
 
   async function handleEdit(id: string) {
     if (!editForm.name.trim()) { toast.error('Nome é obrigatório.'); return }
+    if (!editForm.email.trim()) { toast.error('E-mail é obrigatório.'); return }
     setLoading(true)
-    const supabase = createClient()
-    const { error } = await supabase
-      .from('admin_profiles')
-      .update({
-        name: editForm.name.trim(),
-        role: editForm.role,
-        store_name: editForm.role === 'moderator' ? editForm.store_name.trim() || null : null,
-      })
-      .eq('id', id)
+    const res = await fetch('/api/admin/update-user', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: id, ...editForm }),
+    })
+    const data = await res.json()
     setLoading(false)
-    if (error) { toast.error(error.message); return }
+    if (!res.ok) { toast.error(data.error || 'Erro ao atualizar usuário.'); return }
     toast.success('Usuário atualizado!')
     setEditingId(null)
+    router.refresh()
+  }
+
+  async function handleDelete(u: UserProfile) {
+    setLoading(true)
+    const res = await fetch(`/api/admin/delete-user?userId=${encodeURIComponent(u.id)}`, {
+      method: 'DELETE',
+    })
+    const data = await res.json()
+    setLoading(false)
+    if (!res.ok) { toast.error(data.error || 'Erro ao excluir usuário.'); return }
+    toast.success(`Usuário "${u.name}" excluído.`)
+    setDeletingId(null)
     router.refresh()
   }
 
@@ -96,6 +110,7 @@ export function UserManagement({
     setPasswordId(id)
     setNewPassword('')
     setEditingId(null)
+    setDeletingId(null)
   }
 
   async function handleChangePassword(id: string) {
@@ -176,6 +191,10 @@ export function UserManagement({
                   <Input label="Nome" value={editForm.name}
                     onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
                     disabled={loading} />
+                  <Input label="E-mail (login)" type="email" value={editForm.email}
+                    onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))}
+                    placeholder="usuario@foxcycles.com.br"
+                    disabled={loading} />
                   <div>
                     <label className="text-sm text-gray-300 block mb-1.5">Tipo</label>
                     <select
@@ -216,6 +235,29 @@ export function UserManagement({
                   <Button size="sm" variant="outline" onClick={() => setPasswordId(null)} disabled={loading}>Cancelar</Button>
                 </div>
               </div>
+            ) : deletingId === u.id ? (
+              <div className="flex flex-col gap-3 bg-red-950/30 border border-red-900 rounded-lg p-4 -mx-1">
+                <div>
+                  <p className="text-red-400 font-semibold text-sm">
+                    Excluir <span className="text-white">{u.name}</span> definitivamente?
+                  </p>
+                  <p className="text-gray-400 text-xs mt-1 leading-relaxed">
+                    O login <span className="font-mono">{u.email || '—'}</span> será removido e a pessoa perde
+                    o acesso imediatamente. Esta ação não pode ser desfeita.
+                    <br />
+                    Os cupons que ela validou continuam no histórico. Se você só quer bloquear o acesso
+                    temporariamente, use <span className="text-gray-300">Desativar</span>.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="destructive" loading={loading} onClick={() => handleDelete(u)}>
+                    Sim, excluir
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setDeletingId(null)} disabled={loading}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
             ) : (
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
@@ -249,12 +291,18 @@ export function UserManagement({
                     Alterar senha
                   </button>
                   {u.id !== currentUserId && (
-                    <button onClick={() => handleToggleActive(u)}
-                      className={`text-xs border px-3 py-1.5 rounded-lg transition-colors ${
-                        u.active ? 'border-red-800 text-red-400 hover:bg-red-950' : 'border-[#00ff87]/30 text-[#00ff87] hover:bg-[#00ff87]/10'
-                      }`}>
-                      {u.active ? 'Desativar' : 'Ativar'}
-                    </button>
+                    <>
+                      <button onClick={() => handleToggleActive(u)}
+                        className={`text-xs border px-3 py-1.5 rounded-lg transition-colors ${
+                          u.active ? 'border-red-800 text-red-400 hover:bg-red-950' : 'border-[#00ff87]/30 text-[#00ff87] hover:bg-[#00ff87]/10'
+                        }`}>
+                        {u.active ? 'Desativar' : 'Ativar'}
+                      </button>
+                      <button onClick={() => { setDeletingId(u.id); setEditingId(null); setPasswordId(null) }}
+                        className="text-xs border border-red-900 bg-red-950/40 text-red-400 hover:bg-red-900/50 hover:text-red-300 px-3 py-1.5 rounded-lg transition-colors">
+                        Excluir
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
