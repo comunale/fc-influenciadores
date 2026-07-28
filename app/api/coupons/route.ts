@@ -1,10 +1,21 @@
 import { createClient } from '@/lib/supabase/server'
 import { validateCPF } from '@/lib/validators/cpf'
-import { generateCouponNumber, addDays } from '@/lib/utils'
+import { addDays } from '@/lib/utils'
+import { insertCouponWithRetry } from '@/lib/coupons/insert'
+import { checkRateLimit, getClientIp, COUPON_RULES } from '@/lib/rate-limit'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
   try {
+    // Rota pública: limita por IP antes de qualquer trabalho.
+    const allowed = await checkRateLimit('coupons', getClientIp(request), COUPON_RULES)
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.' },
+        { status: 429 }
+      )
+    }
+
     const body = await request.json()
     const { influencer_code, customer_name, customer_cpf, customer_phone, customer_email } = body
 
@@ -47,13 +58,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Esta campanha não está mais ativa.' }, { status: 400 })
     }
 
-    // Verificar se CPF já tem cupom nesta campanha
+    // Verificar se CPF já tem cupom nesta campanha.
+    // O banco tem UNIQUE(customer_cpf, campaign_id) — este check é só para a mensagem
+    // amigável com o código; a corrida real é tratada no insert.
     const { data: existing } = await supabase
       .from('coupons')
       .select('id, coupon_number')
       .eq('customer_cpf', cpfClean)
       .eq('campaign_id', influencer.campaign_id)
-      .single()
+      .maybeSingle()
 
     if (existing) {
       return NextResponse.json(
@@ -62,43 +75,30 @@ export async function POST(request: Request) {
       )
     }
 
-    // Gerar número único do cupom (retry em caso de colisão)
-    let couponNumber = ''
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const candidate = generateCouponNumber()
-      const { data: dup } = await supabase.from('coupons').select('id').eq('coupon_number', candidate).single()
-      if (!dup) { couponNumber = candidate; break }
-    }
-
-    if (!couponNumber) {
-      return NextResponse.json({ error: 'Erro ao gerar cupom. Tente novamente.' }, { status: 500 })
-    }
-
     const expiresAt = addDays(new Date(), campaign.validity_days)
 
-    // Inserir cupom
-    const { data: coupon, error: insertError } = await supabase
-      .from('coupons')
-      .insert({
-        coupon_number: couponNumber,
-        influencer_id: influencer.id,
-        campaign_id: influencer.campaign_id,
-        customer_name: customer_name.trim(),
-        customer_cpf: cpfClean,
-        customer_phone: phoneClean,
-        customer_email: customer_email.trim().toLowerCase(),
-        status: 'pending',
-        expires_at: expiresAt.toISOString(),
-      })
-      .select()
-      .single()
+    const result = await insertCouponWithRetry(supabase, {
+      influencer_id: influencer.id,
+      campaign_id: influencer.campaign_id,
+      customer_name: customer_name.trim(),
+      customer_cpf: cpfClean,
+      customer_phone: phoneClean,
+      customer_email: customer_email.trim().toLowerCase(),
+      status: 'pending',
+      expires_at: expiresAt.toISOString(),
+    }, 'coupon_number')
 
-    if (insertError || !coupon) {
-      console.error('Insert error:', insertError)
+    if (!result.ok) {
+      if (result.reason === 'duplicate_cpf') {
+        return NextResponse.json(
+          { error: 'Este CPF já possui um cupom para esta campanha.' },
+          { status: 409 }
+        )
+      }
       return NextResponse.json({ error: 'Erro ao salvar cupom. Tente novamente.' }, { status: 500 })
     }
 
-    return NextResponse.json({ coupon_number: coupon.coupon_number }, { status: 201 })
+    return NextResponse.json({ coupon_number: result.coupon.coupon_number }, { status: 201 })
   } catch (err) {
     console.error('Unhandled error:', err)
     return NextResponse.json({ error: 'Erro interno do servidor.' }, { status: 500 })
