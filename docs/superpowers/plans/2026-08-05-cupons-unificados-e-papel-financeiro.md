@@ -43,12 +43,12 @@ Valor no banco (`admin_profiles.role`) e rótulo na tela:
 | Campanhas | ✓ edita | ✗ | ✓ lê |
 | Configurações | ✓ | ✗ | ✗ |
 | Marcar **Conferido** | ✓ | ✓ | ✗ |
-| Marcar **Pago** | ✗ | ✓ | ✗ |
+| Marcar **Pago** | ✓ | ✓ | ✗ |
 | Preencher **NF** | ✓ | ✓ | ✗ |
 | Excluir cupom | ✓ | ✗ | ✗ |
 | Exportar XLS | ✓ | ✓ | ✓ |
 
-> **⚠️ CONFIRMAR ANTES DE EXECUTAR — a linha "Pago".** Conforme escolhido, **o admin não pode marcar Pago**, só o Financeiro. Isso é separação de funções, mas hoje você é o único usuário admin e não existe nenhum usuário `finance` — na prática ninguém conseguirá marcar Pago até você criar um. Se preferir que o admin também marque, é uma linha: incluir `paid`, `paid_at`, `paid_by` em `FIELDS_BY_ROLE.admin` (Task 3) e trocar `is_finance()` por `(is_finance() OR is_admin())` no trigger (Task 1).
+**O admin não tem restrição alguma.** Ele cria, apaga, edita e marca qualquer campo, em qualquer papel. As travas por papel existem para o Financeiro e para o Lojista; o admin passa por cima de todas. Foi decidido assim: separação de funções no campo Pago criaria um impasse, já que hoje existe um único admin.
 
 ### Colunas novas em `coupons`
 
@@ -57,7 +57,7 @@ Valor no banco (`admin_profiles.role`) e rótulo na tela:
 | `verified` | `boolean not null default false` | Conferido | admin, finance |
 | `verified_at` | `timestamptz` | — | automático |
 | `verified_by` | `text` | — | automático |
-| `paid` | `boolean not null default false` | Pago | finance |
+| `paid` | `boolean not null default false` | Pago | admin, finance |
 | `paid_at` | `timestamptz` | Data pgto | automático |
 | `paid_by` | `text` | — | automático |
 | `invoice_number` | `text` | NF | admin, finance |
@@ -153,14 +153,8 @@ create policy coupons_update_admin_or_validation on public.coupons
 create or replace function public.coupons_guard_non_admin_update()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  -- service_role e rotas server-side nao tem sessao: passam direto.
+  -- service_role, rotas server-side e admin passam direto: admin nao tem restricao.
   if auth.uid() is null or public.is_admin() then
-    -- admin nao marca pagamento (separacao de funcoes)
-    if public.is_admin() and (new.paid is distinct from old.paid
-                              or new.paid_at is distinct from old.paid_at
-                              or new.paid_by is distinct from old.paid_by) then
-      raise exception 'Apenas o Financeiro pode marcar o pagamento do influenciador.';
-    end if;
     return new;
   end if;
 
@@ -267,7 +261,7 @@ rollback;
 
 Esperado: `1`. **Se der 0 ou erro, a migração quebrou a operação da loja — reverter antes de seguir.**
 
-Teste C — admin NÃO pode marcar pago:
+Teste C — admin PODE marcar pago (não tem restrição):
 
 ```sql
 begin;
@@ -278,12 +272,13 @@ select 'FOX-TST102', i.id, i.campaign_id, 'Teste', '00000000353', '19999999999',
 from public.influencers i limit 1;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"9b1a0c84-0c0a-4c31-9b19-37d0759fc0c2","role":"authenticated"}';
-update public.coupons set paid = true where coupon_number = 'FOX-TST102';
+with u as (update public.coupons set paid = true, paid_at = now(), paid_by = 'César Comunale'
+           where coupon_number = 'FOX-TST102' returning 1)
+select count(*) as deve_ser_1 from u;
 rollback;
 ```
 
-Esperado: `ERROR: Apenas o Financeiro pode marcar o pagamento do influenciador.`
-(Se a decisão sobre a linha "Pago" tiver sido invertida, este teste deve virar `deve_ser_1`.)
+Esperado: `1`. O admin não tem nenhuma restrição de campo.
 
 - [ ] **Step 6: Confirmar que nenhum dado de teste sobrou**
 
@@ -349,7 +344,7 @@ const MATRIX: Record<Action, Role[]> = {
   'coupons.edit':     ['admin'],
   'coupons.delete':   ['admin'],
   'coupons.verify':   ['admin', 'finance'],
-  'coupons.pay':      ['finance'],
+  'coupons.pay':      ['admin', 'finance'],
   'coupons.invoice':  ['admin', 'finance'],
   'validate':         ['admin', 'moderator'],
   'dashboard':        ['admin', 'finance'],
@@ -467,7 +462,7 @@ import type { Role } from '@/lib/auth/roles'
 // se as duas discordarem, o banco vence e a API devolve 500 — o que é o certo.
 const FIELDS_BY_ROLE: Record<Role, string[]> = {
   admin: ['status', 'customer_name', 'customer_phone', 'customer_email', 'customer_cpf',
-          'verified', 'invoice_number'],
+          'verified', 'paid', 'invoice_number'],
   finance: ['verified', 'paid', 'invoice_number'],
   moderator: [],
 }
