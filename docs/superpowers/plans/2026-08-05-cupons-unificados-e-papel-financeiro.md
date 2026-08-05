@@ -8,6 +8,22 @@
 
 **Tech Stack:** Next.js 16.2.6 (App Router), React 19, Tailwind v4, Supabase (Postgres + RLS), TypeScript, xlsx.
 
+## Estado da execução (atualizado em 2026-08-05)
+
+| Task | Estado |
+|---|---|
+| 1 — Migração do banco | ✅ **feita**, testada e commitada (`dcf6412`) |
+| 1b — NF obrigatória no banco | ✅ **feita** (`db/migrations/002_require_invoice_for_verified.sql`) |
+| 2 — Tipos e permissões | pendente |
+| 3 — Allowlist na API | pendente |
+| 4 — Acesso do Financeiro | pendente ← **destrava o login do financeiro** |
+| 5 — Criar/editar Financeiro pela tela | pendente |
+| 6 — Página unificada | pendente |
+
+**Já existe no banco:** o usuário `financeiro@foxcycles.com.br` com papel `finance`, ativo e com e-mail confirmado. Ele **ainda não consegue entrar** — `proxy.ts` e `AdminNav` só conhecem `admin` e `moderator`. A Task 4 resolve.
+
+**Testes de permissão já validados no banco** (todos com rollback, nada ficou gravado): lojista bloqueado de conferir mas ainda validando no balcão; admin sem restrição; financeiro conferindo/pagando/NF mas bloqueado de alterar dados do cliente; conferir sem NF barrado pela constraint.
+
 ## Global Constraints
 
 - Este projeto **não tem framework de teste**. Verificação = `npx tsc --noEmit`, `npx eslint .`, `npx next build`, asserções SQL via Supabase e smoke test HTTP com curl. Não adicionar Vitest/Jest nesta entrega.
@@ -63,6 +79,17 @@ Valor no banco (`admin_profiles.role`) e rótulo na tela:
 | `invoice_number` | `text` | NF | admin, finance |
 
 `verified` é a **conferência da venda** contra a NF, feita depois que o lojista já validou no balcão. Não substitui `status`.
+
+### Regra: NF obrigatória para conferir
+
+**Não é possível marcar `verified = true` sem `invoice_number` preenchido.** Sem nota fiscal não há prova da venda, e sem conferência não se paga o influenciador — é isso que fecha o circuito.
+
+O número da NF é a trava mais forte do sistema: nota fiscal não se inventa, é documento rastreável amarrado a uma moto específica, com valor e comprador. As outras regras dificultam o uso indevido do cupom; esta é a que amarra.
+
+Aplicada em três camadas:
+1. **Banco** — `check constraint` em `coupons` (Task 1)
+2. **API** — validação no PATCH antes de gravar (Task 3)
+3. **Tela** — checkbox Conferido desabilitado enquanto o campo NF estiver vazio (Task 6)
 
 ## Estrutura de arquivos
 
@@ -491,6 +518,22 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Nenhum campo permitido para o seu perfil.' }, { status: 400 })
   }
 
+  // NF obrigatória para conferir. O banco tem a mesma constraint; esta checagem
+  // existe para devolver uma mensagem legível em vez do erro cru do Postgres.
+  if (update.verified === true) {
+    const nf = typeof update.invoice_number === 'string' ? update.invoice_number.trim() : ''
+    if (!nf) {
+      const { data: atual } = await (await createClient())
+        .from('coupons').select('invoice_number').eq('id', id).single()
+      if (!atual?.invoice_number?.trim()) {
+        return NextResponse.json(
+          { error: 'Informe o número da NF antes de marcar como conferido.' },
+          { status: 400 }
+        )
+      }
+    }
+  }
+
   // Carimbo de quem e quando — nunca vem do cliente.
   const now = new Date().toISOString()
   if ('verified' in update) {
@@ -740,6 +783,22 @@ Larguras: `[14, 18, 24, 16, 16, 28, 18, 12, 12, 14, 18, 20, 12, 10, 18, 16]`. Ma
 ```
 
 O campo NF é um `<input type="text">` que salva no `onBlur`, evitando um PATCH por tecla. `verified_by`/`paid_at` aparecem como texto auxiliar abaixo do checkbox quando preenchidos.
+
+**NF obrigatória para conferir.** O checkbox Conferido fica desabilitado enquanto o cupom não tiver NF, com `title` explicando o motivo — o usuário precisa entender por que não consegue clicar, em vez de achar que está quebrado:
+
+```tsx
+const semNF = !row.invoice_number?.trim()
+
+<input
+  type="checkbox"
+  checked={row.verified}
+  disabled={!can(role, 'coupons.verify') || semNF || saving}
+  title={semNF ? 'Informe o número da NF antes de conferir' : undefined}
+  onChange={(e) => patch({ verified: e.target.checked })}
+/>
+```
+
+Ordem das colunas na tabela: **NF antes de Conferido**, para que o preenchimento siga a ordem natural de uso.
 
 - [ ] **Step 4: Montar o `CuponsTable` novo**
 
