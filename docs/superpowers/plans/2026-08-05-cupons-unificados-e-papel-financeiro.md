@@ -14,13 +14,32 @@
 |---|---|
 | 1 — Migração do banco | ✅ **feita**, testada e commitada (`dcf6412`) |
 | 1b — NF obrigatória no banco | ✅ **feita** (`db/migrations/002_require_invoice_for_verified.sql`) |
-| 2 — Tipos e permissões | pendente |
-| 3 — Allowlist na API | pendente |
-| 4 — Acesso do Financeiro | pendente ← **destrava o login do financeiro** |
+| 2 — Tipos e permissões | ✅ **feita** (`cfb2ae1`) |
+| 3 — Allowlist na API | ✅ **feita** (`864c34b`) |
+| 4 — Acesso do Financeiro | ✅ **feita** (`8797b4f`) — o financeiro já entra |
 | 5 — Criar/editar Financeiro pela tela | pendente |
-| 6 — Página unificada | pendente |
+| 6 — Página unificada | pendente ← **é ela que mostra NF, Conferido e Pago na tela** |
 
-**Já existe no banco:** o usuário `financeiro@foxcycles.com.br` com papel `finance`, ativo e com e-mail confirmado. Ele **ainda não consegue entrar** — `proxy.ts` e `AdminNav` só conhecem `admin` e `moderator`. A Task 4 resolve.
+**Já existe no banco:** o usuário `financeiro@foxcycles.com.br` com papel `finance`, ativo e com e-mail confirmado. Desde a Task 4 ele entra e navega em Dashboard, Cupons e Influencers.
+
+### Desvios do plano feitos na execução (2 e 3 e 4)
+
+1. **`requireRole` ganhou um campo `ok`.** O retorno desenhado no plano (`error?: never`) não
+   é um discriminante válido em TypeScript — `error: string` não é um tipo literal, então
+   `auth.role` ficava possivelmente `undefined` e o `tsc` quebrava. A união agora é
+   `{ ok: true, ... } | { ok: false, error, status }` e o guard vira `if (!auth.ok)`.
+2. **`update` é convertido para `CouponUpdate` no `.update()`.** `Record<string, unknown>`
+   não passa no tipo gerado do Supabase.
+3. **`/admin` no `ALLOWED_BY_ROLE` precisa ser `exact`.** Do jeito que estava no plano, o
+   `isAllowed` casava `pathname.startsWith('/admin' + '/')` e o Financeiro entraria em
+   **todas** as rotas, incluindo Configurações — o oposto da matriz. As regras viraram
+   `{ path, exact? }` e o dashboard entra como `exact: true`.
+4. **`ROLE_LABELS` não foi importado no `AdminNav`.** O componente não exibe o papel em
+   lugar nenhum; o import ficaria sem uso e o eslint reclamaria. Entra na Task 5, onde a
+   tela de usuários realmente mostra o rótulo.
+5. **`configuracoes/page.tsx` não precisou mudar.** Ele já manda não-admin para
+   `/admin/validar`, e o proxy redireciona o financeiro de lá para `/admin/cupons`.
+   Dois saltos, destino certo.
 
 **Testes de permissão já validados no banco** (todos com rollback, nada ficou gravado): lojista bloqueado de conferir mas ainda validando no balcão; admin sem restrição; financeiro conferindo/pagando/NF mas bloqueado de alterar dados do cliente; conferir sem NF barrado pela constraint.
 
