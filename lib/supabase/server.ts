@@ -44,13 +44,16 @@ export async function requireAdmin(): Promise<
 }
 
 // Igual ao requireAdmin, mas aceita uma lista de papéis e devolve qual deles é.
-export async function requireRole(allowed: Role[]): Promise<
-  | { userId: string; role: Role; name: string; error?: never }
-  | { userId?: never; role?: never; name?: never; error: string; status: number }
-> {
+// O campo `ok` existe para o TypeScript conseguir estreitar a união: `error: string`
+// não serve como discriminante, e sem ele `auth.role` fica possivelmente undefined.
+export type RoleAuth =
+  | { ok: true; userId: string; role: Role; name: string }
+  | { ok: false; error: string; status: number }
+
+export async function requireRole(allowed: Role[]): Promise<RoleAuth> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Não autorizado.', status: 401 }
+  if (!user) return { ok: false, error: 'Não autorizado.', status: 401 }
 
   const { data: profile } = await supabase
     .from('admin_profiles')
@@ -58,12 +61,12 @@ export async function requireRole(allowed: Role[]): Promise<
     .eq('id', user.id)
     .single()
 
-  if (!profile?.active) return { error: 'Conta inativa.', status: 403 }
+  if (!profile?.active) return { ok: false, error: 'Conta inativa.', status: 403 }
   if (!allowed.includes(profile.role as Role)) {
-    return { error: 'Sem permissão para esta ação.', status: 403 }
+    return { ok: false, error: 'Sem permissão para esta ação.', status: 403 }
   }
 
-  return { userId: user.id, role: profile.role as Role, name: profile.name }
+  return { ok: true, userId: user.id, role: profile.role as Role, name: profile.name }
 }
 
 // Cliente admin com service role — bypassa RLS completamente.

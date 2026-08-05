@@ -1,59 +1,94 @@
-import { createClient } from '@/lib/supabase/server'
+import { requireRole, createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import type { Role } from '@/lib/auth/roles'
+import type { Database } from '@/lib/supabase/types'
 
-async function requireAdmin() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Unauthorized', status: 401, supabase: null }
-  const { data: profile } = await supabase.from('admin_profiles').select('role, active').eq('id', user.id).single()
-  if (!profile?.active || profile.role !== 'admin') return { error: 'Forbidden', status: 403, supabase: null }
-  return { error: null, status: 200, supabase }
+type CouponUpdate = Database['public']['Tables']['coupons']['Update']
+
+// Quais colunas cada papel pode escrever. O banco repete essa regra no trigger:
+// se as duas discordarem, o banco vence e a API devolve 500 — o que é o certo.
+const FIELDS_BY_ROLE: Record<Role, string[]> = {
+  admin: ['status', 'customer_name', 'customer_phone', 'customer_email', 'customer_cpf',
+          'verified', 'paid', 'invoice_number'],
+  finance: ['verified', 'paid', 'invoice_number'],
+  moderator: [],
 }
 
 // DELETE — exclui um ou mais cupons
 export async function DELETE(request: Request) {
-  const { error, status, supabase } = await requireAdmin()
-  if (error || !supabase) return NextResponse.json({ error }, { status })
+  const auth = await requireRole(['admin'])
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
   const { ids } = await request.json().catch(() => ({ ids: [] }))
   if (!Array.isArray(ids) || ids.length === 0) {
     return NextResponse.json({ error: 'ids[] obrigatório' }, { status: 400 })
   }
 
+  const supabase = await createClient()
   const { error: dbErr } = await supabase.from('coupons').delete().in('id', ids)
   if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 })
 
   return NextResponse.json({ deleted: ids.length })
 }
 
-// PATCH — edita dados de um cupom
+// PATCH — edita dados de um cupom, respeitando o que o papel pode escrever
 export async function PATCH(request: Request) {
-  const { error, status, supabase } = await requireAdmin()
-  if (error || !supabase) return NextResponse.json({ error }, { status })
+  const auth = await requireRole(['admin', 'finance'])
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
   const body = await request.json().catch(() => ({}))
   const { id, ...data } = body
   if (!id) return NextResponse.json({ error: 'id obrigatório' }, { status: 400 })
 
-  const update: {
-    status?: string
-    customer_name?: string
-    customer_phone?: string
-    customer_email?: string
-    customer_cpf?: string
-  } = {}
+  const allowed = FIELDS_BY_ROLE[auth.role]
+  const update: Record<string, unknown> = {}
 
-  if (data.status !== undefined)         update.status         = String(data.status).trim()
-  if (data.customer_name !== undefined)  update.customer_name  = String(data.customer_name).trim()
-  if (data.customer_phone !== undefined) update.customer_phone = String(data.customer_phone).trim()
-  if (data.customer_email !== undefined) update.customer_email = String(data.customer_email).trim()
-  if (data.customer_cpf !== undefined)   update.customer_cpf   = String(data.customer_cpf).trim()
-
-  if (Object.keys(update).length === 0) {
-    return NextResponse.json({ error: 'Nenhum campo válido para atualizar' }, { status: 400 })
+  for (const [key, value] of Object.entries(data)) {
+    if (!allowed.includes(key)) continue
+    if (key === 'verified' || key === 'paid') {
+      update[key] = Boolean(value)
+    } else {
+      update[key] = String(value).trim()
+    }
   }
 
-  const { error: dbErr } = await supabase.from('coupons').update(update).eq('id', id)
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json({ error: 'Nenhum campo permitido para o seu perfil.' }, { status: 400 })
+  }
+
+  const supabase = await createClient()
+
+  // NF obrigatória para conferir. O banco tem a mesma constraint; esta checagem
+  // existe para devolver uma mensagem legível em vez do erro cru do Postgres.
+  if (update.verified === true) {
+    const nf = typeof update.invoice_number === 'string' ? update.invoice_number.trim() : ''
+    if (!nf) {
+      const { data: atual } = await supabase
+        .from('coupons').select('invoice_number').eq('id', id).single()
+      if (!atual?.invoice_number?.trim()) {
+        return NextResponse.json(
+          { error: 'Informe o número da NF antes de marcar como conferido.' },
+          { status: 400 }
+        )
+      }
+    }
+  }
+
+  // Carimbo de quem e quando — nunca vem do cliente.
+  const now = new Date().toISOString()
+  if ('verified' in update) {
+    update.verified_at = update.verified ? now : null
+    update.verified_by = update.verified ? auth.name : null
+  }
+  if ('paid' in update) {
+    update.paid_at = update.paid ? now : null
+    update.paid_by = update.paid ? auth.name : null
+  }
+
+  const { error: dbErr } = await supabase
+    .from('coupons')
+    .update(update as CouponUpdate)
+    .eq('id', id)
   if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 })
 
   return NextResponse.json({ ok: true })
