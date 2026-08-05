@@ -129,6 +129,13 @@ export type Database = {
           status: string
           used_at: string | null
           used_by_admin: string | null
+          verified: boolean
+          verified_at: string | null
+          verified_by: string | null
+          paid: boolean
+          paid_at: string | null
+          paid_by: string | null
+          invoice_number: string | null
         }
         Insert: {
           campaign_id: string
@@ -144,6 +151,13 @@ export type Database = {
           status?: string
           used_at?: string | null
           used_by_admin?: string | null
+          verified?: boolean
+          verified_at?: string | null
+          verified_by?: string | null
+          paid?: boolean
+          paid_at?: string | null
+          paid_by?: string | null
+          invoice_number?: string | null
         }
         Update: {
           campaign_id?: string
@@ -159,6 +173,13 @@ export type Database = {
           status?: string
           used_at?: string | null
           used_by_admin?: string | null
+          verified?: boolean
+          verified_at?: string | null
+          verified_by?: string | null
+          paid?: boolean
+          paid_at?: string | null
+          paid_by?: string | null
+          invoice_number?: string | null
         }
         Relationships: [
           {

@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import type { Database } from './types'
+import type { Role } from '@/lib/auth/roles'
 
 // Retorna o role do usuário logado ou null se não autenticado/sem perfil
 export async function getUserRole(): Promise<string | null> {
@@ -40,6 +41,29 @@ export async function requireAdmin(): Promise<
   if (profile.role !== 'admin') return { error: 'Apenas admins podem executar esta ação.', status: 403 }
 
   return { userId: user.id }
+}
+
+// Igual ao requireAdmin, mas aceita uma lista de papéis e devolve qual deles é.
+export async function requireRole(allowed: Role[]): Promise<
+  | { userId: string; role: Role; name: string; error?: never }
+  | { userId?: never; role?: never; name?: never; error: string; status: number }
+> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autorizado.', status: 401 }
+
+  const { data: profile } = await supabase
+    .from('admin_profiles')
+    .select('role, active, name')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile?.active) return { error: 'Conta inativa.', status: 403 }
+  if (!allowed.includes(profile.role as Role)) {
+    return { error: 'Sem permissão para esta ação.', status: 403 }
+  }
+
+  return { userId: user.id, role: profile.role as Role, name: profile.name }
 }
 
 // Cliente admin com service role — bypassa RLS completamente.
