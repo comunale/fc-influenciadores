@@ -1,11 +1,34 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// Sub-rotas bloqueadas para moderadores (além do dashboard /admin exato)
-const MODERATOR_BLOCKED_PREFIXES = [
-  '/admin/configuracoes',
-  '/admin/usuarios',
-]
+// Rotas que cada papel pode acessar. A primeira entrada é o destino do
+// redirect quando a rota pedida não é permitida. `exact` existe para o
+// dashboard: '/admin' como prefixo casaria com '/admin/qualquer-coisa' e
+// liberaria o sistema inteiro para quem só deveria ver o dashboard.
+type RouteRule = { path: string; exact?: boolean }
+
+const ALLOWED_BY_ROLE: Record<string, RouteRule[]> = {
+  admin: [{ path: '/admin' }],
+  finance: [
+    { path: '/admin/cupons' },
+    { path: '/admin', exact: true },
+    { path: '/admin/influencers' },
+  ],
+  moderator: [
+    { path: '/admin/validar' },
+    { path: '/admin/cupons' },
+    { path: '/admin/influencers' },
+    { path: '/admin/campanhas' },
+  ],
+}
+
+function isAllowed(role: string, pathname: string): boolean {
+  if (role === 'admin') return true
+  const rules = ALLOWED_BY_ROLE[role] ?? []
+  return rules.some((r) =>
+    r.exact ? pathname === r.path : pathname === r.path || pathname.startsWith(r.path + '/')
+  )
+}
 
 export async function proxy(request: NextRequest) {
   // Redireciona domínio legado Vercel → domínio customizado (301 permanente)
@@ -69,14 +92,11 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL('/admin/login', request.url))
     }
 
-    // Moderador não pode acessar rotas de admin pleno
-    if (profile?.role === 'moderator') {
-      const isDashboard = pathname === '/admin'
-      const isBlockedPrefix = MODERATOR_BLOCKED_PREFIXES.some(
-        (p) => pathname === p || pathname.startsWith(p + '/')
-      )
-      if (isDashboard || isBlockedPrefix) {
-        return NextResponse.redirect(new URL('/admin/validar', request.url))
+    // Papéis não-admin só entram nas rotas da sua lista
+    if (profile?.role && profile.role !== 'admin') {
+      if (!isAllowed(profile.role, pathname)) {
+        const home = ALLOWED_BY_ROLE[profile.role]?.[0]?.path ?? '/admin/validar'
+        return NextResponse.redirect(new URL(home, request.url))
       }
     }
   }
