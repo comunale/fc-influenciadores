@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { requireRole, createClient } from '@/lib/supabase/server'
 import { validateCPF } from '@/lib/validators/cpf'
 import { addDays } from '@/lib/utils'
 import { insertCouponWithRetry } from '@/lib/coupons/insert'
@@ -7,23 +7,45 @@ import { NextResponse } from 'next/server'
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { influencer_id, campaign_id, customer_name, customer_cpf, customer_phone, customer_email } = body
+    const { influencer_id, campaign_id, customer_name, customer_cpf, customer_phone, customer_email, seller_id } = body
+
+    // Autenticar antes de validar o corpo: quem não tem sessão recebe 401,
+    // não uma pista sobre quais campos a rota espera.
+    const auth = await requireRole(['admin', 'moderator'])
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
     if (!influencer_id || !campaign_id || !customer_name || !customer_cpf || !customer_phone || !customer_email) {
       return NextResponse.json({ error: 'Todos os campos são obrigatórios.' }, { status: 400 })
     }
+    if (!seller_id) {
+      return NextResponse.json({ error: 'Escolha o vendedor antes de validar.' }, { status: 400 })
+    }
 
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
 
-    const { data: profile } = await supabase
-      .from('admin_profiles')
-      .select('name')
-      .eq('id', user.id)
+    // Mesma checagem da rota de validação: o vendedor precisa existir, estar
+    // ativo e ser da loja de quem chamou. O trigger de INSERT repete no banco.
+    const { data: seller } = await supabase
+      .from('sellers')
+      .select('id, store_name, active')
+      .eq('id', seller_id)
       .single()
 
-    if (!profile) return NextResponse.json({ error: 'Perfil não encontrado.' }, { status: 403 })
+    if (!seller?.active) {
+      return NextResponse.json({ error: 'Vendedor inválido ou inativo.' }, { status: 400 })
+    }
+
+    if (auth.role === 'moderator') {
+      const { data: profile } = await supabase
+        .from('admin_profiles')
+        .select('store_name')
+        .eq('id', auth.userId)
+        .single()
+
+      if (!profile?.store_name || profile.store_name !== seller.store_name) {
+        return NextResponse.json({ error: 'Vendedor não pertence à sua loja.' }, { status: 403 })
+      }
+    }
 
     const cpfClean = customer_cpf.replace(/\D/g, '')
     if (!validateCPF(cpfClean)) {
@@ -80,7 +102,8 @@ export async function POST(request: Request) {
       status: 'used',
       expires_at: expiresAt.toISOString(),
       used_at: now.toISOString(),
-      used_by_admin: profile.name,
+      used_by_admin: auth.name,
+      seller_id,
     }, '*, influencers(name, instagram_handle), campaigns(name, discount_value, discount_type, coupon_title)')
 
     if (!result.ok) {

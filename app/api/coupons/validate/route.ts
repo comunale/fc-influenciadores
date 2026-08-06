@@ -1,32 +1,50 @@
-import { createClient } from '@/lib/supabase/server'
+import { requireRole, createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { coupon_number, admin_name } = body
+    // `admin_name` já veio do corpo aqui e era gravado como validador — qualquer
+    // nome, inclusive inventado por curl. Agora o validador sai sempre da sessão.
+    const { coupon_number, seller_id } = body
+
+    // Autenticar antes de validar o corpo: quem não tem sessão recebe 401,
+    // não uma pista sobre quais campos a rota espera.
+    const auth = await requireRole(['admin', 'moderator'])
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
     if (!coupon_number) {
       return NextResponse.json({ error: 'Código do cupom é obrigatório.' }, { status: 400 })
     }
+    if (!seller_id) {
+      return NextResponse.json({ error: 'Escolha o vendedor antes de validar.' }, { status: 400 })
+    }
 
     const supabase = await createClient()
 
-    // Verificar autenticação
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
-    }
-
-    // Buscar perfil (store ou admin pode validar)
-    const { data: profile } = await supabase
-      .from('admin_profiles')
-      .select('role, name')
-      .eq('id', user.id)
+    // Vendedor precisa existir, estar ativo e — se quem chama é lojista —
+    // ser da loja dele. Sem esta checagem bastava chamar a API na mão com
+    // qualquer id para furar o vínculo. O trigger no Postgres repete a regra.
+    const { data: seller } = await supabase
+      .from('sellers')
+      .select('id, store_name, active')
+      .eq('id', seller_id)
       .single()
 
-    if (!profile) {
-      return NextResponse.json({ error: 'Perfil não encontrado.' }, { status: 403 })
+    if (!seller?.active) {
+      return NextResponse.json({ error: 'Vendedor inválido ou inativo.' }, { status: 400 })
+    }
+
+    if (auth.role === 'moderator') {
+      const { data: profile } = await supabase
+        .from('admin_profiles')
+        .select('store_name')
+        .eq('id', auth.userId)
+        .single()
+
+      if (!profile?.store_name || profile.store_name !== seller.store_name) {
+        return NextResponse.json({ error: 'Vendedor não pertence à sua loja.' }, { status: 403 })
+      }
     }
 
     // Buscar cupom com dados relacionados
@@ -60,7 +78,8 @@ export async function POST(request: Request) {
       .update({
         status: 'used',
         used_at: new Date().toISOString(),
-        used_by_admin: admin_name || profile.name,
+        used_by_admin: auth.name,
+        seller_id,
       })
       .eq('id', coupon.id)
       .select('*, influencers(name, instagram_handle), campaigns(name, discount_value, discount_type, coupon_title)')

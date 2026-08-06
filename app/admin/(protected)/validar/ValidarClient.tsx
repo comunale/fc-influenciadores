@@ -5,8 +5,11 @@ import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
 import { formatCPF, formatPhone } from '@/lib/validators/cpf'
+import { SellerSelect } from '@/components/admin/SellerSelect'
+import { ExpressSuccess } from '@/components/admin/ExpressSuccess'
+import type { Seller } from '@/components/admin/SellerManagement'
 
-interface CouponData {
+export interface CouponData {
   id: string
   coupon_number: string
   customer_name: string
@@ -58,9 +61,18 @@ function formatDiscount(campaigns: { discount_type: string; discount_value: numb
     : `${campaigns.discount_value}%`
 }
 
-export function ValidarClient({ initialCode = '' }: { initialCode?: string }) {
+export function ValidarClient({
+  initialCode = '',
+  sellers,
+  showStore = false,
+}: {
+  initialCode?: string
+  sellers: Seller[]
+  showStore?: boolean
+}) {
   const [code, setCode] = useState(initialCode)
   const [loading, setLoading] = useState(false)
+  const [sellerId, setSellerId] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const didAutoSearch = useRef(false)
@@ -93,6 +105,7 @@ export function ValidarClient({ initialCode = '' }: { initialCode?: string }) {
     setExpressError('')
     setCode('')
     setExpressForm(emptyExpress)
+    setSellerId('')
     setTimeout(() => inputRef.current?.focus(), 100)
   }
 
@@ -150,13 +163,13 @@ export function ValidarClient({ initialCode = '' }: { initialCode?: string }) {
   }
 
   async function handleValidate() {
-    if (!coupon) return
+    if (!coupon || !sellerId) return
     setValidating(true)
     try {
       const res = await fetch('/api/coupons/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ coupon_number: coupon.coupon_number }),
+        body: JSON.stringify({ coupon_number: coupon.coupon_number, seller_id: sellerId }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -174,7 +187,7 @@ export function ValidarClient({ initialCode = '' }: { initialCode?: string }) {
 
   async function handleExpressSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!influencer) return
+    if (!influencer || !sellerId) return
     setExpressError('')
     setSaving(true)
     try {
@@ -188,6 +201,7 @@ export function ValidarClient({ initialCode = '' }: { initialCode?: string }) {
           customer_cpf: expressForm.cpf,
           customer_phone: expressForm.phone,
           customer_email: expressForm.email,
+          seller_id: sellerId,
         }),
       })
       const data = await res.json()
@@ -313,15 +327,20 @@ export function ValidarClient({ initialCode = '' }: { initialCode?: string }) {
           </div>
 
           {coupon.status === 'pending' && (
-            <Button
-              onClick={handleValidate}
-              size="xl"
-              loading={validating}
-              className="w-full font-black text-black text-xl rounded-2xl"
-              style={{ minHeight: '72px' }}
-            >
-              {validating ? 'Validando...' : '✓ APLICAR DESCONTO'}
-            </Button>
+            <>
+              <SellerSelect sellers={sellers} value={sellerId} onChange={setSellerId}
+                disabled={validating} showStore={showStore} />
+              <Button
+                onClick={handleValidate}
+                size="xl"
+                loading={validating}
+                disabled={!sellerId}
+                className="w-full font-black text-black text-xl rounded-2xl disabled:opacity-40"
+                style={{ minHeight: '72px' }}
+              >
+                {validating ? 'Validando...' : '✓ APLICAR DESCONTO'}
+              </Button>
+            </>
           )}
 
           <button
@@ -404,6 +423,9 @@ export function ValidarClient({ initialCode = '' }: { initialCode?: string }) {
               className="h-14 w-full rounded-xl border border-[#2a2a2a] bg-[#1e1e1e] px-4 text-white placeholder:text-gray-600 focus:border-[#00ff87] focus:outline-none focus:ring-1 focus:ring-[#00ff87] text-base"
             />
 
+            <SellerSelect sellers={sellers} value={sellerId} onChange={setSellerId}
+              disabled={saving} showStore={showStore} />
+
             {expressError && (
               <div className="bg-red-950 border border-red-800 rounded-xl p-3 text-red-400 text-sm text-center">
                 {expressError}
@@ -414,7 +436,8 @@ export function ValidarClient({ initialCode = '' }: { initialCode?: string }) {
               type="submit"
               size="xl"
               loading={saving}
-              className="w-full font-black text-black text-lg rounded-2xl mt-1"
+              disabled={!sellerId}
+              className="w-full font-black text-black text-lg rounded-2xl mt-1 disabled:opacity-40"
               style={{ minHeight: '72px' }}
             >
               {saving ? 'Cadastrando...' : '✓ CADASTRAR E VALIDAR CUPOM'}
@@ -431,48 +454,7 @@ export function ValidarClient({ initialCode = '' }: { initialCode?: string }) {
       )}
 
       {/* ─── SUCESSO EXPRESS ─── */}
-      {successCoupon && (
-        <div className="flex flex-col gap-4">
-          <div className="bg-[#00ff87]/10 border border-[#00ff87]/40 rounded-xl p-6 text-center">
-            <div className="text-[#00ff87] text-5xl font-black">✓</div>
-            <div className="text-[#00ff87] font-bold text-xl mt-2">Cupom validado com sucesso!</div>
-            <div className="text-white font-mono font-black text-3xl mt-3 tracking-widest">
-              {successCoupon.coupon_number}
-            </div>
-            <div className="text-[#00ff87] font-black text-3xl mt-2">
-              {formatDiscount(successCoupon.campaigns)}
-            </div>
-            <div className="text-gray-400 text-sm mt-1">de desconto aplicado</div>
-          </div>
-
-          <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-5">
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <div className="text-xs text-gray-500">Cliente</div>
-                <div className="text-white font-semibold">{successCoupon.customer_name}</div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500">Indicado por</div>
-                <div className="text-white">@{successCoupon.influencers.instagram_handle}</div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500">CPF</div>
-                <div className="text-gray-300 font-mono text-xs">
-                  {successCoupon.customer_cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500">Telefone</div>
-                <div className="text-gray-300 text-xs">{successCoupon.customer_phone}</div>
-              </div>
-            </div>
-          </div>
-
-          <Button onClick={resetAll} size="lg" className="w-full h-14 font-bold">
-            Validar outro cupom
-          </Button>
-        </div>
-      )}
+      {successCoupon && <ExpressSuccess coupon={successCoupon} onReset={resetAll} />}
     </div>
   )
 }
