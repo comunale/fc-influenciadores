@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { UserManagement } from './UserManagement'
+import { SellerManagement, type Seller } from './SellerManagement'
 import { AppSettingsGeral } from './AppSettings'
 
 interface UserProfile {
@@ -30,6 +31,7 @@ interface Settings {
 // abaixo. As colunas email_subject/email_body seguem intactas no banco.
 const TABS = [
   { id: 'usuarios', label: 'Usuários' },
+  { id: 'vendedores', label: 'Vendedores' },
   { id: 'geral', label: 'Geral' },
 ]
 
@@ -37,10 +39,14 @@ export function ConfigTabs({
   users,
   currentUserId,
   settings,
+  sellers,
+  storeNames,
 }: {
   users: UserProfile[]
   currentUserId: string
   settings: Settings
+  sellers: Seller[]
+  storeNames: string[]
 }) {
   const [activeTab, setActiveTab] = useState('usuarios')
 
@@ -66,6 +72,10 @@ export function ConfigTabs({
       {/* Conteúdo da aba */}
       {activeTab === 'usuarios' && (
         <UserManagement users={users} currentUserId={currentUserId} />
+      )}
+
+      {activeTab === 'vendedores' && (
+        <SellerManagement sellers={sellers} storeNames={storeNames} />
       )}
 
       {activeTab === 'geral' && (

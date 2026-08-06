@@ -16,7 +16,7 @@ export default async function ConfiguracoesPage() {
 
   if (profile?.role !== 'admin') redirect('/admin/validar')
 
-  const [usersRes, settingsRes] = await Promise.all([
+  const [usersRes, settingsRes, sellersRes] = await Promise.all([
     supabase
       .from('admin_profiles')
       .select('id, name, email, role, store_name, active, created_at')
@@ -26,6 +26,11 @@ export default async function ConfiguracoesPage() {
       .select('company_name, sender_email, whatsapp_text, email_subject, email_body, contact_phone')
       .eq('id', 1)
       .single(),
+    supabase
+      .from('sellers')
+      .select('id, name, store_name, active, created_at')
+      .order('store_name')
+      .order('name'),
   ])
 
   const defaultSettings = {
@@ -41,6 +46,17 @@ export default async function ConfiguracoesPage() {
     ? { ...settingsRes.data, contact_phone: settingsRes.data.contact_phone || '' }
     : defaultSettings
 
+  // As lojas vêm dos próprios logins de lojista. Digitar o nome à mão abriria
+  // espaço para "Campinas 2" ≠ "Fox Cycles Campinas 2", e a lista do balcão
+  // apareceria vazia sem erro nenhum na tela.
+  const storeNames = Array.from(
+    new Set(
+      (usersRes.data ?? [])
+        .filter((u) => u.role === 'moderator' && u.store_name)
+        .map((u) => u.store_name as string)
+    )
+  ).sort()
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-white mb-8">Configurações</h1>
@@ -48,6 +64,8 @@ export default async function ConfiguracoesPage() {
         users={usersRes.data || []}
         currentUserId={user.id}
         settings={settings}
+        sellers={sellersRes.data || []}
+        storeNames={storeNames}
       />
     </div>
   )
