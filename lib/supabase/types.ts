@@ -136,6 +136,7 @@ export type Database = {
           paid_at: string | null
           paid_by: string | null
           invoice_number: string | null
+          seller_id: string | null
         }
         Insert: {
           campaign_id: string
@@ -158,6 +159,7 @@ export type Database = {
           paid_at?: string | null
           paid_by?: string | null
           invoice_number?: string | null
+          seller_id?: string | null
         }
         Update: {
           campaign_id?: string
@@ -180,6 +182,7 @@ export type Database = {
           paid_at?: string | null
           paid_by?: string | null
           invoice_number?: string | null
+          seller_id?: string | null
         }
         Relationships: [
           {
@@ -194,6 +197,13 @@ export type Database = {
             columns: ["influencer_id"]
             isOneToOne: false
             referencedRelation: "influencers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupons_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "sellers"
             referencedColumns: ["id"]
           },
         ]
@@ -244,6 +254,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sellers: {
+        Row: {
+          id: string
+          name: string
+          store_name: string
+          active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          store_name: string
+          active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          store_name?: string
+          active?: boolean
+          created_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {
