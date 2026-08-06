@@ -17,8 +17,6 @@ const ALLOWED_BY_ROLE: Record<string, RouteRule[]> = {
   moderator: [
     { path: '/admin/validar' },
     { path: '/admin/cupons' },
-    { path: '/admin/influencers' },
-    { path: '/admin/campanhas' },
   ],
 }
 

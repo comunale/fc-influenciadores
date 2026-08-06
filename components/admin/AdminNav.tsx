@@ -16,8 +16,8 @@ const ALL_NAV = [
   { href: '/admin',               label: 'Dashboard',     exact: true,  roles: ['admin', 'finance'] },
   { href: '/admin/validar',       label: 'Validar',       exact: false, roles: ['admin', 'moderator'] },
   { href: '/admin/cupons',        label: 'Cupons',        exact: false, roles: ['admin', 'finance', 'moderator'] },
-  { href: '/admin/influencers',   label: 'Influencers',   exact: false, roles: ['admin', 'finance', 'moderator'] },
-  { href: '/admin/campanhas',     label: 'Campanhas',     exact: false, roles: ['admin', 'moderator'] },
+  { href: '/admin/influencers',   label: 'Influencers',   exact: false, roles: ['admin', 'finance'] },
+  { href: '/admin/campanhas',     label: 'Campanhas',     exact: false, roles: ['admin'] },
   { href: '/admin/configuracoes', label: 'Configurações', exact: false, roles: ['admin'] },
 ]
 
