@@ -9,7 +9,7 @@ import type { ResumoComissao } from '@/lib/commission'
 import { mensagemDeErro } from '@/lib/db-errors'
 import { motivoLinkInativo } from '@/lib/influencer-status'
 import { ParceriaPanel, type ParceriaForm } from './ParceriaPanel'
-import { Input } from '@/components/ui/input'
+import { InfluencerForm } from './InfluencerForm'
 import { Button } from '@/components/ui/button'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://influenciadores.foxcycles.com.br'
@@ -51,6 +51,8 @@ interface Props {
   influencers: InfluencerRow[]
   campaigns: Campaign[]
   canEdit?: boolean
+  /** Barra de filtros, renderizada pela pagina que faz a filtragem. */
+  filtros?: React.ReactNode
 }
 
 const emptyForm = {
@@ -70,7 +72,7 @@ const emptyForm = {
   coupon_description: '',
 }
 
-export function InfluencersList({ influencers: initial, campaigns, canEdit = false }: Props) {
+export function InfluencersList({ influencers: initial, campaigns, canEdit = false, filtros }: Props) {
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [excluindoId, setExcluindoId] = useState<string | null>(null)
@@ -224,131 +226,27 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white">Influencers</h1>
-          <p className="text-gray-500 text-sm mt-0.5">{initial.length} cadastrados</p>
         </div>
         {canEdit && <Button onClick={openCreate} size="sm">+ Novo Influencer</Button>}
       </div>
 
+      {/* A barra de filtros vem da pagina, que e quem faz a filtragem. O contador
+          dela ja diz "N de M", entao o cabecalho acima nao repete. */}
+      {filtros}
+
       {/* Modal criar/editar */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4 bg-black/60">
-          <div className="bg-[#141414] border border-[#1e1e1e] rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#1e1e1e]">
-              <h2 className="text-white font-semibold text-lg">
-                {editing ? 'Editar Influencer' : 'Novo Influencer'}
-              </h2>
-              <button onClick={() => setShowForm(false)} className="text-gray-500 hover:text-white text-xl">✕</button>
-            </div>
-
-            <form onSubmit={handleSave} className="p-6 flex flex-col gap-4">
-              <div>
-                <label className="text-sm text-gray-300 block mb-1.5">Campanha *</label>
-                <select
-                  value={form.campaign_id}
-                  onChange={(e) => {
-                    const c = campaigns.find((x) => x.id === e.target.value)
-                    // A campanha e MODELO: preenche, nao manda. Depois disto os
-                    // valores sao deste influencer e podem ser editados a vontade.
-                    setForm((p) => ({
-                      ...p,
-                      campaign_id: e.target.value,
-                      ...(c ? {
-                        discount_type: c.discount_type,
-                        discount_value: String(c.discount_value),
-                        validity_days: String(c.validity_days),
-                        coupon_title: c.coupon_title ?? '',
-                        coupon_description: c.coupon_description ?? '',
-                      } : {}),
-                    }))
-                  }}
-                  className="w-full h-12 px-4 rounded-lg border border-[#2a2a2a] bg-[#1e1e1e] text-white text-sm focus:border-[#00ff87] focus:outline-none"
-                  disabled={loading}
-                >
-                  {campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-
-              <p className="text-xs text-gray-500 md:col-span-2 -mb-1">
-                A campanha preenche os campos abaixo, mas eles passam a ser deste
-                influencer. Editar aqui não afeta a campanha nem os outros.
-              </p>
-
-              <div>
-                <label className="text-sm text-gray-300 block mb-1.5">Tipo de desconto</label>
-                <select
-                  value={form.discount_type}
-                  onChange={(e) => setForm((p) => ({ ...p, discount_type: e.target.value }))}
-                  className="w-full h-12 px-4 rounded-lg border border-[#2a2a2a] bg-[#1e1e1e] text-white text-sm focus:border-[#00ff87] focus:outline-none"
-                  disabled={loading}
-                >
-                  <option value="fixed">Valor fixo (R$)</option>
-                  <option value="percentage">Percentual (%)</option>
-                </select>
-              </div>
-
-              <Input label="Desconto" type="number" value={form.discount_value}
-                onChange={(e) => setForm((p) => ({ ...p, discount_value: e.target.value }))}
-                disabled={loading} />
-
-              <Input label="Validade do cupom (dias)" type="number" value={form.validity_days}
-                onChange={(e) => setForm((p) => ({ ...p, validity_days: e.target.value }))}
-                disabled={loading} />
-
-              <Input label="Título do cupom" value={form.coupon_title}
-                onChange={(e) => setForm((p) => ({ ...p, coupon_title: e.target.value }))}
-                disabled={loading} />
-
-              <Input label="Descrição do cupom" value={form.coupon_description}
-                onChange={(e) => setForm((p) => ({ ...p, coupon_description: e.target.value }))}
-                disabled={loading} className="md:col-span-2" />
-
-              <Input label="Nome completo *" value={form.name}
-                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                placeholder="Ex: Prii Valim" disabled={loading} />
-
-              <Input label="@ Instagram *" value={form.instagram_handle}
-                onChange={(e) => handleHandleChange(e.target.value)}
-                placeholder="@seuperfil" disabled={loading} />
-
-              <Input label="Código do cupom *" value={form.coupon_code}
-                onChange={(e) => setForm((p) => ({ ...p, coupon_code: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') }))}
-                placeholder="SEUPERFIL" disabled={loading} />
-
-              <div className="grid grid-cols-2 gap-3">
-                <Input label="Fee fixo (R$)" type="number" value={form.fee_amount}
-                  onChange={(e) => setForm((p) => ({ ...p, fee_amount: e.target.value }))}
-                  disabled={loading} />
-                <Input label="Comissão/venda (R$)" type="number" value={form.commission_per_sale}
-                  onChange={(e) => setForm((p) => ({ ...p, commission_per_sale: e.target.value }))}
-                  disabled={loading} />
-              </div>
-
-              <Input label="Comissão inicia na venda nº" type="number" value={form.commission_starts_at}
-                onChange={(e) => setForm((p) => ({ ...p, commission_starts_at: e.target.value }))}
-                disabled={loading} />
-
-              {editing && (
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input type="checkbox" checked={form.active}
-                    onChange={(e) => setForm((p) => ({ ...p, active: e.target.checked }))}
-                    className="accent-[#00ff87] w-4 h-4" />
-                  <span className="text-sm text-gray-300">Ativo</span>
-                </label>
-              )}
-
-              <div className="flex gap-3 pt-2">
-                <Button type="submit" loading={loading} className="flex-1">
-                  {editing ? 'Salvar alterações' : 'Criar Influencer'}
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setShowForm(false)} disabled={loading}>
-                  Cancelar
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <InfluencerForm
+          editando={!!editing}
+          form={form}
+          setForm={setForm}
+          campaigns={campaigns}
+          loading={loading}
+          onSalvar={handleSave}
+          onFechar={() => setShowForm(false)}
+          onHandleChange={handleHandleChange}
+        />
       )}
-
       {/* Lista */}
       <div className="flex flex-col gap-3">
         {initial.map((inf) => (

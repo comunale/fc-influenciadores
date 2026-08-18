@@ -1,18 +1,40 @@
 import { createClient, getUserRole } from '@/lib/supabase/server'
 import { InfluencersList } from '@/components/admin/InfluencersList'
+import { InfluencersFilters } from '@/components/admin/InfluencersFilters'
 import { calcularComissao } from '@/lib/commission'
+import { linkAtivo, venceEmAte } from '@/lib/influencer-status'
 
 export const dynamic = 'force-dynamic'
 
-export default async function InfluencersPage() {
+interface SearchParams {
+  q?: string
+  estado?: string
+  campaign_id?: string
+  a_pagar?: string
+  vencendo?: string
+  [key: string]: string | undefined
+}
+
+export default async function InfluencersPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>
+}) {
+  const params = await searchParams
   const [role, supabase] = await Promise.all([getUserRole(), createClient()])
 
-  const [{ data: influencers }, { data: campaigns }] = await Promise.all([
+  const [{ data: influencers }, { data: campaigns }, { data: todasCampanhas }] = await Promise.all([
     supabase
       .from('influencers')
       .select('*, campaigns(name), coupons(id, status, verified, paid, created_at, commission_per_sale)')
       .order('name'),
-    supabase.from('campaigns').select('id, name, discount_type, discount_value, validity_days, coupon_title, coupon_description').eq('active', true),
+    // Só as ativas servem de modelo no cadastro...
+    supabase
+      .from('campaigns')
+      .select('id, name, discount_type, discount_value, validity_days, coupon_title, coupon_description')
+      .eq('active', true),
+    // ...mas o filtro precisa de todas, senão some quem está em campanha encerrada.
+    supabase.from('campaigns').select('id, name').order('name'),
   ])
 
   const enriched = (influencers || []).map((inf) => {
@@ -37,9 +59,45 @@ export default async function InfluencersPage() {
     }
   })
 
+  let lista = enriched
+
+  if (params.q) {
+    const q = params.q.toLowerCase()
+    lista = lista.filter((i) =>
+      i.name.toLowerCase().includes(q) ||
+      i.instagram_handle.toLowerCase().includes(q) ||
+      i.coupon_code.toLowerCase().includes(q)
+    )
+  }
+
+  // "ativo" aqui significa o mesmo que na landing: o link abre.
+  if (params.estado === 'ativo') lista = lista.filter((i) => linkAtivo(i))
+  if (params.estado === 'inativo') lista = lista.filter((i) => !i.active)
+  if (params.estado === 'encerrada') {
+    lista = lista.filter((i) => i.active && !linkAtivo(i))
+  }
+
+  if (params.campaign_id) lista = lista.filter((i) => i.campaign_id === params.campaign_id)
+
+  if (params.a_pagar === '1') lista = lista.filter((i) => i.comissao.comissaoAPagar > 0)
+
+  if (params.vencendo === '1') lista = lista.filter((i) => venceEmAte(i, 30))
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
-      <InfluencersList influencers={enriched} campaigns={campaigns || []} canEdit={role === 'admin'} />
+      <InfluencersList
+        influencers={lista}
+        campaigns={campaigns || []}
+        canEdit={role === 'admin'}
+        filtros={
+          <InfluencersFilters
+            campaigns={todasCampanhas || []}
+            filters={params}
+            total={enriched.length}
+            mostrando={lista.length}
+          />
+        }
+      />
     </div>
   )
 }

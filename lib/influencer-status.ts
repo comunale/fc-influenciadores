@@ -33,3 +33,18 @@ export function motivoLinkInativo(inf: StatusDoLink): string | null {
   }
   return null
 }
+
+/**
+ * A parceria vence nos proximos `dias`?
+ *
+ * Vive aqui junto do resto da regra de prazo, e nao na pagina, porque
+ * `Date.now()` chamado durante a renderizacao de um Server Component e barrado
+ * pela regra de funcao impura do React.
+ */
+export function venceEmAte(inf: StatusDoLink, dias: number): boolean {
+  if (!inf.partnership_ends_at) return false
+  const hoje = new Date()
+  const limite = new Date(hoje.getTime() + dias * 86400000).toISOString().slice(0, 10)
+  return inf.partnership_ends_at >= hoje.toISOString().slice(0, 10)
+      && inf.partnership_ends_at <= limite
+}
