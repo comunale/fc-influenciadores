@@ -12,6 +12,7 @@ export function CuponsRowItem({
   role,
   colSpan,
   selected,
+  suspeito = false,
   onToggleSelect,
   onEdit,
   onDelete,
@@ -21,6 +22,7 @@ export function CuponsRowItem({
   role: Role
   colSpan: number
   selected: boolean
+  suspeito?: boolean
   onToggleSelect: (id: string) => void
   onEdit: (c: CouponRow) => void
   onDelete: (ids: string[], label: string) => void
@@ -106,7 +108,15 @@ export function CuponsRowItem({
           {formatDate(c.created_at)}
         </td>
         <td className="px-4 py-3 cursor-pointer" onClick={toggle}>
-          <div className="text-white font-medium">{c.customer_name}</div>
+          <div className="text-white font-medium">
+            {c.customer_name}
+            {suspeito && (
+              <span
+                title="Este telefone aparece em clientes com CPFs diferentes"
+                className="ml-1 text-yellow-500"
+              >⚠</span>
+            )}
+          </div>
           <div className="text-gray-500 text-xs">{c.customer_email}</div>
         </td>
         {/* Origem: quem indicou e quem vendeu. Eram duas colunas ate 18/08 e

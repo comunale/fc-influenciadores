@@ -94,9 +94,16 @@ O `pg_cron` já está instalado (migration 007) e serve exatamente para isso.
 Não há canal externo (e-mail foi descartado), então o aviso vive dentro do
 sistema — um bloco no Dashboard.
 
-### 4. Fluxo do QR code no balcão (anti-abuso)
+### 4. ~~Fluxo do QR code no balcão~~ — ✅ FEITO em 18/08
 
-**Nota de 18/08:** a *leitura* do QR já funciona e ninguém sabia — o QR do cupom aponta para `/admin/validar?codigo=FOX-XXXXXX` e a tela lê o parâmetro sozinha. O que falta é o outro QR: o do LINK DO INFLUENCIADOR, para o cliente gerar o próprio cupom.
+**Entregue em 18/08:** o Lojista perdeu o cadastro express (trava na rota, não só na
+tela) e passou a ver o QR do link do influenciador — quem preenche é o cliente, no
+próprio celular. Cupons com o mesmo telefone em CPFs diferentes aparecem marcados na
+lista, olhando a base inteira e não só a página.
+
+A *leitura* do QR já funcionava e ninguém sabia: o QR do cupom aponta para
+`/admin/validar?codigo=FOX-XXXXXX` e a tela lê o parâmetro sozinha. Virou uma dica
+na tela.
 
 **Spec aprovada em 2026-07-28**, nunca implementada.
 `docs/superpowers/specs/2026-07-28-cupom-express-anti-abuso-design.md`

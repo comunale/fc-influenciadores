@@ -23,6 +23,7 @@ export function CuponsTable({
   filters,
   role,
   noLimite = false,
+  suspeitos,
 }: {
   coupons: CouponRow[]
   influencers: InfluencerOption[]
@@ -30,6 +31,8 @@ export function CuponsTable({
   role: Role
   /** A lista bateu no teto e pode haver mais — dizer, nunca truncar em silêncio. */
   noLimite?: boolean
+  /** Ids de cupons com telefone repetido em CPFs diferentes. */
+  suspeitos: Set<string>
 }) {
   const router = useRouter()
 
@@ -205,6 +208,7 @@ export function CuponsTable({
                     role={role}
                     colSpan={colSpan}
                     selected={selected.has(c.id)}
+                    suspeito={suspeitos.has(c.id)}
                     onToggleSelect={toggleOne}
                     onEdit={openEdit}
                     onDelete={confirmDelete}
