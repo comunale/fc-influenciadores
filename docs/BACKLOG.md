@@ -21,7 +21,7 @@ cada um uma entrega que funciona sozinha:
 
 | | Subsistema | Estado |
 |---|---|---|
-| 1 | **Parceria como entidade** | spec e plano aprovados, pronto para executar |
+| 1 | **Parceria como entidade** | 🔄 **em execução** — tasks 1 a 4 feitas, faltam 5 a 8 |
 | 2 | Fechamentos e pagamentos | depende do 1 |
 | 3 | Funil de prospecção | independente |
 | 4 | Portal do influenciador | depende do 1 e 2. Regra de visibilidade definida (ver abaixo) |
@@ -35,6 +35,24 @@ por fora**. Mostrar em detalhe criaria cobrança sobre o que já foi acertado; e
 por completo faria o influenciador achar que o histórico sumiu. A linha fechada resolve
 os dois.
 | 5 | Menus, páginas e papéis | cada entrega arruma a sua parte |
+
+### Subsistema 1 — onde parou (18/08)
+
+Plano: `docs/superpowers/plans/2026-08-18-parceria-como-entidade.md`
+
+| Task | Estado |
+|---|---|
+| 1 — Tabela e backfill | ✅ 18 parcerias, índice único testado, 0 cupons órfãos |
+| 2 — Módulo da parceria | ✅ puro e testado |
+| 3 — Link depende da parceria | ✅ landing testada, HTTP 200 |
+| 4 — Cupom nasce vinculado | ✅ testado ponta a ponta |
+| 5 — Comissão conta por parceria | pendente |
+| 6 — Renovar encerra e abre | pendente |
+| 7 — Tela: parceria ativa e histórico | pendente |
+| 8 — Remover campos duplicados | pendente |
+
+**A Task 8 fecha o ciclo.** Enquanto os campos antigos existirem no influenciador,
+alguém pode editar o lugar errado e não surtir efeito. Não deixar pela metade.
 
 ---
 
