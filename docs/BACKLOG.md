@@ -21,7 +21,7 @@ cada um uma entrega que funciona sozinha:
 
 | | Subsistema | Estado |
 |---|---|---|
-| 1 | **Parceria como entidade** | spec aprovada — `docs/superpowers/specs/2026-08-18-parceria-como-entidade-design.md` |
+| 1 | **Parceria como entidade** | spec e plano aprovados, pronto para executar |
 | 2 | Fechamentos e pagamentos | depende do 1 |
 | 3 | Funil de prospecção | independente |
 | 4 | Portal do influenciador | depende do 1 e 2. Regra de visibilidade já definida |
