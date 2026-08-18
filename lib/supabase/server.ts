@@ -1,25 +1,57 @@
+import { cache } from 'react'
 import { createServerClient } from '@supabase/ssr'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import type { Database } from './types'
 import type { Role } from '@/lib/auth/roles'
 
-// Retorna o role do usuário logado ou null se não autenticado/sem perfil
-export async function getUserRole(): Promise<string | null> {
+/**
+ * Usuário logado e o perfil dele, buscados UMA VEZ por requisição.
+ *
+ * Sem o cache, cada carregamento de página consultava o Supabase seis vezes
+ * antes de buscar qualquer dado: o proxy, o layout e a página faziam cada um o
+ * seu `getUser()` mais a consulta ao perfil. E `getUser()` valida o token pela
+ * rede a cada chamada — era a maior parte da lentidão que o César sentia na
+ * tela de Cupons, não a consulta de cupons, que roda em 0,355 ms.
+ *
+ * O `cache` do React dedupe dentro da mesma renderização, então layout e página
+ * passam a dividir o mesmo resultado. O proxy roda fora dela e continua com a
+ * sua própria checagem — é ele que protege a rota antes de qualquer render.
+ */
+export const getUsuarioAtual = cache(async (): Promise<{
+  userId: string
+  email: string
+  role: string
+  name: string
+  storeName: string | null
+} | null> => {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
+
     const { data: profile } = await supabase
       .from('admin_profiles')
-      .select('role, active')
+      .select('role, active, name, store_name')
       .eq('id', user.id)
       .single()
+
     if (!profile?.active) return null
-    return profile.role
+    return {
+      userId: user.id,
+      email: user.email ?? '',
+      role: profile.role,
+      name: profile.name,
+      storeName: profile.store_name,
+    }
   } catch {
     return null
   }
+})
+
+// Retorna o role do usuário logado ou null se não autenticado/sem perfil
+export async function getUserRole(): Promise<string | null> {
+  return (await getUsuarioAtual())?.role ?? null
 }
 
 // Garante que quem chamou a rota é um admin ativo.
