@@ -137,6 +137,7 @@ export type Database = {
           paid_by: string | null
           invoice_number: string | null
           seller_id: string | null
+          partnership_id: string | null
           discount_type: string | null
           discount_value: number | null
           commission_per_sale: number | null
@@ -163,6 +164,7 @@ export type Database = {
           paid_by?: string | null
           invoice_number?: string | null
           seller_id?: string | null
+          partnership_id?: string | null
           discount_type?: string | null
           discount_value?: number | null
           commission_per_sale?: number | null
@@ -189,6 +191,7 @@ export type Database = {
           paid_by?: string | null
           invoice_number?: string | null
           seller_id?: string | null
+          partnership_id?: string | null
           discount_type?: string | null
           discount_value?: number | null
           commission_per_sale?: number | null
@@ -323,6 +326,69 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      partnerships: {
+        Row: {
+          id: string
+          influencer_id: string
+          campaign_id: string | null
+          status: string
+          starts_at: string
+          ends_at: string | null
+          fee_amount: number
+          fee_timing: string
+          commission_per_sale: number
+          commission_starts_at: number
+          commission_counts_from: string
+          payment_schedule: string
+          discount_type: string
+          discount_value: number
+          validity_days: number
+          coupon_title: string | null
+          coupon_description: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          influencer_id: string
+          campaign_id?: string | null
+          status?: string
+          starts_at?: string
+          ends_at?: string | null
+          fee_amount?: number
+          fee_timing?: string
+          commission_per_sale?: number
+          commission_starts_at?: number
+          commission_counts_from?: string
+          payment_schedule?: string
+          discount_type: string
+          discount_value: number
+          validity_days: number
+          coupon_title?: string | null
+          coupon_description?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          influencer_id?: string
+          campaign_id?: string | null
+          status?: string
+          starts_at?: string
+          ends_at?: string | null
+          fee_amount?: number
+          fee_timing?: string
+          commission_per_sale?: number
+          commission_starts_at?: number
+          commission_counts_from?: string
+          payment_schedule?: string
+          discount_type?: string
+          discount_value?: number
+          validity_days?: number
+          coupon_title?: string | null
+          coupon_description?: string | null
+          created_at?: string
+        }
+        Relationships: []
       }
       sellers: {
         Row: {
