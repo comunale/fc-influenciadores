@@ -74,6 +74,20 @@ export async function PATCH(request: Request) {
     }
   }
 
+  // Pago exige conferencia. O banco tem a mesma constraint; aqui a mensagem
+  // sai legivel em vez do erro cru do Postgres.
+  if (update.paid === true) {
+    const { data: atual } = await supabase
+      .from('coupons').select('verified').eq('id', id).single()
+    const vaiFicarConferido = update.verified === true || atual?.verified === true
+    if (!vaiFicarConferido) {
+      return NextResponse.json(
+        { error: 'Confira o cupom antes de marcar como pago.' },
+        { status: 400 }
+      )
+    }
+  }
+
   // Carimbo de quem e quando — nunca vem do cliente.
   const now = new Date().toISOString()
   if ('verified' in update) {
