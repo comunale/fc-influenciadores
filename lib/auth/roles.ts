@@ -18,6 +18,7 @@ export type Action =
   | 'coupons.pay'
   | 'coupons.invoice'
   | 'validate'
+  | 'coupons.express'
   | 'dashboard'
   | 'influencers.edit'
   | 'influencers.payment'
@@ -32,6 +33,9 @@ const MATRIX: Record<Action, Role[]> = {
   'coupons.pay':      ['admin', 'finance'],
   'coupons.invoice':  ['admin', 'finance'],
   'validate':         ['admin', 'moderator'],
+  // Cadastro express no balcao: so admin, como saida de emergencia. O Lojista
+  // perdeu em 18/08 -- era o caminho que permitia inventar uma indicacao.
+  'coupons.express':  ['admin'],
   'dashboard':        ['admin', 'finance'],
   'influencers.edit': ['admin'],
   // Dado bancario: so quem paga. O Lojista nao le nem pela API (RLS na tabela).

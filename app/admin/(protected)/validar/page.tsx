@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ValidarClient } from './ValidarClient'
+import { type Role } from '@/lib/auth/roles'
 
 interface SearchParams {
   codigo?: string
@@ -43,6 +44,7 @@ export default async function ValidarPage({
       initialCode={initialCode}
       sellers={sellers ?? []}
       showStore={profile?.role === 'admin'}
+      role={(profile?.role ?? 'moderator') as Role}
     />
   )
 }

@@ -13,7 +13,8 @@ export async function POST(request: Request) {
 
     // Autenticar antes de validar o corpo: quem não tem sessão recebe 401,
     // não uma pista sobre quais campos a rota espera.
-    const auth = await requireRole(['admin', 'moderator'])
+    // So admin. E aqui que a regra vale -- esconder na tela nunca foi trava.
+  const auth = await requireRole(['admin'])
     if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
     if (!influencer_id || !campaign_id || !customer_name || !customer_cpf || !customer_phone || !customer_email) {
