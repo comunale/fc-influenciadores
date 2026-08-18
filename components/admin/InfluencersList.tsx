@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/utils'
+import { mensagemDeErro } from '@/lib/db-errors'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
@@ -48,6 +49,7 @@ const emptyForm = {
 export function InfluencersList({ influencers: initial, campaigns, canEdit = false }: Props) {
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
+  const [excluindoId, setExcluindoId] = useState<string | null>(null)
   const [editing, setEditing] = useState<InfluencerRow | null>(null)
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ ...emptyForm, campaign_id: campaigns[0]?.id || '' })
@@ -108,6 +110,15 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
     }
     toast.success(editing ? 'Influencer atualizado!' : 'Influencer criado!')
     setShowForm(false)
+    router.refresh()
+  }
+
+  async function handleDelete(inf: { id: string; instagram_handle: string }) {
+    const supabase = createClient()
+    const { error } = await supabase.from('influencers').delete().eq('id', inf.id)
+    if (error) { toast.error(mensagemDeErro(error.message, 'influencer')); return }
+    toast.success(`Influencer ${inf.instagram_handle} excluído.`)
+    setExcluindoId(null)
     router.refresh()
   }
 
@@ -271,12 +282,37 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
                 Copiar Link
               </button>
               {canEdit && (
-                <button
-                  onClick={() => handleToggleActive(inf)}
-                  className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
-                >
-                  {inf.active ? 'Desativar' : 'Ativar'}
-                </button>
+                <>
+                  <button
+                    onClick={() => handleToggleActive(inf)}
+                    className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
+                  >
+                    {inf.active ? 'Desativar' : 'Ativar'}
+                  </button>
+                  {excluindoId === inf.id ? (
+                    <>
+                      <button
+                        onClick={() => handleDelete(inf)}
+                        className="text-xs bg-red-700 text-white font-semibold px-3 py-1.5 rounded-lg hover:bg-red-600 transition-colors flex-shrink-0"
+                      >
+                        Confirmar exclusão
+                      </button>
+                      <button
+                        onClick={() => setExcluindoId(null)}
+                        className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
+                      >
+                        Cancelar
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => setExcluindoId(inf.id)}
+                      className="text-xs border border-red-900 text-red-400 hover:bg-red-950 px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
+                    >
+                      Excluir
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>

@@ -1,5 +1,6 @@
 import { requireRole, createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { mensagemDeErro } from '@/lib/db-errors'
 
 // GET — lista os vendedores que quem chamou pode ver.
 // Admin e financeiro veem todos; lojista só os da própria loja.
@@ -90,6 +91,42 @@ export async function PATCH(request: Request) {
   const supabase = await createClient()
   const { error } = await supabase.from('sellers').update(update).eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json({ ok: true })
+}
+
+// DELETE — só admin, e só para vendedor que nunca validou nada.
+//
+// A preocupação original era perder o histórico de quem validou o quê. Ela é
+// legítima, mas quem protege isso é a FK coupons_seller_id_fkey: vendedor com
+// cupom vinculado é recusado pelo banco. Sobra o caso inofensivo — nome digitado
+// errado, pessoa que nunca chegou a atender — que antes ficava entulhando a
+// lista do balcão para sempre.
+export async function DELETE(request: Request) {
+  const auth = await requireRole(['admin'])
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
+
+  const id = new URL(request.url).searchParams.get('id')
+  if (!id) return NextResponse.json({ error: 'id obrigatório' }, { status: 400 })
+
+  const supabase = await createClient()
+
+  const { count } = await supabase
+    .from('coupons')
+    .select('*', { count: 'exact', head: true })
+    .eq('seller_id', id)
+
+  if ((count || 0) > 0) {
+    return NextResponse.json(
+      {
+        error: `Este vendedor já validou ${count} cupom(ns) e não pode ser excluído. Desative-o para tirá-lo da lista do balcão sem perder o histórico.`,
+      },
+      { status: 400 }
+    )
+  }
+
+  const { error } = await supabase.from('sellers').delete().eq('id', id)
+  if (error) return NextResponse.json({ error: mensagemDeErro(error.message, 'vendedor') }, { status: 400 })
 
   return NextResponse.json({ ok: true })
 }

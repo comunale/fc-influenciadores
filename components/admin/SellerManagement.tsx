@@ -26,6 +26,7 @@ export function SellerManagement({
   const [showCreate, setShowCreate] = useState(false)
   const [createForm, setCreateForm] = useState({ name: '', store_name: storeNames[0] ?? '' })
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [excluindoId, setExcluindoId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ name: '', store_name: '' })
 
   async function handleCreate(e: React.FormEvent) {
@@ -63,6 +64,17 @@ export function SellerManagement({
     if (!res.ok) { toast.error(data.error || 'Erro ao atualizar vendedor.'); return }
     toast.success('Vendedor atualizado!')
     setEditingId(null)
+    router.refresh()
+  }
+
+  async function handleDelete(s: Seller) {
+    setLoading(true)
+    const res = await fetch(`/api/admin/sellers?id=${encodeURIComponent(s.id)}`, { method: 'DELETE' })
+    const data = await res.json()
+    setLoading(false)
+    if (!res.ok) { toast.error(data.error || 'Erro ao excluir.'); return }
+    toast.success(`Vendedor "${s.name}" excluído.`)
+    setExcluindoId(null)
     router.refresh()
   }
 
@@ -178,6 +190,23 @@ export function SellerManagement({
                     }`}>
                     {s.active ? 'Desativar' : 'Ativar'}
                   </button>
+                  {excluindoId === s.id ? (
+                    <>
+                      <button onClick={() => handleDelete(s)} disabled={loading}
+                        className="text-xs bg-red-700 text-white font-semibold px-3 py-1.5 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50">
+                        Confirmar
+                      </button>
+                      <button onClick={() => setExcluindoId(null)} disabled={loading}
+                        className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white px-3 py-1.5 rounded-lg transition-colors">
+                        Cancelar
+                      </button>
+                    </>
+                  ) : (
+                    <button onClick={() => setExcluindoId(s.id)}
+                      className="text-xs border border-red-900 text-red-400 hover:bg-red-950 px-3 py-1.5 rounded-lg transition-colors">
+                      Excluir
+                    </button>
+                  )}
                 </div>
               </div>
             )}

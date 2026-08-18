@@ -8,6 +8,9 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import type { Campaign } from '@/lib/supabase/types'
+import { mensagemDeErro } from '@/lib/db-errors'
+
+type CampanhaComContagem = Campaign & { influencer_count?: number }
 
 const emptyForm = {
   name: '',
@@ -19,9 +22,10 @@ const emptyForm = {
   active: true,
 }
 
-export function CampanhasList({ campaigns: initial, canEdit = false }: { campaigns: Campaign[]; canEdit?: boolean }) {
+export function CampanhasList({ campaigns: initial, canEdit = false }: { campaigns: CampanhaComContagem[]; canEdit?: boolean }) {
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
+  const [excluindoId, setExcluindoId] = useState<string | null>(null)
   const [editing, setEditing] = useState<Campaign | null>(null)
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState(emptyForm)
@@ -72,6 +76,15 @@ export function CampanhasList({ campaigns: initial, canEdit = false }: { campaig
     if (error) { toast.error(error.message); return }
     toast.success(editing ? 'Campanha atualizada!' : 'Campanha criada!')
     setShowForm(false)
+    router.refresh()
+  }
+
+  async function handleDelete(c: CampanhaComContagem) {
+    const supabase = createClient()
+    const { error } = await supabase.from('campaigns').delete().eq('id', c.id)
+    if (error) { toast.error(mensagemDeErro(error.message, 'campanha')); return }
+    toast.success(`Campanha "${c.name}" excluída.`)
+    setExcluindoId(null)
     router.refresh()
   }
 
@@ -219,8 +232,54 @@ export function CampanhasList({ campaigns: initial, canEdit = false }: { campaig
               </div>
             </div>
 
+            {canEdit && excluindoId === c.id && (
+              <div className="bg-red-950/30 border border-red-900 rounded-lg p-4 flex flex-col gap-3">
+                <div>
+                  <p className="text-red-400 font-semibold text-sm">
+                    Excluir a campanha &ldquo;{c.name}&rdquo;?
+                  </p>
+                  <p className="text-gray-400 text-xs mt-1 leading-relaxed">
+                    {(c.influencer_count ?? 0) > 0 ? (
+                      <>
+                        <span className="text-red-300 font-semibold">
+                          Os {c.influencer_count} influencers desta campanha serão excluídos junto
+                        </span>
+                        , e os links deles param de funcionar. Se a campanha já tiver cupons
+                        gerados, a exclusão é recusada e nada acontece.
+                      </>
+                    ) : (
+                      <>Esta campanha não tem influencers vinculados. Se já tiver cupons gerados,
+                      a exclusão é recusada e nada acontece.</>
+                    )}
+                    <br />
+                    Para encerrar sem perder nada, use <span className="text-gray-300">Desativar</span>.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleDelete(c)}
+                    className="text-xs bg-red-700 text-white font-semibold px-4 py-1.5 rounded-lg hover:bg-red-600 transition-colors"
+                  >
+                    Sim, excluir
+                  </button>
+                  <button
+                    onClick={() => setExcluindoId(null)}
+                    className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white px-4 py-1.5 rounded-lg transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+
             {canEdit && (
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setExcluindoId(c.id)}
+                  className="text-xs px-4 py-1.5 rounded-lg border border-red-900 text-red-400 hover:bg-red-950 transition-colors"
+                >
+                  Excluir
+                </button>
                 <button
                   onClick={() => handleToggle(c)}
                   className={`text-xs px-4 py-1.5 rounded-lg transition-colors border ${
