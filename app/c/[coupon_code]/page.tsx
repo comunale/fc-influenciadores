@@ -3,10 +3,21 @@ import { notFound } from 'next/navigation'
 import { FoxLogo } from '@/components/FoxLogo'
 import { CouponForm } from '@/components/forms/CouponForm'
 import { formatCurrency } from '@/lib/utils'
+import { linkAtivo } from '@/lib/influencer-status'
 import type { Metadata } from 'next'
 
 interface PageProps {
   params: Promise<{ coupon_code: string }>
+}
+
+/**
+ * Os termos vêm do influenciador desde 18/08/2026, não mais da campanha.
+ * A campanha continua sendo lida apenas como rótulo, no rodapé.
+ */
+const CAMPOS = 'instagram_handle, active, partnership_ends_at, discount_value, discount_type, coupon_title, coupon_description'
+
+function rotuloDesconto(tipo: string, valor: number) {
+  return tipo === 'fixed' ? formatCurrency(valor) : `${valor}%`
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -15,38 +26,25 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const { data: influencer } = await supabase
     .from('influencers')
-    .select('instagram_handle, campaigns(discount_value, discount_type, coupon_title, coupon_description)')
+    .select(CAMPOS)
     .eq('coupon_code', coupon_code.toUpperCase())
-    .eq('active', true)
-    .single()
+    .maybeSingle()
 
-  if (!influencer) {
+  if (!influencer || !linkAtivo(influencer)) {
     return { title: 'FoxCycles | Cupom de Desconto' }
   }
 
-  const campaign = influencer.campaigns as {
-    discount_value: number
-    discount_type: string
-    coupon_title: string
-    coupon_description: string
-  }
-
-  const discountLabel = campaign.discount_type === 'fixed'
-    ? formatCurrency(campaign.discount_value)
-    : `${campaign.discount_value}%`
-
+  const discountLabel = rotuloDesconto(influencer.discount_type, influencer.discount_value)
   const title = `FoxCycles | ${discountLabel} OFF — Indicado por @${influencer.instagram_handle}`
-  const description = campaign.coupon_description || campaign.coupon_title || `Cupom exclusivo para desconto na FoxCycles.`
+  const description =
+    influencer.coupon_description ||
+    influencer.coupon_title ||
+    'Cupom exclusivo para desconto na FoxCycles.'
 
   return {
     title,
     description,
-    openGraph: {
-      title,
-      description,
-      siteName: 'FoxCycles',
-      type: 'website',
-    },
+    openGraph: { title, description, siteName: 'FoxCycles', type: 'website' },
   }
 }
 
@@ -56,28 +54,16 @@ export default async function CouponLandingPage({ params }: PageProps) {
 
   const { data: influencer } = await supabase
     .from('influencers')
-    .select('*, campaigns(*)')
+    .select('*, campaigns(name)')
     .eq('coupon_code', coupon_code.toUpperCase())
-    .eq('active', true)
-    .single()
+    .maybeSingle()
 
-  if (!influencer) notFound()
+  // A campanha não decide mais. O link depende do influenciador estar ativo e
+  // dentro do prazo — ver lib/influencer-status.ts.
+  if (!influencer || !linkAtivo(influencer)) notFound()
 
-  const campaign = influencer.campaigns as {
-    name: string
-    discount_value: number
-    discount_type: string
-    coupon_title: string
-    coupon_description: string
-    active: boolean
-  }
-
-  if (!campaign?.active) notFound()
-
-  const discountLabel =
-    campaign.discount_type === 'fixed'
-      ? formatCurrency(campaign.discount_value)
-      : `${campaign.discount_value}%`
+  const discountLabel = rotuloDesconto(influencer.discount_type, influencer.discount_value)
+  const campanha = (influencer.campaigns as { name: string } | null)?.name ?? ''
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] flex flex-col items-center">
@@ -97,13 +83,9 @@ export default async function CouponLandingPage({ params }: PageProps) {
 
         {/* Hero desconto */}
         <div className="text-center flex flex-col gap-2">
-          <div className="text-6xl font-black text-[#00ff87] leading-none">
-            {discountLabel}
-          </div>
+          <div className="text-6xl font-black text-[#00ff87] leading-none">{discountLabel}</div>
           <div className="text-xl font-bold text-white">OFF na sua moto elétrica</div>
-          <div className="text-sm text-gray-400 mt-1">
-            {campaign.coupon_description}
-          </div>
+          <div className="text-sm text-gray-400 mt-1">{influencer.coupon_description}</div>
         </div>
 
         {/* Separador visual */}
@@ -121,7 +103,7 @@ export default async function CouponLandingPage({ params }: PageProps) {
         {/* Info campanha */}
         <div className="text-center">
           <p className="text-xs text-gray-600">
-            Campanha: {campaign.name} · FoxCycles Campinas
+            {campanha ? `Campanha: ${campanha} · ` : ''}FoxCycles Campinas
           </p>
         </div>
       </div>
