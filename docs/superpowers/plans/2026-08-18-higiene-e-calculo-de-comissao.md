@@ -35,11 +35,19 @@ Cinco itens foram levantados. Esta rodada cobre **1 e 4** (higiene) e a **funda�
 
 Formalmente: as vendas do influenciador são ordenadas cronologicamente e recebem uma posição a partir de 1. A venda na posição `i` gera `commission_per_sale` quando `i >= commission_starts_at`.
 
-### ⚠️ Suposição que precisa de confirmação antes da Task 3
+### Decisão confirmada: venda = cupom aprovado pelo Financeiro
 
-**O que conta como "venda" para gerar comissão é o cupom com `verified = true`** — ou seja, conferido pelo Financeiro contra a NF, não apenas usado no balcão.
+**O que conta como "venda" para gerar comissão é o cupom com `verified = true`** — conferido pelo Financeiro contra a NF, não apenas usado no balcão. Confirmado pelo César em 18/08: "sim, o financeiro tem que aprovar".
 
-É a leitura coerente com o sistema: a corrente NF → Conferido → Pago existe justamente para autorizar pagamento, e pagar comissão por cupom não conferido anularia o controle construído. Mas se o combinado comercial for "conta a partir do uso no balcão", a Task 3 muda de `verified` para `status = 'used'` — **uma linha**, na constante `VENDA_CONTA_QUANDO`.
+Coerente com a corrente NF → Conferido → Pago, que existe justamente para autorizar pagamento. Implementado na constante `VENDA_CONTA_QUANDO` de `lib/commission.ts`, isolada caso a regra comercial mude.
+
+### 🔒 Os dados atuais são migração de planilha — não expor externamente
+
+**Restrição levantada pelo César em 18/08.** O que está sendo conferido agora é histórico que veio de uma planilha, sendo acertado retroativamente. Serve para controle **interno**; não é base confiável para mostrar a terceiros.
+
+Consequência prática: os números de comissão desta rodada aparecem **apenas nas telas internas** (Influencers, para admin e Financeiro). Nada disso é público, então esta rodada está liberada.
+
+Mas isso **trava um requisito do item 5**: o portal do influenciador não pode exibir o histórico sem antes existir uma forma de separar "registro migrado da planilha" de "registro nascido no sistema". Sem isso, um influenciador abre a tela e cobra um valor que talvez já tenha sido pago por fora. A decisão de como marcar isso (uma coluna `legacy` nos cupons, uma data de corte, ou marcar os antigos como já pagos) fica para o plano do portal — mas **não pode ser esquecida**.
 
 ### ⚠️ Lacuna conhecida: o fixo (`fee_amount`)
 
@@ -524,4 +532,4 @@ git commit -m "feat: comissao gerada e a pagar na tela de influencers"
 
 - **Dados bancários dos influenciadores** (item 2), visível só para Financeiro e admin.
 - **Prazo de parceria e aviso de encerramento** (item 3). Atenção: `validity_days` é a validade do CUPOM para o cliente, não o prazo do link do influenciador. O prazo de parceria não existe e precisa de campo novo.
-- **Portal do influenciador** (item 5), com login por e-mail e senha, papel novo, e apoiado em `calcularComissao` desta rodada.
+- **Portal do influenciador** (item 5), com login por e-mail e senha, papel novo, e apoiado em `calcularComissao` desta rodada. **Pré-requisito:** separar dado migrado da planilha do dado nascido no sistema, senão o portal expõe número que não foi feito para ser externo.
