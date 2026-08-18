@@ -33,11 +33,13 @@ interface InfluencerData {
   instagram_handle: string
   coupon_code: string
   campaign_id: string
-  // Os termos vem do influencer desde 18/08/2026. A campanha ficou so como rotulo.
-  discount_value: number
-  discount_type: string
-  validity_days: number
-  coupon_title: string | null
+  // Os termos vem da PARCERIA ativa desde 18/08/2026.
+  partnerships: {
+    status: string
+    validity_days: number
+    discount_type: string
+    discount_value: number
+  }[] | null
   campaigns: { name: string } | null
 }
 
@@ -60,6 +62,11 @@ function normalize(raw: string): { type: 'coupon' | 'influencer'; value: string 
  * Influencer e cupom sempre tem os campos preenchidos -- a migracao 008
  * preencheu todo o historico, entao nao ha caso sem retrato.
  */
+/** A parceria ativa do influenciador devolvido pelo lookup do balcao. */
+function parceriaDo(inf: InfluencerData) {
+  return inf.partnerships?.find((p) => p.status === 'ativa') ?? null
+}
+
 function formatDiscount(o: { discount_type?: string | null; discount_value?: number | null }) {
   if (o.discount_type == null || o.discount_value == null) return '—'
   return o.discount_type === 'fixed' ? formatCurrency(o.discount_value) : `${o.discount_value}%`
@@ -376,12 +383,12 @@ export function ValidarClient({
               <div>
                 <div className="text-xs text-gray-500">Desconto</div>
                 <div className="text-[#00ff87] font-black text-2xl">
-                  {formatDiscount(influencer)}
+                  {formatDiscount(parceriaDo(influencer) ?? {})}
                 </div>
               </div>
               <div>
                 <div className="text-xs text-gray-500">Validade do cupom</div>
-                <div className="text-white font-semibold">{influencer.validity_days} dias</div>
+                <div className="text-white font-semibold">{parceriaDo(influencer)?.validity_days ?? 0} dias</div>
               </div>
             </div>
           </div>

@@ -106,15 +106,16 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
       name: inf.name,
       instagram_handle: inf.instagram_handle,
       coupon_code: inf.coupon_code,
-      fee_amount: String(inf.fee_amount),
-      commission_per_sale: String(inf.parceria?.commission_per_sale ?? 0),
-      commission_starts_at: String(inf.commission_starts_at),
       active: inf.active,
-      discount_type: inf.discount_type,
+      // Os termos vem da PARCERIA ativa, nao mais do influenciador.
+      fee_amount: String(inf.parceria?.fee_amount ?? 0),
+      commission_per_sale: String(inf.parceria?.commission_per_sale ?? 0),
+      commission_starts_at: String(inf.parceria?.commission_starts_at ?? 1),
+      discount_type: inf.parceria?.discount_type ?? 'fixed',
       discount_value: String(inf.parceria?.discount_value ?? 0),
       validity_days: String(inf.parceria?.validity_days ?? 30),
-      coupon_title: inf.coupon_title ?? '',
-      coupon_description: inf.coupon_description ?? '',
+      coupon_title: inf.parceria?.coupon_title ?? '',
+      coupon_description: inf.parceria?.coupon_description ?? '',
     })
     setShowForm(true)
   }
@@ -132,15 +133,20 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
     }
     setLoading(true)
     const supabase = createClient()
-    const payload = {
+    // A PESSOA e o ACORDO sao gravados separado desde 18/08/2026.
+    const dadosPessoa = {
       campaign_id: form.campaign_id,
       name: form.name.trim(),
       instagram_handle: form.instagram_handle,
       coupon_code: form.coupon_code.toUpperCase(),
+      active: form.active,
+    }
+
+    const termosDoAcordo = {
+      campaign_id: form.campaign_id,
       fee_amount: parseFloat(form.fee_amount) || 0,
       commission_per_sale: parseFloat(form.commission_per_sale) || 0,
-      commission_starts_at: parseInt(form.commission_starts_at) || 2,
-      active: form.active,
+      commission_starts_at: parseInt(form.commission_starts_at) || 1,
       discount_type: form.discount_type,
       discount_value: parseFloat(form.discount_value) || 0,
       validity_days: parseInt(form.validity_days) || 30,
@@ -148,13 +154,35 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
       coupon_description: form.coupon_description.trim() || null,
     }
 
-    const { error } = editing
-      ? await supabase.from('influencers').update(payload).eq('id', editing.id)
-      : await supabase.from('influencers').insert(payload)
+    let influencerId = editing?.id ?? ''
+    let error = null
+
+    if (editing) {
+      const r = await supabase.from('influencers').update(dadosPessoa).eq('id', editing.id)
+      error = r.error
+    } else {
+      const r = await supabase.from('influencers').insert(dadosPessoa).select('id').single()
+      error = r.error
+      influencerId = r.data?.id ?? ''
+    }
+
+    if (error) {
+      setLoading(false)
+      toast.error(error.code === '23505' ? 'Código de cupom já existe.' : error.message)
+      return
+    }
+
+    // O acordo: atualiza a parceria ativa, ou cria a primeira ao cadastrar.
+    const parceriaId = editing?.parceria?.id
+    const rp = parceriaId
+      ? await supabase.from('partnerships').update(termosDoAcordo).eq('id', parceriaId)
+      : await supabase.from('partnerships').insert({
+          ...termosDoAcordo, influencer_id: influencerId, status: 'ativa',
+        })
 
     setLoading(false)
-    if (error) {
-      toast.error(error.code === '23505' ? 'Código de cupom já existe.' : error.message)
+    if (rp.error) {
+      toast.error('Dados salvos, mas os termos da parceria falharam: ' + rp.error.message)
       return
     }
     toast.success(editing ? 'Influencer atualizado!' : 'Influencer criado!')
@@ -166,9 +194,9 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
     setParceria({ inf, acao })
     setPForm({
       ends_at: inf.parceria?.ends_at ?? '',
-      discount_value: String(inf.discount_value),
-      validity_days: String(inf.validity_days),
-      commission_per_sale: String(inf.commission_per_sale),
+      discount_value: String(inf.parceria?.discount_value ?? 0),
+      validity_days: String(inf.parceria?.validity_days ?? 30),
+      commission_per_sale: String(inf.parceria?.commission_per_sale ?? 0),
       commission_starts_at: String(inf.parceria?.commission_starts_at ?? 1),
       fee_amount: String(inf.parceria?.fee_amount ?? 0),
       fee_timing: inf.parceria?.fee_timing ?? 'inicio',
@@ -355,8 +383,8 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
 
             {/* O numero "a pagar" nao se sustenta sozinho: precisa dizer de que acordo saiu. */}
             <p className="text-xs text-gray-600">
-              Contrato: {formatCurrency(inf.commission_per_sale)} por venda, a partir da{' '}
-              {inf.commission_starts_at}ª · Fixo de {formatCurrency(inf.comissao.fixo)}{' '}
+              Contrato: {formatCurrency(inf.parceria?.commission_per_sale ?? 0)} por venda, a partir da{' '}
+              {inf.parceria?.commission_starts_at ?? 1}ª · Fixo de {formatCurrency(inf.comissao.fixo)}{' '}
               <span className="text-gray-700">(pagamento do fixo não é controlado pelo sistema)</span>
             </p>
 
