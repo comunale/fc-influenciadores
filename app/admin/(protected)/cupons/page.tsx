@@ -14,6 +14,15 @@ interface SearchParams {
   [key: string]: string | undefined
 }
 
+/**
+ * Quantos cupons a tela carrega de uma vez.
+ *
+ * Os filtros vão todos para o banco desde 18/08/2026 — antes a página buscava
+ * 500 linhas com três junções e filtrava em memória, o que ficava lento assim
+ * que o volume crescesse.
+ */
+const LIMITE = 200
+
 export default async function CuponsPage({
   searchParams,
 }: {
@@ -24,41 +33,47 @@ export default async function CuponsPage({
 
   if (!can(role, 'coupons.read')) redirect('/admin/validar')
 
-  const [couponsRes, influencersRes] = await Promise.all([
-    supabase
-      .from('coupons')
-      .select(
-        '*, influencers(id, name, instagram_handle), campaigns(name), sellers(id, name, store_name)'
+  let query = supabase
+    .from('coupons')
+    .select(
+      '*, influencers(id, name, instagram_handle), campaigns(name), sellers(id, name, store_name)'
+    )
+
+  if (params.status) query = query.eq('status', params.status)
+  if (params.influencer_id) query = query.eq('influencer_id', params.influencer_id)
+  if (params.from) query = query.gte('created_at', params.from)
+  if (params.to) query = query.lte('created_at', params.to + 'T23:59:59')
+
+  // Filtro de conferência: é como o Financeiro acha o que falta fazer.
+  if (params.conferencia === 'pendente') query = query.eq('verified', false)
+  if (params.conferencia === 'conferido') query = query.eq('verified', true)
+  if (params.conferencia === 'pago') query = query.eq('paid', true)
+  if (params.conferencia === 'a_pagar') {
+    query = query.eq('verified', true).eq('paid', false)
+  }
+
+  if (params.q) {
+    // Vai montar um filtro .or() em texto: só deixa passar o que é seguro ali.
+    const q = params.q.replace(/[(),*]/g, '').trim()
+    if (q) {
+      query = query.or(
+        [
+          `customer_name.ilike.%${q}%`,
+          `customer_cpf.ilike.%${q}%`,
+          `coupon_number.ilike.%${q}%`,
+          `customer_email.ilike.%${q}%`,
+          `invoice_number.ilike.%${q}%`,
+        ].join(',')
       )
-      .order('created_at', { ascending: false })
-      .limit(500),
+    }
+  }
+
+  const [couponsRes, influencersRes] = await Promise.all([
+    query.order('created_at', { ascending: false }).limit(LIMITE),
     supabase.from('influencers').select('id, name, instagram_handle').order('name'),
   ])
 
-  let coupons = (couponsRes.data || []) as unknown as CouponRow[]
-
-  if (params.status) coupons = coupons.filter((c) => c.status === params.status)
-  if (params.influencer_id) coupons = coupons.filter((c) => c.influencers?.id === params.influencer_id)
-
-  if (params.q) {
-    const q = params.q.toLowerCase()
-    coupons = coupons.filter((c) =>
-      c.customer_name.toLowerCase().includes(q) ||
-      c.customer_cpf.includes(q) ||
-      c.coupon_number.toLowerCase().includes(q) ||
-      c.customer_email.toLowerCase().includes(q) ||
-      (c.invoice_number ?? '').toLowerCase().includes(q)
-    )
-  }
-
-  // Filtro de conferência: é como o Financeiro encontra o que falta fazer.
-  if (params.conferencia === 'pendente') coupons = coupons.filter((c) => !c.verified)
-  if (params.conferencia === 'conferido') coupons = coupons.filter((c) => c.verified)
-  if (params.conferencia === 'a_pagar') coupons = coupons.filter((c) => c.verified && !c.paid)
-  if (params.conferencia === 'pago') coupons = coupons.filter((c) => c.paid)
-
-  if (params.from) coupons = coupons.filter((c) => new Date(c.created_at) >= new Date(params.from!))
-  if (params.to) coupons = coupons.filter((c) => new Date(c.created_at) <= new Date(params.to! + 'T23:59:59'))
+  const coupons = (couponsRes.data || []) as unknown as CouponRow[]
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
@@ -67,6 +82,7 @@ export default async function CuponsPage({
         influencers={influencersRes.data || []}
         filters={params}
         role={role as Role}
+        noLimite={coupons.length >= LIMITE}
       />
     </div>
   )

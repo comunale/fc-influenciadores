@@ -22,11 +22,14 @@ export function CuponsTable({
   influencers,
   filters,
   role,
+  noLimite = false,
 }: {
   coupons: CouponRow[]
   influencers: InfluencerOption[]
   filters: Record<string, string | undefined>
   role: Role
+  /** A lista bateu no teto e pode haver mais — dizer, nunca truncar em silêncio. */
+  noLimite?: boolean
 }) {
   const router = useRouter()
 
@@ -37,12 +40,20 @@ export function CuponsTable({
   const [saving, setSaving] = useState(false)
 
   const podeExcluir = can(role, 'coupons.delete')
+  // O Lojista só lê: as colunas financeiras não fazem sentido para ele e são
+  // metade da largura da tabela.
+  const podeConferir = can(role, 'coupons.verify')
   const podeEditar = can(role, 'coupons.edit')
   const temAcoes = podeEditar || podeExcluir
 
-  // Colunas fixas: Código, Data, Cliente, Influencer, Vendedor, Status,
-  // Desconto, NF, Conferido, Pago. Mais a de seleção e a de ações, se houver.
-  const colSpan = 10 + (podeExcluir ? 1 : 0) + (temAcoes ? 1 : 0)
+  // 12 colunas criavam barra de rolagem horizontal. Influencer e Vendedor viraram
+  // uma coluna só, e o desconto entrou embaixo do status. O que saiu daqui
+  // continua na linha expandida.
+  const COLUNAS = podeConferir
+    ? ['Código', 'Data', 'Cliente', 'Origem', 'Status', 'NF', 'Conferido', 'Pago']
+    : ['Código', 'Data', 'Cliente', 'Origem', 'Status']
+
+  const colSpan = COLUNAS.length + (podeExcluir ? 1 : 0) + (temAcoes ? 1 : 0)
 
   const allSelected = coupons.length > 0 && selected.size === coupons.length
   const someSelected = selected.size > 0
@@ -125,7 +136,6 @@ export function CuponsTable({
     }
   }
 
-  const COLUNAS = ['Código', 'Data', 'Cliente', 'Influencer', 'Vendedor', 'Status', 'Desconto', 'NF', 'Conferido', 'Pago']
 
   return (
     <>
@@ -134,6 +144,9 @@ export function CuponsTable({
           <h1 className="text-2xl font-bold text-white">Cupons</h1>
           <p className="text-gray-500 text-sm mt-0.5">
             {coupons.length} resultado{coupons.length !== 1 ? 's' : ''}
+            {noLimite && (
+              <span className="text-yellow-500"> · mostrando os mais recentes, filtre para ver o resto</span>
+            )}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">

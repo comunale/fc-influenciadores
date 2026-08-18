@@ -109,20 +109,24 @@ export function CuponsRowItem({
           <div className="text-white font-medium">{c.customer_name}</div>
           <div className="text-gray-500 text-xs">{c.customer_email}</div>
         </td>
-        <td className="px-4 py-3 text-gray-300 whitespace-nowrap cursor-pointer" onClick={toggle}>
-          {c.influencers?.instagram_handle ?? '—'}
-        </td>
-        <td className="px-4 py-3 text-gray-300 whitespace-nowrap cursor-pointer" onClick={toggle}>
-          {c.sellers?.name ?? '—'}
+        {/* Origem: quem indicou e quem vendeu. Eram duas colunas ate 18/08 e
+            criavam barra horizontal -- os dois fatos continuam lado a lado. */}
+        <td className="px-4 py-3 whitespace-nowrap cursor-pointer" onClick={toggle}>
+          <div className="text-gray-300">{c.influencers?.instagram_handle ?? '—'}</div>
+          {c.sellers?.name && (
+            <div className="text-gray-500 text-xs">vend. {c.sellers.name}</div>
+          )}
         </td>
         <td className="px-4 py-3 cursor-pointer" onClick={toggle}>
           <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${st.color}`}>{st.label}</span>
-        </td>
-        <td className="px-4 py-3 text-[#00ff87] font-bold whitespace-nowrap cursor-pointer" onClick={toggle}>
-          {discountLabel(c)}
+          <div className="text-[#00ff87] text-xs font-bold mt-0.5">{discountLabel(c)}</div>
         </td>
 
-        {/* NF vem ANTES de Conferido: é a ordem natural de preenchimento. */}
+        {/* NF vem ANTES de Conferido: é a ordem natural de preenchimento.
+            Todo o bloco financeiro some para quem não pode conferir -- eram
+            metade da largura da tabela para o Lojista, que só lê. */}
+        {podeConferir && (
+        <>
         <td className="px-3 py-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
           {podeNF ? (
             <input
@@ -182,6 +186,8 @@ export function CuponsRowItem({
             <div className="text-[10px] text-gray-500 mt-0.5">{formatDate(c.paid_at)}</div>
           )}
         </td>
+        </>
+        )}
 
         {temAcoes && (
           <td className="px-3 py-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
