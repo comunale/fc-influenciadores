@@ -14,6 +14,21 @@ Atualizado em 2026-08-18.
 
 ---
 
+## Reestruturação como gerenciador de parcerias (decidida em 18/08)
+
+O sistema virou uma plataforma de gestão de parcerias. Quebrado em 5 subsistemas,
+cada um uma entrega que funciona sozinha:
+
+| | Subsistema | Estado |
+|---|---|---|
+| 1 | **Parceria como entidade** | spec aprovada —  |
+| 2 | Fechamentos e pagamentos | depende do 1 |
+| 3 | Funil de prospecção | independente |
+| 4 | Portal do influenciador | depende do 1 e 2. Regra de visibilidade já definida |
+| 5 | Menus, páginas e papéis | cada entrega arruma a sua parte |
+
+---
+
 ## Pedidos do César ainda não construídos
 
 ### 1. ~~Dados bancários dos influenciadores~~ — ✅ FEITO em 18/08
