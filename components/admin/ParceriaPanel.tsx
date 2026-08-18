@@ -19,6 +19,9 @@ export type ParceriaForm = {
   validity_days: string
   commission_per_sale: string
   commission_starts_at: string
+  fee_amount: string
+  fee_timing: string
+  payment_schedule: string
   zerar_contagem: boolean
 }
 
@@ -83,6 +86,27 @@ export function ParceriaPanel({
                 <Input label="A partir da venda nº" type="number" value={form.commission_starts_at}
                   onChange={(e) => setForm((p) => ({ ...p, commission_starts_at: e.target.value }))}
                   disabled={loading} />
+                <Input label="Fee fixo (R$)" type="number" value={form.fee_amount}
+                  onChange={(e) => setForm((p) => ({ ...p, fee_amount: e.target.value }))}
+                  disabled={loading} />
+                <div>
+                  <label className="text-sm text-gray-300 block mb-1.5">Fee sai</label>
+                  <select value={form.fee_timing} disabled={loading}
+                    onChange={(e) => setForm((p) => ({ ...p, fee_timing: e.target.value }))}
+                    className="w-full h-12 px-4 rounded-lg border border-[#2a2a2a] bg-[#1e1e1e] text-white text-sm focus:border-[#00ff87] focus:outline-none">
+                    <option value="inicio">No início da parceria</option>
+                    <option value="fechamento">No fechamento</option>
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-sm text-gray-300 block mb-1.5">Pagamento da comissão</label>
+                  <select value={form.payment_schedule} disabled={loading}
+                    onChange={(e) => setForm((p) => ({ ...p, payment_schedule: e.target.value }))}
+                    className="w-full h-12 px-4 rounded-lg border border-[#2a2a2a] bg-[#1e1e1e] text-white text-sm focus:border-[#00ff87] focus:outline-none">
+                    <option value="fim">No fim da parceria, tudo de uma vez</option>
+                    <option value="mensal">A cada 30 dias</option>
+                  </select>
+                </div>
               </div>
 
               {/* Zerar ou não a contagem depende do que foi combinado caso a caso.

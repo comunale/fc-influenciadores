@@ -85,7 +85,9 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
   const [parceria, setParceria] = useState<{ inf: InfluencerRow; acao: 'prorrogar' | 'renovar' } | null>(null)
   const [pForm, setPForm] = useState<ParceriaForm>({
     ends_at: '', discount_value: '', validity_days: '',
-    commission_per_sale: '', commission_starts_at: '', zerar_contagem: false,
+    commission_per_sale: '', commission_starts_at: '',
+    fee_amount: '', fee_timing: 'inicio', payment_schedule: 'fim',
+    zerar_contagem: false,
   })
   const [editing, setEditing] = useState<InfluencerRow | null>(null)
   const [loading, setLoading] = useState(false)
@@ -105,12 +107,12 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
       instagram_handle: inf.instagram_handle,
       coupon_code: inf.coupon_code,
       fee_amount: String(inf.fee_amount),
-      commission_per_sale: String(inf.commission_per_sale),
+      commission_per_sale: String(inf.parceria?.commission_per_sale ?? 0),
       commission_starts_at: String(inf.commission_starts_at),
       active: inf.active,
       discount_type: inf.discount_type,
-      discount_value: String(inf.discount_value),
-      validity_days: String(inf.validity_days),
+      discount_value: String(inf.parceria?.discount_value ?? 0),
+      validity_days: String(inf.parceria?.validity_days ?? 30),
       coupon_title: inf.coupon_title ?? '',
       coupon_description: inf.coupon_description ?? '',
     })
@@ -167,7 +169,10 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
       discount_value: String(inf.discount_value),
       validity_days: String(inf.validity_days),
       commission_per_sale: String(inf.commission_per_sale),
-      commission_starts_at: String(inf.commission_starts_at),
+      commission_starts_at: String(inf.parceria?.commission_starts_at ?? 1),
+      fee_amount: String(inf.parceria?.fee_amount ?? 0),
+      fee_timing: inf.parceria?.fee_timing ?? 'inicio',
+      payment_schedule: inf.parceria?.payment_schedule ?? 'fim',
       zerar_contagem: false,
     })
   }
@@ -188,6 +193,9 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
             validity_days: pForm.validity_days,
             commission_per_sale: pForm.commission_per_sale,
             commission_starts_at: pForm.commission_starts_at,
+            fee_amount: pForm.fee_amount,
+            fee_timing: pForm.fee_timing,
+            payment_schedule: pForm.payment_schedule,
           },
           zerar_contagem: pForm.zerar_contagem,
         } : {}),
