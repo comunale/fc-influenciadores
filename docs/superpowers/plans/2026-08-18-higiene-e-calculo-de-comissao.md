@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** ENTREGA CONCLUÍDA em 2026-08-18 — as quatro tasks feitas e em produção.
+
 **Goal:** Deixar visível se a campanha do influenciador está ativa, corrigir sozinho os cupons vencidos que ficaram como pendentes, e fazer o sistema responder "quanto eu devo a este influenciador".
 
 **Architecture:** O cálculo de comissão vira um módulo puro, sem banco e sem React, testável em milissegundos — é a fundação de que os próximos planos (encerramento de parceria e portal do influenciador) vão depender. A expiração de cupons roda como job diário no `pg_cron`, instalado nesta rodada — o dado fica correto sozinho, sem depender de alguém abrir a tela.
@@ -76,7 +78,7 @@ Resultado, já em produção: extensão instalada, função `public.expirar_cupo
 
 ---
 
-### Task 1: Tag de estado do influenciador
+### Task 1: Tag de estado do influenciador — ✅ FEITA
 
 **Files:**
 - Modify: `app/admin/(protected)/influencers/page.tsx`
@@ -188,7 +190,7 @@ Resultado: **7 cupons expirados**. Antes: `pending` 8 (7 vencidos). Depois:
 `paid` e `seller_id` não mudaram.
 
 
-### Task 3: Cálculo de comissão
+### Task 3: Cálculo de comissão — ✅ FEITA
 
 **Files:**
 - Create: `lib/commission.ts`
@@ -402,7 +404,7 @@ git commit -m "feat: calculo de comissao por influenciador"
 
 ---
 
-### Task 4: Comissão na tela de Influencers
+### Task 4: Comissão na tela de Influencers — ✅ FEITA
 
 **Files:**
 - Modify: `app/admin/(protected)/influencers/page.tsx`
