@@ -232,8 +232,10 @@ export function ValidarClient({
         <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-5">
           <h1 className="text-white font-bold text-lg mb-1">Validar Cupom na Loja</h1>
           <p className="text-gray-400 text-sm leading-relaxed">
-            Digite o código do cupom (ex: <span className="font-mono text-[#00ff87]">FOX-AB12CD</span>) ou o{' '}
-            <span className="text-[#00ff87]">@</span> do influencer que indicou o cliente.
+            Digite o código do cupom do cliente (ex:{' '}
+            <span className="font-mono text-[#00ff87]">FOX-AB12CD</span>) ou o código do
+            influencer que indicou (ex:{' '}
+            <span className="font-mono text-[#00ff87]">CAIIUXO300</span>), para cadastrar na hora.
           </p>
         </div>
       )}
@@ -242,20 +244,20 @@ export function ValidarClient({
       {!hasResult && (
         <form onSubmit={handleSearch} className="flex flex-col gap-3">
           <label className="text-sm font-medium text-gray-300">
-            Código do cupom ou @ do influencer
+            Código do cupom ou código do influencer
           </label>
           <input
             ref={inputRef}
             type="text"
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
-            placeholder="FOX-XXXXXX ou @INFLUENCER"
+            placeholder="FOX-XXXXXX ou CODIGO"
             autoComplete="off"
             autoFocus
             className="h-16 w-full rounded-xl border border-[#2a2a2a] bg-[#1e1e1e] px-5 text-2xl font-mono font-bold text-[#00ff87] placeholder:text-gray-600 placeholder:text-lg placeholder:font-normal tracking-widest focus:border-[#00ff87] focus:outline-none focus:ring-1 focus:ring-[#00ff87] text-center uppercase"
           />
           <p className="text-gray-600 text-xs text-center">
-            Digite o código do cupom OU o @ do influencer que indicou
+            Digite o código do cupom do cliente OU o código do influencer
           </p>
           <Button type="submit" size="lg" loading={loading} className="w-full h-14 text-base font-bold">
             {loading ? 'Buscando...' : 'Buscar'}

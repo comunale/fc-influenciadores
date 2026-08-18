@@ -5,7 +5,9 @@ import { linkAtivo } from '@/lib/influencer-status'
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const handle = searchParams.get('handle')?.trim().replace(/^@/, '').toUpperCase()
+    const bruto = searchParams.get('handle')?.trim().replace(/^@/, '').toUpperCase() ?? ''
+    // Vai montar um filtro .or() em texto: so deixa passar o que e seguro ali.
+    const handle = bruto.replace(/[^A-Z0-9._-]/g, '')
 
     if (!handle) {
       return NextResponse.json({ error: 'Handle obrigatório.' }, { status: 400 })
@@ -18,11 +20,17 @@ export async function GET(request: Request) {
     const { data: influencer, error } = await supabase
       .from('influencers')
       .select('*, campaigns(name)')
+      // Busca SO pelo codigo do cupom, nunca pelo @ do Instagram. Decisao do
+      // Cesar em 18/08/2026: a tela prometia os dois mas so aceitava o codigo, e
+      // ele preferiu tirar a promessa a manter duas formas de achar a mesma coisa.
       .eq('coupon_code', handle)
       .maybeSingle()
 
     if (error || !influencer) {
-      return NextResponse.json({ error: 'Influencer ou cupom não encontrado.' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Código não encontrado. Confira o código do influencer na tela Influencers.' },
+        { status: 404 }
+      )
     }
 
     // A campanha nao decide mais. Ver lib/influencer-status.ts.
