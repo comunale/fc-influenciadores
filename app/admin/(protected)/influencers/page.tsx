@@ -41,19 +41,22 @@ export default async function InfluencersPage({
 
   const enriched = (influencers || []).map((inf) => {
     const couponsArr = (inf.coupons as { status: string }[]) || []
+    const parceria = parceriaAtiva(inf.partnerships as Parceria[] | null)
     const comissao = calcularComissao(
       {
-        commission_per_sale: inf.commission_per_sale,
-        commission_starts_at: inf.commission_starts_at,
-        fee_amount: inf.fee_amount,
-        commission_count_since: inf.commission_count_since,
+        // O contrato vem da PARCERIA ativa desde 18/08/2026.
+        commission_per_sale: parceria?.commission_per_sale ?? 0,
+        commission_starts_at: parceria?.commission_starts_at ?? 1,
+        fee_amount: parceria?.fee_amount ?? 0,
+        commission_counts_from: (parceria?.commission_counts_from ?? 'parceria') as 'parceria' | 'historico',
+        partnership_id: parceria?.id ?? '',
       },
-      (inf.coupons as { id: string; verified: boolean; paid: boolean; created_at: string; commission_per_sale: number | null }[]) || []
+      (inf.coupons as { id: string; verified: boolean; paid: boolean; created_at: string; commission_per_sale: number | null; partnership_id: string | null }[]) || []
     )
 
     return {
       ...inf,
-      parceria: parceriaAtiva(inf.partnerships as Parceria[] | null),
+      parceria,
       comissao,
       campaign_name: (inf.campaigns as { name: string } | null)?.name ?? '',
       total_coupons: couponsArr.length,

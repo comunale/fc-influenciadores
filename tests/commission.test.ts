@@ -1,10 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { calcularComissao, type VendaParaComissao } from '@/lib/commission'
 
-const contrato = { commission_per_sale: 500, commission_starts_at: 2, fee_amount: 500, commission_count_since: null }
+const contrato = {
+  commission_per_sale: 500, commission_starts_at: 2, fee_amount: 500,
+  commission_counts_from: 'parceria' as const, partnership_id: 'p1',
+}
 
 function venda(id: string, dia: string, opts: Partial<VendaParaComissao> = {}): VendaParaComissao {
-  return { id, created_at: `2026-06-${dia}T12:00:00Z`, verified: true, paid: false, commission_per_sale: null, ...opts }
+  return { id, created_at: `2026-06-${dia}T12:00:00Z`, verified: true, paid: false, commission_per_sale: null, partnership_id: 'p1', ...opts }
 }
 
 describe('calcularComissao', () => {
@@ -98,22 +101,31 @@ it('usa o valor gravado no cupom, nao o valor atual do contrato', () => {
     expect(r.comissaoGerada).toBe(500)
   })
 
-  it('commission_count_since ignora vendas anteriores a data', () => {
-    // Renovou zerando a contagem em 15/06: a venda de 05/06 nao conta nem para
-    // a posicao nem para o dinheiro.
+  it('contando pela parceria, so as vendas dela contam', () => {
+    // Renovou: as vendas da parceria anterior nao contam nem para a posicao
+    // nem para o dinheiro.
     const r = calcularComissao(
-      { ...contrato, commission_count_since: '2026-06-15' },
-      [venda('antiga', '05'), venda('nova1', '20'), venda('nova2', '21')]
+      { ...contrato, commission_counts_from: 'parceria', partnership_id: 'p2' },
+      [
+        venda('velha', '05', { partnership_id: 'p1' }),
+        venda('nova1', '20', { partnership_id: 'p2' }),
+        venda('nova2', '21', { partnership_id: 'p2' }),
+      ]
     )
     expect(r.totalVendas).toBe(2)
     expect(r.vendasQueContam).toBe(1)
     expect(r.comissaoGerada).toBe(500)
   })
 
-  it('sem commission_count_since, conta tudo', () => {
-    const r = calcularComissao({ ...contrato, commission_count_since: null }, [
-      venda('a', '05'), venda('b', '06'),
-    ])
+  it('contando pelo historico, as vendas antigas tambem contam', () => {
+    const r = calcularComissao(
+      { ...contrato, commission_counts_from: 'historico', partnership_id: 'p2' },
+      [
+        venda('velha', '05', { partnership_id: 'p1' }),
+        venda('nova', '20', { partnership_id: 'p2' }),
+      ]
+    )
     expect(r.totalVendas).toBe(2)
+    expect(r.vendasQueContam).toBe(1)
   })
 })

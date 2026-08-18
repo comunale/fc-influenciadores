@@ -24,6 +24,8 @@ export type VendaParaComissao = {
    * Nulo so em cupom anterior a migration 008.
    */
   commission_per_sale: number | null
+  /** De qual acordo esta venda nasceu (migration 010). */
+  partnership_id: string | null
 }
 
 /** O combinado com o influenciador, como esta no cadastro dele. */
@@ -32,11 +34,15 @@ export type ContratoInfluencer = {
   commission_starts_at: number
   fee_amount: number
   /**
-   * Renovacao que zera a contagem grava esta data; vendas anteriores a ela
-   * deixam de contar, inclusive para a posicao. Nulo = conta a parceria toda.
-   * Zerar ou nao e decisao caso a caso do Cesar, por isso e dado e nao regra.
+   * 'parceria' = so as vendas DESTE acordo contam. 'historico' = contam as de
+   * todos os acordos do influenciador.
+   *
+   * Substitui o commission_count_since de 18/08, que guardava uma data magica.
+   * Dizer de onde conta e mais honesto do que dizer desde quando.
    */
-  commission_count_since: string | null
+  commission_counts_from: 'parceria' | 'historico'
+  /** A parceria cujo acordo esta sendo calculado. */
+  partnership_id: string
 }
 
 export type ResumoComissao = {
@@ -66,10 +72,12 @@ export function calcularComissao(
   contrato: ContratoInfluencer,
   cupons: VendaParaComissao[]
 ): ResumoComissao {
-  const desde = contrato.commission_count_since
   const vendas = cupons
     .filter(VENDA_CONTA_QUANDO)
-    .filter((c) => !desde || c.created_at.slice(0, 10) >= desde)
+    .filter((c) =>
+      contrato.commission_counts_from === 'historico' ||
+      c.partnership_id === contrato.partnership_id
+    )
     .sort((a, b) => a.created_at.localeCompare(b.created_at))
 
   const inicio = Math.max(1, contrato.commission_starts_at || 1)
