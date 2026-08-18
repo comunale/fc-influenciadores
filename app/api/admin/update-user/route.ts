@@ -1,5 +1,6 @@
 import { requireAdmin, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { isRole } from '@/lib/auth/roles'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -16,7 +17,7 @@ export async function PATCH(request: Request) {
     if (!name?.trim()) {
       return NextResponse.json({ error: 'Nome é obrigatório.' }, { status: 400 })
     }
-    if (!['admin', 'moderator'].includes(role)) {
+    if (!isRole(role)) {
       return NextResponse.json({ error: 'Perfil inválido.' }, { status: 400 })
     }
     if (role === 'moderator' && !store_name?.trim()) {

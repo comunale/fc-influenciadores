@@ -71,7 +71,7 @@ export function ConfigTabs({
 
       {/* Conteúdo da aba */}
       {activeTab === 'usuarios' && (
-        <UserManagement users={users} currentUserId={currentUserId} />
+        <UserManagement users={users} currentUserId={currentUserId} storeNames={storeNames} />
       )}
 
       {activeTab === 'vendedores' && (

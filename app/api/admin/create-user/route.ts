@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { isRole } from '@/lib/auth/roles'
 
 export async function POST(request: Request) {
   try {
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
     if (!email || !password || !name || !role) {
       return NextResponse.json({ error: 'Todos os campos são obrigatórios.' }, { status: 400 })
     }
-    if (!['admin', 'moderator'].includes(role)) {
+    if (!isRole(role)) {
       return NextResponse.json({ error: 'Perfil inválido.' }, { status: 400 })
     }
     if (password.length < 8) {

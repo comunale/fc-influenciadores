@@ -7,6 +7,14 @@ import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
+import { ROLES, ROLE_LABELS, type Role } from '@/lib/auth/roles'
+
+// Dica curta ao lado do nome do papel, so na tela de criacao.
+const ROLE_HINT: Record<Role, string> = {
+  admin: ' — acesso total',
+  finance: ' — confere NF, marca pago e exporta',
+  moderator: ' — só valida cupons no balcão',
+}
 
 interface UserProfile {
   id: string
@@ -18,17 +26,15 @@ interface UserProfile {
   created_at: string
 }
 
-const ROLE_LABELS: Record<string, string> = {
-  admin: 'Administrador',
-  moderator: 'Moderador (Loja)',
-}
 
 export function UserManagement({
   users,
   currentUserId,
+  storeNames,
 }: {
   users: UserProfile[]
   currentUserId: string
+  storeNames: string[]
 }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -131,6 +137,11 @@ export function UserManagement({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Lojas ja existentes. O campo aceita digitar uma nova, mas escolher da
+          lista evita criar loja fantasma por erro de digitacao. */}
+      <datalist id="lojas-existentes">
+        {storeNames.map((s) => <option key={s} value={s} />)}
+      </datalist>
       {/* Header + botão */}
       <div className="flex items-center justify-between">
         <p className="text-gray-500 text-sm">{users.length} usuário{users.length !== 1 ? 's' : ''} cadastrado{users.length !== 1 ? 's' : ''}</p>
@@ -161,12 +172,14 @@ export function UserManagement({
                 className="w-full h-12 px-4 rounded-lg border border-[#2a2a2a] bg-[#1e1e1e] text-white text-sm focus:border-[#00ff87] focus:outline-none"
                 disabled={loading}
               >
-                <option value="moderator">Moderador (Loja) — só valida cupons</option>
-                <option value="admin">Administrador — acesso total</option>
+                {ROLES.map((r) => (
+                  <option key={r} value={r}>{ROLE_LABELS[r]}{ROLE_HINT[r]}</option>
+                ))}
               </select>
             </div>
             {createForm.role === 'moderator' && (
-              <Input label="Nome da loja *" placeholder="Ex: FoxCycles Campinas" value={createForm.store_name}
+              <Input label="Nome da loja *" list="lojas-existentes"
+                placeholder="Escolha da lista ou digite uma loja nova" value={createForm.store_name}
                 onChange={(e) => setCreateForm((p) => ({ ...p, store_name: e.target.value }))}
                 required disabled={loading} className="md:col-span-2" />
             )}
@@ -203,12 +216,13 @@ export function UserManagement({
                       className="w-full h-12 px-4 rounded-lg border border-[#2a2a2a] bg-[#1e1e1e] text-white text-sm focus:border-[#00ff87] focus:outline-none"
                       disabled={loading || u.id === currentUserId}
                     >
-                      <option value="moderator">Moderador (Loja)</option>
-                      <option value="admin">Administrador</option>
+                      {ROLES.map((r) => (
+                        <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                      ))}
                     </select>
                   </div>
                   {editForm.role === 'moderator' && (
-                    <Input label="Nome da loja" value={editForm.store_name}
+                    <Input label="Nome da loja" list="lojas-existentes" value={editForm.store_name}
                       onChange={(e) => setEditForm((p) => ({ ...p, store_name: e.target.value }))}
                       disabled={loading} className="md:col-span-2" />
                   )}
@@ -267,9 +281,11 @@ export function UserManagement({
                     </span>
                     {u.id === currentUserId && <span className="text-xs text-gray-500">(você)</span>}
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                      u.role === 'admin' ? 'bg-[#00ff87]/10 text-[#00ff87]' : 'bg-[#1e1e1e] text-gray-400'
+                      u.role === 'admin' ? 'bg-[#00ff87]/10 text-[#00ff87]' :
+                      u.role === 'finance' ? 'bg-blue-500/10 text-blue-400' :
+                      'bg-[#1e1e1e] text-gray-400'
                     }`}>
-                      {ROLE_LABELS[u.role] || u.role}
+                      {ROLE_LABELS[u.role as Role] || u.role}
                     </span>
                     {!u.active && (
                       <span className="text-xs bg-red-950 text-red-400 px-2 py-0.5 rounded-full">Inativo</span>
