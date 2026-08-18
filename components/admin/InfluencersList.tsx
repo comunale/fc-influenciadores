@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/utils'
+import type { ResumoComissao } from '@/lib/commission'
 import { mensagemDeErro } from '@/lib/db-errors'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -26,6 +27,7 @@ interface InfluencerRow {
   total_coupons: number
   used_coupons: number
   pending_coupons: number
+  comissao: ResumoComissao
 }
 
 interface Campaign { id: string; name: string }
@@ -270,18 +272,27 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
                 <div className="text-white font-bold">{inf.total_coupons}</div>
               </div>
               <div className="bg-[#1a1a1a] rounded-lg px-3 py-2 text-center">
-                <div className="text-xs text-gray-500">Vendas</div>
-                <div className="text-[#00ff87] font-bold">{inf.used_coupons}</div>
+                <div className="text-xs text-gray-500">Vendas aprovadas</div>
+                <div className="text-white font-bold">{inf.comissao.totalVendas}</div>
               </div>
               <div className="bg-[#1a1a1a] rounded-lg px-3 py-2 text-center">
-                <div className="text-xs text-gray-500">Fee</div>
-                <div className="text-white font-bold text-sm">{formatCurrency(inf.fee_amount)}</div>
+                <div className="text-xs text-gray-500">Comissão gerada</div>
+                <div className="text-white font-bold text-sm">{formatCurrency(inf.comissao.comissaoGerada)}</div>
               </div>
               <div className="bg-[#1a1a1a] rounded-lg px-3 py-2 text-center">
-                <div className="text-xs text-gray-500">Comissão/venda</div>
-                <div className="text-[#00ff87] font-bold text-sm">{formatCurrency(inf.commission_per_sale)}</div>
+                <div className="text-xs text-gray-500">A pagar</div>
+                <div className={`font-bold text-sm ${inf.comissao.comissaoAPagar > 0 ? 'text-[#00ff87]' : 'text-gray-500'}`}>
+                  {formatCurrency(inf.comissao.comissaoAPagar)}
+                </div>
               </div>
             </div>
+
+            {/* O numero "a pagar" nao se sustenta sozinho: precisa dizer de que acordo saiu. */}
+            <p className="text-xs text-gray-600">
+              Contrato: {formatCurrency(inf.commission_per_sale)} por venda, a partir da{' '}
+              {inf.commission_starts_at}ª · Fixo de {formatCurrency(inf.comissao.fixo)}{' '}
+              <span className="text-gray-700">(pagamento do fixo não é controlado pelo sistema)</span>
+            </p>
 
             {/* Linha 3: link + ações */}
             <div className="flex items-center gap-2 flex-wrap">
