@@ -22,6 +22,7 @@ interface InfluencerRow {
   active: boolean
   campaign_id: string
   campaign_name: string
+  campaign_active: boolean
   total_coupons: number
   used_coupons: number
   pending_coupons: number
@@ -231,9 +232,21 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-white font-semibold">{inf.name}</span>
                   <span className="text-[#00ff87] text-sm">{inf.instagram_handle}</span>
-                  {!inf.active && (
-                    <span className="text-xs text-red-400 bg-red-950 px-2 py-0.5 rounded-full">Inativo</span>
-                  )}
+                  {(() => {
+                    // Dois interruptores independentes. Antes desta etiqueta, um
+                    // influenciador ativo dentro de campanha desligada parecia no ar
+                    // -- foi o que deixou 17 links mortos sem ninguem entender por que.
+                    const estado = !inf.active
+                      ? { texto: 'Influencer inativo', cor: 'bg-[#1e1e1e] text-gray-400' }
+                      : !inf.campaign_active
+                        ? { texto: 'Campanha encerrada', cor: 'bg-red-950 text-red-400' }
+                        : { texto: 'Ativo', cor: 'bg-[#00ff87]/10 text-[#00ff87]' }
+                    return (
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${estado.cor}`}>
+                        {estado.texto}
+                      </span>
+                    )
+                  })()}
                 </div>
                 <div className="text-gray-500 text-xs mt-0.5">
                   Campanha: {inf.campaign_name} · Código:{' '}
