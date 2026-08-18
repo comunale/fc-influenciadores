@@ -14,6 +14,24 @@ Atualizado em 2026-08-18.
 
 ---
 
+## Retomando o trabalho — leia isto primeiro
+
+**Última sessão: 18/08/2026.** Estado: tudo commitado e no ar, nada pela metade.
+
+Antes de construir o portal, **duas confirmações do César estão pendentes** (ele
+saiu antes de responder):
+
+1. **O influenciador não vê dado nenhum de cliente** — nem nome, nem CPF, nem
+   telefone. Só números: *"12 cupons · 5 vendas · 3 aprovadas"*. São clientes da
+   FoxCycles, não dele.
+2. **O portal é somente leitura** — não edita nada, nem os próprios dados
+   bancários. Mudar chave PIX por uma tela que um terceiro acessa é superfície de
+   fraude sem ganho que compense.
+
+As duas estão na spec. Não começar o portal sem a resposta.
+
+---
+
 ## Reestruturação como gerenciador de parcerias (decidida em 18/08)
 
 O sistema virou uma plataforma de gestão de parcerias. Quebrado em 5 subsistemas,
@@ -24,7 +42,7 @@ cada um uma entrega que funciona sozinha:
 | 1 | **Parceria como entidade** | ✅ **concluído em 18/08** |
 | 2 | Fechamentos e pagamentos | depende do 1 |
 | 3 | Funil de prospecção | independente |
-| 4 | Portal do influenciador | depende do 1 e 2. Regra de visibilidade definida (ver abaixo) |
+| 4 | Portal do influenciador | 📋 **spec escrita, aguardando 2 confirmações** — `specs/2026-08-18-portal-do-influenciador-design.md` |
 
 **Visibilidade no portal, decidida em 18/08:** a visibilidade é **por parceria**, não
 por cupom. A parceria antiga aparece como uma linha fechada — *"Parceria Reinauguração
@@ -116,6 +134,23 @@ Conferido, Pago, vendedor nomeado) ataca pela auditoria, depois da venda. Os
 dois se complementam — hoje o vendedor ainda cria e valida um cupom sozinho.
 
 ---
+
+## Correção de segurança feita em 18/08
+
+**As tabelas eram legíveis por qualquer um.** `coupons`, `influencers`,
+`partnerships` e `campaigns` tinham SELECT liberado para `public` — para quem
+tivesse a chave anon, que vai no código do navegador e é pública por natureza.
+
+Testado antes de corrigir: um anônimo lia a tabela de cupons inteira, com **nome,
+CPF, telefone e e-mail de todo cliente**. E `coupons` tinha INSERT liberado —
+dava para criar cupom direto, driblando o rate limit.
+
+Corrigido na migration 013: as páginas públicas passaram a ler pelo servidor e as
+tabelas só respondem a quem está autenticado. Verificado com `role anon`: zero
+linhas em todas, e o insert não passa.
+
+**A ordem foi de propósito: código primeiro, política depois.** Apertar a regra
+antes derrubaria o site — foi assim que o balcão ficou 12 dias fora do ar.
 
 ## Dívidas técnicas conhecidas
 
