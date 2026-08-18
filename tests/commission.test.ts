@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { calcularComissao, type VendaParaComissao } from '@/lib/commission'
 
-const contrato = { commission_per_sale: 500, commission_starts_at: 2, fee_amount: 500 }
+const contrato = { commission_per_sale: 500, commission_starts_at: 2, fee_amount: 500, commission_count_since: null }
 
 function venda(id: string, dia: string, opts: Partial<VendaParaComissao> = {}): VendaParaComissao {
-  return { id, created_at: `2026-06-${dia}T12:00:00Z`, verified: true, paid: false, ...opts }
+  return { id, created_at: `2026-06-${dia}T12:00:00Z`, verified: true, paid: false, commission_per_sale: null, ...opts }
 }
 
 describe('calcularComissao', () => {
@@ -79,5 +79,41 @@ describe('calcularComissao', () => {
   it('commission_starts_at zero ou ausente vale como 1', () => {
     const r = calcularComissao({ ...contrato, commission_starts_at: 0 }, [venda('a', '05')])
     expect(r.vendasQueContam).toBe(1)
+  })
+it('usa o valor gravado no cupom, nao o valor atual do contrato', () => {
+    // Renovou de 500 para 900. As vendas antigas continuam valendo 500 -- e o
+    // que impede uma renovacao de reescrever comissao ja paga.
+    const r = calcularComissao({ ...contrato, commission_per_sale: 900, commission_starts_at: 1 }, [
+      venda('a', '05', { commission_per_sale: 500 }),
+      venda('b', '06', { commission_per_sale: 500 }),
+      venda('c', '20', { commission_per_sale: 900 }),
+    ])
+    expect(r.comissaoGerada).toBe(1900)
+  })
+
+  it('cupom sem retrato cai no valor do contrato', () => {
+    const r = calcularComissao({ ...contrato, commission_starts_at: 1 }, [
+      venda('a', '05', { commission_per_sale: null }),
+    ])
+    expect(r.comissaoGerada).toBe(500)
+  })
+
+  it('commission_count_since ignora vendas anteriores a data', () => {
+    // Renovou zerando a contagem em 15/06: a venda de 05/06 nao conta nem para
+    // a posicao nem para o dinheiro.
+    const r = calcularComissao(
+      { ...contrato, commission_count_since: '2026-06-15' },
+      [venda('antiga', '05'), venda('nova1', '20'), venda('nova2', '21')]
+    )
+    expect(r.totalVendas).toBe(2)
+    expect(r.vendasQueContam).toBe(1)
+    expect(r.comissaoGerada).toBe(500)
+  })
+
+  it('sem commission_count_since, conta tudo', () => {
+    const r = calcularComissao({ ...contrato, commission_count_since: null }, [
+      venda('a', '05'), venda('b', '06'),
+    ])
+    expect(r.totalVendas).toBe(2)
   })
 })

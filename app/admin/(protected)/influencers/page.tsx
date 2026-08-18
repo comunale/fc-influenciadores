@@ -10,7 +10,7 @@ export default async function InfluencersPage() {
   const [{ data: influencers }, { data: campaigns }] = await Promise.all([
     supabase
       .from('influencers')
-      .select('*, campaigns(name, active), coupons(id, status, verified, paid, created_at)')
+      .select('*, campaigns(name, active), coupons(id, status, verified, paid, created_at, commission_per_sale)')
       .order('name'),
     supabase.from('campaigns').select('id, name').eq('active', true),
   ])
@@ -22,8 +22,9 @@ export default async function InfluencersPage() {
         commission_per_sale: inf.commission_per_sale,
         commission_starts_at: inf.commission_starts_at,
         fee_amount: inf.fee_amount,
+        commission_count_since: inf.commission_count_since,
       },
-      (inf.coupons as { id: string; verified: boolean; paid: boolean; created_at: string }[]) || []
+      (inf.coupons as { id: string; verified: boolean; paid: boolean; created_at: string; commission_per_sale: number | null }[]) || []
     )
 
     return {
