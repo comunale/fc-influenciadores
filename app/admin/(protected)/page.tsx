@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { formatDate } from '@/lib/utils'
 import { venceEmAte } from '@/lib/influencer-status'
+import { parceriaAtiva, type Parceria } from '@/lib/partnership'
 import Link from 'next/link'
 
 export default async function AdminDashboard() {
@@ -22,7 +23,7 @@ export default async function AdminDashboard() {
       .order('created_at', { ascending: false })
       .limit(10),
     supabase.from('influencers')
-      .select('id, name, instagram_handle, partnership_ends_at, active, coupons(status)')
+      .select('id, name, instagram_handle, active, partnerships(*), coupons(status)')
       .eq('active', true),
   ])
 
@@ -44,9 +45,11 @@ export default async function AdminDashboard() {
   // Parcerias que vencem nos proximos 30 dias. Depois da data o link para de
   // funcionar sozinho -- este bloco existe para o Cesar fechar as vendas e
   // pagar a comissao antes disso acontecer.
+  // O prazo vive na parceria desde 18/08/2026, nao mais no influenciador.
   const vencendo = (influencers || [])
-    .filter((i) => venceEmAte(i, 30))
-    .sort((a, b) => (a.partnership_ends_at ?? '').localeCompare(b.partnership_ends_at ?? ''))
+    .map((i) => ({ ...i, parceria: parceriaAtiva(i.partnerships as Parceria[] | null) }))
+    .filter((i) => venceEmAte(i.parceria, 30))
+    .sort((a, b) => (a.parceria?.ends_at ?? '').localeCompare(b.parceria?.ends_at ?? ''))
 
   const metrics = [
     { label: 'Cupons Gerados', value: total, color: 'text-white' },
@@ -72,7 +75,7 @@ export default async function AdminDashboard() {
             {vencendo.map((i) => (
               <div key={i.id} className="flex items-center justify-between text-sm">
                 <span className="text-white">{i.instagram_handle}</span>
-                <span className="text-yellow-400">até {formatDate(i.partnership_ends_at!)}</span>
+                <span className="text-yellow-400">até {formatDate(i.parceria!.ends_at!)}</span>
               </div>
             ))}
           </div>

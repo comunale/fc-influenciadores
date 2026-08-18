@@ -3,6 +3,7 @@ import { InfluencersList } from '@/components/admin/InfluencersList'
 import { InfluencersFilters } from '@/components/admin/InfluencersFilters'
 import { calcularComissao } from '@/lib/commission'
 import { linkAtivo, venceEmAte } from '@/lib/influencer-status'
+import { parceriaAtiva, type Parceria } from '@/lib/partnership'
 import { type Role } from '@/lib/auth/roles'
 
 export const dynamic = 'force-dynamic'
@@ -27,7 +28,7 @@ export default async function InfluencersPage({
   const [{ data: influencers }, { data: campaigns }, { data: todasCampanhas }] = await Promise.all([
     supabase
       .from('influencers')
-      .select('*, campaigns(name), coupons(id, status, verified, paid, created_at, commission_per_sale)')
+      .select('*, partnerships(*), campaigns(name), coupons(id, status, verified, paid, created_at, commission_per_sale, partnership_id)')
       .order('name'),
     // Só as ativas servem de modelo no cadastro...
     supabase
@@ -52,6 +53,7 @@ export default async function InfluencersPage({
 
     return {
       ...inf,
+      parceria: parceriaAtiva(inf.partnerships as Parceria[] | null),
       comissao,
       campaign_name: (inf.campaigns as { name: string } | null)?.name ?? '',
       total_coupons: couponsArr.length,
@@ -72,17 +74,17 @@ export default async function InfluencersPage({
   }
 
   // "ativo" aqui significa o mesmo que na landing: o link abre.
-  if (params.estado === 'ativo') lista = lista.filter((i) => linkAtivo(i))
+  if (params.estado === 'ativo') lista = lista.filter((i) => linkAtivo(i, i.parceria))
   if (params.estado === 'inativo') lista = lista.filter((i) => !i.active)
   if (params.estado === 'encerrada') {
-    lista = lista.filter((i) => i.active && !linkAtivo(i))
+    lista = lista.filter((i) => i.active && !linkAtivo(i, i.parceria))
   }
 
   if (params.campaign_id) lista = lista.filter((i) => i.campaign_id === params.campaign_id)
 
   if (params.a_pagar === '1') lista = lista.filter((i) => i.comissao.comissaoAPagar > 0)
 
-  if (params.vencendo === '1') lista = lista.filter((i) => venceEmAte(i, 30))
+  if (params.vencendo === '1') lista = lista.filter((i) => venceEmAte(i.parceria, 30))
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">

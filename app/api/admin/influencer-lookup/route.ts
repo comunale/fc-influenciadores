@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { linkAtivo } from '@/lib/influencer-status'
+import { parceriaAtiva, type Parceria } from '@/lib/partnership'
 
 export async function GET(request: Request) {
   try {
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
 
     const { data: influencer, error } = await supabase
       .from('influencers')
-      .select('*, campaigns(name)')
+      .select('*, partnerships(*), campaigns(name)')
       // Busca SO pelo codigo do cupom, nunca pelo @ do Instagram. Decisao do
       // Cesar em 18/08/2026: a tela prometia os dois mas so aceitava o codigo, e
       // ele preferiu tirar a promessa a manter duas formas de achar a mesma coisa.
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
     }
 
     // A campanha nao decide mais. Ver lib/influencer-status.ts.
-    if (!linkAtivo(influencer)) {
+    if (!linkAtivo(influencer, parceriaAtiva(influencer.partnerships as Parceria[] | null))) {
       return NextResponse.json({ error: 'A parceria deste influencer não está ativa.' }, { status: 400 })
     }
 

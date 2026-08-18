@@ -8,6 +8,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import type { ResumoComissao } from '@/lib/commission'
 import { mensagemDeErro } from '@/lib/db-errors'
 import { motivoLinkInativo } from '@/lib/influencer-status'
+import type { Parceria } from '@/lib/partnership'
 import { can, type Role } from '@/lib/auth/roles'
 import { DadosBancarios } from './DadosBancarios'
 import { ParceriaPanel, type ParceriaForm } from './ParceriaPanel'
@@ -32,7 +33,7 @@ interface InfluencerRow {
   validity_days: number
   coupon_title: string | null
   coupon_description: string | null
-  partnership_ends_at: string | null
+  parceria: Parceria | null
   total_coupons: number
   used_coupons: number
   pending_coupons: number
@@ -162,7 +163,7 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
   function abrirParceria(inf: InfluencerRow, acao: 'prorrogar' | 'renovar') {
     setParceria({ inf, acao })
     setPForm({
-      ends_at: inf.partnership_ends_at ?? '',
+      ends_at: inf.parceria?.ends_at ?? '',
       discount_value: String(inf.discount_value),
       validity_days: String(inf.validity_days),
       commission_per_sale: String(inf.commission_per_sale),
@@ -269,7 +270,7 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
                     // -- foi o que deixou 17 links mortos sem ninguem entender por que.
                     // Mesma regra que decide se o link abre (lib/influencer-status.ts).
                     // A campanha nao entra mais: desde 18/08/2026 ela nao derruba link.
-                    const motivo = motivoLinkInativo(inf)
+                    const motivo = motivoLinkInativo(inf, inf.parceria)
                     const estado = motivo
                       ? { texto: motivo, cor: 'bg-red-950 text-red-400' }
                       : { texto: 'Ativo', cor: 'bg-[#00ff87]/10 text-[#00ff87]' }
@@ -283,8 +284,8 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
                 <div className="text-gray-500 text-xs mt-0.5">
                   Campanha: {inf.campaign_name} · Código:{' '}
                   <span className="font-mono text-gray-300">{inf.coupon_code}</span>
-                  {inf.partnership_ends_at && (
-                    <> · Parceria até <span className="text-gray-300">{formatDate(inf.partnership_ends_at)}</span></>
+                  {inf.parceria?.ends_at && (
+                    <> · Parceria até <span className="text-gray-300">{formatDate(inf.parceria.ends_at)}</span></>
                   )}
                 </div>
               </div>

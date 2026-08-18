@@ -4,6 +4,7 @@ import { FoxLogo } from '@/components/FoxLogo'
 import { CouponForm } from '@/components/forms/CouponForm'
 import { formatCurrency } from '@/lib/utils'
 import { linkAtivo } from '@/lib/influencer-status'
+import { parceriaAtiva, type Parceria } from '@/lib/partnership'
 import type { Metadata } from 'next'
 
 interface PageProps {
@@ -11,10 +12,11 @@ interface PageProps {
 }
 
 /**
- * Os termos vêm do influenciador desde 18/08/2026, não mais da campanha.
+ * Os termos vêm da PARCERIA ativa desde 18/08/2026. Antes vinham da campanha,
+ * que derrubava todos os influenciadores de uma vez; depois do influenciador.
  * A campanha continua sendo lida apenas como rótulo, no rodapé.
  */
-const CAMPOS = 'instagram_handle, active, partnership_ends_at, discount_value, discount_type, coupon_title, coupon_description'
+const CAMPOS = 'instagram_handle, active, partnerships(*)'
 
 function rotuloDesconto(tipo: string, valor: number) {
   return tipo === 'fixed' ? formatCurrency(valor) : `${valor}%`
@@ -30,15 +32,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     .eq('coupon_code', coupon_code.toUpperCase())
     .maybeSingle()
 
-  if (!influencer || !linkAtivo(influencer)) {
+  const p = parceriaAtiva(influencer?.partnerships as Parceria[] | null)
+  if (!influencer || !linkAtivo(influencer, p)) {
     return { title: 'FoxCycles | Cupom de Desconto' }
   }
 
-  const discountLabel = rotuloDesconto(influencer.discount_type, influencer.discount_value)
+  const discountLabel = rotuloDesconto(p!.discount_type, p!.discount_value)
   const title = `FoxCycles | ${discountLabel} OFF — Indicado por @${influencer.instagram_handle}`
   const description =
-    influencer.coupon_description ||
-    influencer.coupon_title ||
+    p!.coupon_description ||
+    p!.coupon_title ||
     'Cupom exclusivo para desconto na FoxCycles.'
 
   return {
@@ -54,15 +57,16 @@ export default async function CouponLandingPage({ params }: PageProps) {
 
   const { data: influencer } = await supabase
     .from('influencers')
-    .select('*, campaigns(name)')
+    .select('*, partnerships(*), campaigns(name)')
     .eq('coupon_code', coupon_code.toUpperCase())
     .maybeSingle()
 
-  // A campanha não decide mais. O link depende do influenciador estar ativo e
-  // dentro do prazo — ver lib/influencer-status.ts.
-  if (!influencer || !linkAtivo(influencer)) notFound()
+  // O link depende do influenciador estar ativo e da PARCERIA estar vigente.
+  // Ver lib/influencer-status.ts.
+  const parceria = parceriaAtiva(influencer?.partnerships as Parceria[] | null)
+  if (!influencer || !linkAtivo(influencer, parceria)) notFound()
 
-  const discountLabel = rotuloDesconto(influencer.discount_type, influencer.discount_value)
+  const discountLabel = rotuloDesconto(parceria!.discount_type, parceria!.discount_value)
   const campanha = (influencer.campaigns as { name: string } | null)?.name ?? ''
 
   return (
@@ -85,7 +89,7 @@ export default async function CouponLandingPage({ params }: PageProps) {
         <div className="text-center flex flex-col gap-2">
           <div className="text-6xl font-black text-[#00ff87] leading-none">{discountLabel}</div>
           <div className="text-xl font-bold text-white">OFF na sua moto elétrica</div>
-          <div className="text-sm text-gray-400 mt-1">{influencer.coupon_description}</div>
+          <div className="text-sm text-gray-400 mt-1">{parceria!.coupon_description}</div>
         </div>
 
         {/* Separador visual */}

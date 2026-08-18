@@ -4,6 +4,7 @@ import { addDays } from '@/lib/utils'
 import { insertCouponWithRetry } from '@/lib/coupons/insert'
 import { NextResponse } from 'next/server'
 import { linkAtivo } from '@/lib/influencer-status'
+import { parceriaAtiva, type Parceria } from '@/lib/partnership'
 
 export async function POST(request: Request) {
   try {
@@ -83,7 +84,7 @@ export async function POST(request: Request) {
     // Os termos vem do influenciador desde 18/08/2026, nao da campanha.
     const { data: influencer } = await supabase
       .from('influencers')
-      .select('id, active, partnership_ends_at, validity_days, discount_type, discount_value, commission_per_sale')
+      .select('id, active, partnerships(*)')
       .eq('id', influencer_id)
       .maybeSingle()
 
@@ -91,21 +92,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Influencer não encontrado.' }, { status: 404 })
     }
 
-    if (!linkAtivo(influencer)) {
+    const parceria = parceriaAtiva(influencer.partnerships as Parceria[] | null)
+    if (!linkAtivo(influencer, parceria)) {
       return NextResponse.json({ error: 'A parceria deste influencer não está ativa.' }, { status: 400 })
     }
 
     const now = new Date()
-    const expiresAt = addDays(now, influencer.validity_days)
+    const expiresAt = addDays(now, parceria!.validity_days)
 
     const result = await insertCouponWithRetry(supabase, {
       influencer_id,
       campaign_id,
-      // Retrato do que valia agora. Sem isso, renovar o influenciador
-      // reescreveria o desconto e a comissao deste cupom.
-      discount_type: influencer.discount_type,
-      discount_value: influencer.discount_value,
-      commission_per_sale: influencer.commission_per_sale,
+      partnership_id: parceria!.id,
+      // Retrato do que valia agora. Sem isso, renovar a parceria reescreveria o
+      // desconto e a comissao deste cupom.
+      discount_type: parceria!.discount_type,
+      discount_value: parceria!.discount_value,
+      commission_per_sale: parceria!.commission_per_sale,
       customer_name: customer_name.trim(),
       customer_cpf: cpfClean,
       customer_phone: phoneClean,

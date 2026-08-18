@@ -1,50 +1,44 @@
+import { parceriaVigente, type Parceria } from './partnership'
+
 /**
  * Quando o link do influenciador abre.
  *
- * Ate 18/08/2026 dependia da CAMPANHA estar ativa, o que derrubava todos os
- * influenciadores dela de uma vez. Naquele dia isso deixou 17 de 18 links
- * mortos, com todo mundo marcado como ativo e nada na tela indicando o motivo.
+ * A regra mudou de dono duas vezes, e vale saber por quê:
+ *  - até 18/08/2026 dependia da CAMPANHA, o que derrubava todos os
+ *    influenciadores dela de uma vez -- naquele dia deixou 17 de 18 links
+ *    mortos, com todos marcados como ativos e nada na tela explicando;
+ *  - depois passou a depender do influenciador;
+ *  - agora depende da PARCERIA, que é onde o prazo realmente vive.
  *
- * Agora depende so do influenciador: estar ativo e dentro do prazo. A checagem
- * acontece na hora em que alguem abre o link -- nao depende de nenhuma rotina
- * agendada rodar.
- *
- * Vive aqui, e nao dentro da pagina, porque as rotas de criacao de cupom usam
- * a mesma regra. Duas copias divergiriam, e o link abriria num fluxo e fecharia
- * no outro.
+ * A checagem acontece quando alguém abre o link. Não depende de rotina agendada.
  */
-export type StatusDoLink = {
-  active: boolean
-  partnership_ends_at: string | null
+export function linkAtivo(inf: { active: boolean }, parceria: Parceria | null): boolean {
+  return inf.active && parceriaVigente(parceria)
 }
 
-export function linkAtivo(inf: StatusDoLink): boolean {
-  if (!inf.active) return false
-  if (!inf.partnership_ends_at) return true // sem prazo definido
-  // Compara so a data: a parceria vale ate o fim do dia combinado.
-  return inf.partnership_ends_at >= new Date().toISOString().slice(0, 10)
-}
-
-/** Por que o link nao abre. Usado para explicar na tela do admin. */
-export function motivoLinkInativo(inf: StatusDoLink): string | null {
+/** Por que o link não abre. Usado para explicar na tela do admin. */
+export function motivoLinkInativo(
+  inf: { active: boolean },
+  parceria: Parceria | null
+): string | null {
   if (!inf.active) return 'Influencer inativo'
-  if (inf.partnership_ends_at && inf.partnership_ends_at < new Date().toISOString().slice(0, 10)) {
-    return 'Parceria encerrada'
+  if (!parceria) return 'Sem parceria'
+  if (parceria.status !== 'ativa') return 'Parceria encerrada'
+  if (parceria.ends_at && parceria.ends_at < new Date().toISOString().slice(0, 10)) {
+    return 'Parceria vencida'
   }
   return null
 }
 
 /**
- * A parceria vence nos proximos `dias`?
+ * A parceria vence nos próximos `dias`?
  *
- * Vive aqui junto do resto da regra de prazo, e nao na pagina, porque
- * `Date.now()` chamado durante a renderizacao de um Server Component e barrado
- * pela regra de funcao impura do React.
+ * Vive aqui, e não na página, porque `Date.now()` durante a renderização de um
+ * Server Component é barrado pela regra de função impura do React.
  */
-export function venceEmAte(inf: StatusDoLink, dias: number): boolean {
-  if (!inf.partnership_ends_at) return false
+export function venceEmAte(p: Parceria | null, dias: number): boolean {
+  if (!p?.ends_at || p.status !== 'ativa') return false
   const hoje = new Date()
   const limite = new Date(hoje.getTime() + dias * 86400000).toISOString().slice(0, 10)
-  return inf.partnership_ends_at >= hoje.toISOString().slice(0, 10)
-      && inf.partnership_ends_at <= limite
+  return p.ends_at >= hoje.toISOString().slice(0, 10) && p.ends_at <= limite
 }

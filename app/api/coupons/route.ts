@@ -4,6 +4,7 @@ import { addDays } from '@/lib/utils'
 import { insertCouponWithRetry } from '@/lib/coupons/insert'
 import { checkRateLimit, getClientIp, COUPON_RULES } from '@/lib/rate-limit'
 import { linkAtivo } from '@/lib/influencer-status'
+import { parceriaAtiva, type Parceria } from '@/lib/partnership'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
     // Buscar influencer pelo código
     const { data: influencer, error: inflError } = await supabase
       .from('influencers')
-      .select('*')
+      .select('*, partnerships(*)')
       .eq('coupon_code', influencer_code.toUpperCase())
       .maybeSingle()
 
@@ -53,8 +54,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Link de influencer inválido.' }, { status: 404 })
     }
 
-    // A campanha nao decide mais. Ver lib/influencer-status.ts.
-    if (!linkAtivo(influencer)) {
+    // O link depende da PARCERIA ativa. Ver lib/influencer-status.ts.
+    const parceria = parceriaAtiva(influencer.partnerships as Parceria[] | null)
+    if (!linkAtivo(influencer, parceria)) {
       return NextResponse.json({ error: 'Este link não está mais ativo.' }, { status: 400 })
     }
 
@@ -75,16 +77,17 @@ export async function POST(request: Request) {
       )
     }
 
-    const expiresAt = addDays(new Date(), influencer.validity_days)
+    const expiresAt = addDays(new Date(), parceria!.validity_days)
 
     const result = await insertCouponWithRetry(supabase, {
       influencer_id: influencer.id,
       campaign_id: influencer.campaign_id,
-      // Retrato do que valia agora. Sem isso, renovar o influenciador
-      // reescreveria o desconto e a comissao deste cupom.
-      discount_type: influencer.discount_type,
-      discount_value: influencer.discount_value,
-      commission_per_sale: influencer.commission_per_sale,
+      partnership_id: parceria!.id,
+      // Retrato do que valia agora. Sem isso, renovar a parceria reescreveria o
+      // desconto e a comissao deste cupom.
+      discount_type: parceria!.discount_type,
+      discount_value: parceria!.discount_value,
+      commission_per_sale: parceria!.commission_per_sale,
       customer_name: customer_name.trim(),
       customer_cpf: cpfClean,
       customer_phone: phoneClean,
