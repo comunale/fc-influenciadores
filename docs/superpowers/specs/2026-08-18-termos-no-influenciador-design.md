@@ -35,6 +35,27 @@ O link passa a depender só do influenciador: `active` e o prazo dele. A campanh
 
 Rótulo de agrupamento para relatório, e modelo para não redigitar os mesmos valores a cada cadastro. Os cupons continuam guardando `campaign_id`, então o relatório por campanha segue funcionando.
 
+## Como um link morre
+
+Esta parte gerou dúvida na conversa e precisa ficar sem ambiguidade: **o link continua podendo ser derrubado, e de forma mais precisa que hoje.**
+
+```
+1. Influenciador desativado          → morre na hora, ato manual
+2. partnership_ends_at no passado    → morre sozinho, na data combinada
+```
+
+A verificação acontece **na hora em que alguém abre o link** — não depende de nenhuma rotina rodar. Passou da data, a página não abre. O `pg_cron` serve apenas para **avisar antes** que a parceria está acabando, nunca para derrubar.
+
+O que muda em relação a hoje:
+
+| | Hoje | Depois |
+|---|---|---|
+| Encerrar uma parceria | impossível sem derrubar as outras | desativa ou põe prazo |
+| Encerrar na data combinada | não existe | automático |
+| Encerrar um grupo de uma vez | desativa a campanha | um por um |
+
+O único poder perdido é derrubar 16 links num clique desligando a campanha — que foi justamente o que causou o incidente de 18/08, com 17 links mortos sem ninguém ter pedido.
+
 ## O retrato: sem isso, renovar destrói o passado
 
 **O cupom não guarda o desconto que concedeu.** Ele guarda o vínculo com a campanha e o valor é lido de lá na exibição.
