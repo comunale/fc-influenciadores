@@ -22,7 +22,7 @@ export default async function CouponPage({ params }: PageProps) {
 
   const { data: coupon } = await supabase
     .from('coupons')
-    .select('*, influencers(name, instagram_handle, coupon_title, coupon_description)')
+    .select('*, influencers(name, instagram_handle), partnerships(coupon_title, coupon_description)')
     .eq('coupon_number', coupon_number.toUpperCase())
     .single()
 

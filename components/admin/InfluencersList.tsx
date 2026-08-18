@@ -22,17 +22,9 @@ interface InfluencerRow {
   name: string
   instagram_handle: string
   coupon_code: string
-  fee_amount: number
-  commission_per_sale: number
-  commission_starts_at: number
   active: boolean
   campaign_id: string
   campaign_name: string
-  discount_type: string
-  discount_value: number
-  validity_days: number
-  coupon_title: string | null
-  coupon_description: string | null
   parceria: Parceria | null
   total_coupons: number
   used_coupons: number

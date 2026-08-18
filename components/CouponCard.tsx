@@ -8,9 +8,10 @@ import type { Coupon, Influencer } from '@/lib/supabase/types'
 
 interface CouponCardProps {
   coupon: Coupon & {
-    // O desconto vem do RETRATO no proprio cupom (migration 008). Os textos
-    // vem do influencer, que passou a ser dono dos termos.
-    influencers: Pick<Influencer, 'name' | 'instagram_handle' | 'coupon_title' | 'coupon_description'>
+    // O desconto vem do RETRATO no proprio cupom (migration 008). Os textos vem
+    // da PARCERIA em que o cupom nasceu (migration 010).
+    influencers: Pick<Influencer, 'name' | 'instagram_handle'>
+    partnerships: { coupon_title: string | null; coupon_description: string | null } | null
   }
 }
 
@@ -123,7 +124,7 @@ export function CouponCard({ coupon }: CouponCardProps) {
         {/* Topo colorido */}
         <div className="bg-[#00ff87] px-6 py-4 flex flex-col items-center gap-1">
           <div className="text-black text-xs font-bold uppercase tracking-widest">FoxCycles</div>
-          <div className="text-black text-lg font-black">{coupon.influencers.coupon_title}</div>
+          <div className="text-black text-lg font-black">{coupon.partnerships?.coupon_title}</div>
         </div>
 
         {/* Separador dentilhado */}
@@ -194,7 +195,7 @@ export function CouponCard({ coupon }: CouponCardProps) {
 
           {/* Descrição */}
           <div className="text-xs text-gray-500 text-center leading-relaxed border-t border-[#1e1e1e] pt-3">
-            {coupon.influencers.coupon_description}
+            {coupon.partnerships?.coupon_description}
           </div>
         </div>
       </div>

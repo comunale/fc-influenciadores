@@ -218,6 +218,13 @@ export type Database = {
             referencedRelation: "sellers"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "coupons_partnership_id_fkey"
+            columns: ["partnership_id"]
+            isOneToOne: false
+            referencedRelation: "partnerships"
+            referencedColumns: ["id"]
+          },
         ]
       }
       influencer_payment_info: {
@@ -263,18 +270,8 @@ export type Database = {
         Row: {
           active: boolean
           campaign_id: string
-          commission_per_sale: number
-          commission_starts_at: number
-          discount_type: string
-          discount_value: number
-          validity_days: number
-          coupon_title: string | null
-          coupon_description: string | null
-          partnership_ends_at: string | null
-          commission_count_since: string | null
           coupon_code: string
           created_at: string
-          fee_amount: number
           id: string
           instagram_handle: string
           name: string
@@ -282,18 +279,8 @@ export type Database = {
         Insert: {
           active?: boolean
           campaign_id: string
-          commission_per_sale?: number
-          commission_starts_at?: number
-          discount_type?: string
-          discount_value?: number
-          validity_days?: number
-          coupon_title?: string | null
-          coupon_description?: string | null
-          partnership_ends_at?: string | null
-          commission_count_since?: string | null
           coupon_code: string
           created_at?: string
-          fee_amount?: number
           id?: string
           instagram_handle: string
           name: string
@@ -301,18 +288,8 @@ export type Database = {
         Update: {
           active?: boolean
           campaign_id?: string
-          commission_per_sale?: number
-          commission_starts_at?: number
-          discount_type?: string
-          discount_value?: number
-          validity_days?: number
-          coupon_title?: string | null
-          coupon_description?: string | null
-          partnership_ends_at?: string | null
-          commission_count_since?: string | null
           coupon_code?: string
           created_at?: string
-          fee_amount?: number
           id?: string
           instagram_handle?: string
           name?: string
