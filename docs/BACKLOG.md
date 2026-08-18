@@ -61,7 +61,7 @@ sistema — um bloco no Dashboard.
 
 ### 4. Fluxo do QR code no balcão (anti-abuso)
 
-**Nota de 18/08:** a *leitura* do QR já funciona e ninguém sabia — o QR do cupom aponta para  e a tela lê o parâmetro sozinha. O que falta é o outro QR: o do LINK DO INFLUENCIADOR, para o cliente gerar o próprio cupom.
+**Nota de 18/08:** a *leitura* do QR já funciona e ninguém sabia — o QR do cupom aponta para `/admin/validar?codigo=FOX-XXXXXX` e a tela lê o parâmetro sozinha. O que falta é o outro QR: o do LINK DO INFLUENCIADOR, para o cliente gerar o próprio cupom.
 
 **Spec aprovada em 2026-07-28**, nunca implementada.
 `docs/superpowers/specs/2026-07-28-cupom-express-anti-abuso-design.md`
