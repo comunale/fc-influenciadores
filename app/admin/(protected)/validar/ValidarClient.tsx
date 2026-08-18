@@ -10,6 +10,9 @@ import { ExpressSuccess } from '@/components/admin/ExpressSuccess'
 import type { Seller } from '@/components/admin/SellerManagement'
 
 export interface CouponData {
+  // Retrato gravado no cupom (migration 008).
+  discount_type: string | null
+  discount_value: number | null
   id: string
   coupon_number: string
   customer_name: string
@@ -30,15 +33,12 @@ interface InfluencerData {
   instagram_handle: string
   coupon_code: string
   campaign_id: string
-  campaigns: {
-    id: string
-    name: string
-    discount_value: number
-    discount_type: string
-    coupon_title: string
-    validity_days: number
-    active: boolean
-  }
+  // Os termos vem do influencer desde 18/08/2026. A campanha ficou so como rotulo.
+  discount_value: number
+  discount_type: string
+  validity_days: number
+  coupon_title: string | null
+  campaigns: { name: string } | null
 }
 
 const statusConfig = {
@@ -55,10 +55,14 @@ function normalize(raw: string): { type: 'coupon' | 'influencer'; value: string 
   return { type: v.startsWith('FOX-') ? 'coupon' : 'influencer', value: v }
 }
 
-function formatDiscount(campaigns: { discount_type: string; discount_value: number }) {
-  return campaigns.discount_type === 'fixed'
-    ? formatCurrency(campaigns.discount_value)
-    : `${campaigns.discount_value}%`
+/**
+ * O desconto vem do RETRATO gravado no proprio registro desde 18/08/2026.
+ * Influencer e cupom sempre tem os campos preenchidos -- a migracao 008
+ * preencheu todo o historico, entao nao ha caso sem retrato.
+ */
+function formatDiscount(o: { discount_type?: string | null; discount_value?: number | null }) {
+  if (o.discount_type == null || o.discount_value == null) return '—'
+  return o.discount_type === 'fixed' ? formatCurrency(o.discount_value) : `${o.discount_value}%`
 }
 
 export function ValidarClient({
@@ -301,7 +305,7 @@ export function ValidarClient({
               </div>
               <div>
                 <div className="text-xs text-gray-500">Desconto</div>
-                <div className="text-[#00ff87] font-bold text-sm">{formatDiscount(coupon.campaigns)}</div>
+                <div className="text-[#00ff87] font-bold text-sm">{formatDiscount(coupon)}</div>
               </div>
               <div>
                 <div className="text-xs text-gray-500">Válido até</div>
@@ -370,12 +374,12 @@ export function ValidarClient({
               <div>
                 <div className="text-xs text-gray-500">Desconto</div>
                 <div className="text-[#00ff87] font-black text-2xl">
-                  {formatDiscount(influencer.campaigns)}
+                  {formatDiscount(influencer)}
                 </div>
               </div>
               <div>
                 <div className="text-xs text-gray-500">Validade do cupom</div>
-                <div className="text-white font-semibold">{influencer.campaigns.validity_days} dias</div>
+                <div className="text-white font-semibold">{influencer.validity_days} dias</div>
               </div>
             </div>
           </div>

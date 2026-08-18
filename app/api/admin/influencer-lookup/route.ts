@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { linkAtivo } from '@/lib/influencer-status'
 
 export async function GET(request: Request) {
   try {
@@ -16,18 +17,17 @@ export async function GET(request: Request) {
 
     const { data: influencer, error } = await supabase
       .from('influencers')
-      .select('*, campaigns(*)')
+      .select('*, campaigns(name)')
       .eq('coupon_code', handle)
-      .eq('active', true)
-      .single()
+      .maybeSingle()
 
     if (error || !influencer) {
       return NextResponse.json({ error: 'Influencer ou cupom não encontrado.' }, { status: 404 })
     }
 
-    const campaign = influencer.campaigns as { active: boolean }
-    if (!campaign?.active) {
-      return NextResponse.json({ error: 'Campanha inativa.' }, { status: 400 })
+    // A campanha nao decide mais. Ver lib/influencer-status.ts.
+    if (!linkAtivo(influencer)) {
+      return NextResponse.json({ error: 'A parceria deste influencer não está ativa.' }, { status: 400 })
     }
 
     return NextResponse.json({ influencer })

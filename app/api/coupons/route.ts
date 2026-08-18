@@ -3,6 +3,7 @@ import { validateCPF } from '@/lib/validators/cpf'
 import { addDays } from '@/lib/utils'
 import { insertCouponWithRetry } from '@/lib/coupons/insert'
 import { checkRateLimit, getClientIp, COUPON_RULES } from '@/lib/rate-limit'
+import { linkAtivo } from '@/lib/influencer-status'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -44,18 +45,17 @@ export async function POST(request: Request) {
     // Buscar influencer pelo código
     const { data: influencer, error: inflError } = await supabase
       .from('influencers')
-      .select('*, campaigns(*)')
+      .select('*')
       .eq('coupon_code', influencer_code.toUpperCase())
-      .eq('active', true)
-      .single()
+      .maybeSingle()
 
     if (inflError || !influencer) {
-      return NextResponse.json({ error: 'Link de influencer inválido ou inativo.' }, { status: 404 })
+      return NextResponse.json({ error: 'Link de influencer inválido.' }, { status: 404 })
     }
 
-    const campaign = (influencer as { campaigns: { id: string; active: boolean; validity_days: number } }).campaigns
-    if (!campaign?.active) {
-      return NextResponse.json({ error: 'Esta campanha não está mais ativa.' }, { status: 400 })
+    // A campanha nao decide mais. Ver lib/influencer-status.ts.
+    if (!linkAtivo(influencer)) {
+      return NextResponse.json({ error: 'Este link não está mais ativo.' }, { status: 400 })
     }
 
     // Verificar se CPF já tem cupom nesta campanha.
@@ -75,11 +75,16 @@ export async function POST(request: Request) {
       )
     }
 
-    const expiresAt = addDays(new Date(), campaign.validity_days)
+    const expiresAt = addDays(new Date(), influencer.validity_days)
 
     const result = await insertCouponWithRetry(supabase, {
       influencer_id: influencer.id,
       campaign_id: influencer.campaign_id,
+      // Retrato do que valia agora. Sem isso, renovar o influenciador
+      // reescreveria o desconto e a comissao deste cupom.
+      discount_type: influencer.discount_type,
+      discount_value: influencer.discount_value,
+      commission_per_sale: influencer.commission_per_sale,
       customer_name: customer_name.trim(),
       customer_cpf: cpfClean,
       customer_phone: phoneClean,

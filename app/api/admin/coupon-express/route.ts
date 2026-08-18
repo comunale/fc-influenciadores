@@ -3,6 +3,7 @@ import { validateCPF } from '@/lib/validators/cpf'
 import { addDays } from '@/lib/utils'
 import { insertCouponWithRetry } from '@/lib/coupons/insert'
 import { NextResponse } from 'next/server'
+import { linkAtivo } from '@/lib/influencer-status'
 
 export async function POST(request: Request) {
   try {
@@ -79,22 +80,32 @@ export async function POST(request: Request) {
       )
     }
 
-    const { data: campaign } = await supabase
-      .from('campaigns')
-      .select('validity_days, active')
-      .eq('id', campaign_id)
-      .single()
+    // Os termos vem do influenciador desde 18/08/2026, nao da campanha.
+    const { data: influencer } = await supabase
+      .from('influencers')
+      .select('id, active, partnership_ends_at, validity_days, discount_type, discount_value, commission_per_sale')
+      .eq('id', influencer_id)
+      .maybeSingle()
 
-    if (!campaign?.active) {
-      return NextResponse.json({ error: 'Campanha inativa.' }, { status: 400 })
+    if (!influencer) {
+      return NextResponse.json({ error: 'Influencer não encontrado.' }, { status: 404 })
+    }
+
+    if (!linkAtivo(influencer)) {
+      return NextResponse.json({ error: 'A parceria deste influencer não está ativa.' }, { status: 400 })
     }
 
     const now = new Date()
-    const expiresAt = addDays(now, campaign.validity_days)
+    const expiresAt = addDays(now, influencer.validity_days)
 
     const result = await insertCouponWithRetry(supabase, {
       influencer_id,
       campaign_id,
+      // Retrato do que valia agora. Sem isso, renovar o influenciador
+      // reescreveria o desconto e a comissao deste cupom.
+      discount_type: influencer.discount_type,
+      discount_value: influencer.discount_value,
+      commission_per_sale: influencer.commission_per_sale,
       customer_name: customer_name.trim(),
       customer_cpf: cpfClean,
       customer_phone: phoneClean,

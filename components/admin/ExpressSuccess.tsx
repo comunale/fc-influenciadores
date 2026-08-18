@@ -8,10 +8,14 @@ import type { CouponData } from '@/app/admin/(protected)/validar/ValidarClient'
 // compilação, então o ciclo ValidarClient → ExpressSuccess → ValidarClient não
 // existe em runtime. `formatDiscount`, ao contrário, é valor: importá-lo
 // fecharia o ciclo de verdade. São quatro linhas, repetir sai mais barato.
-function formatDiscount(campaigns: { discount_type: string; discount_value: number }) {
-  return campaigns.discount_type === 'fixed'
-    ? formatCurrency(campaigns.discount_value)
-    : `${campaigns.discount_value}%`
+/**
+ * O desconto vem do RETRATO gravado no proprio registro desde 18/08/2026.
+ * Influencer e cupom sempre tem os campos preenchidos -- a migracao 008
+ * preencheu todo o historico, entao nao ha caso sem retrato.
+ */
+function formatDiscount(o: { discount_type?: string | null; discount_value?: number | null }) {
+  if (o.discount_type == null || o.discount_value == null) return '—'
+  return o.discount_type === 'fixed' ? formatCurrency(o.discount_value) : `${o.discount_value}%`
 }
 
 export function ExpressSuccess({ coupon, onReset }: { coupon: CouponData; onReset: () => void }) {
@@ -24,7 +28,7 @@ export function ExpressSuccess({ coupon, onReset }: { coupon: CouponData; onRese
           {coupon.coupon_number}
         </div>
         <div className="text-[#00ff87] font-black text-3xl mt-2">
-          {formatDiscount(coupon.campaigns)}
+          {formatDiscount(coupon)}
         </div>
         <div className="text-gray-400 text-sm mt-1">de desconto aplicado</div>
       </div>
