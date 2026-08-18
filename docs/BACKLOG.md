@@ -24,7 +24,16 @@ cada um uma entrega que funciona sozinha:
 | 1 | **Parceria como entidade** | spec e plano aprovados, pronto para executar |
 | 2 | Fechamentos e pagamentos | depende do 1 |
 | 3 | Funil de prospecção | independente |
-| 4 | Portal do influenciador | depende do 1 e 2. Regra de visibilidade já definida |
+| 4 | Portal do influenciador | depende do 1 e 2. Regra de visibilidade definida (ver abaixo) |
+
+**Visibilidade no portal, decidida em 18/08:** a visibilidade é **por parceria**, não
+por cupom. A parceria antiga aparece como uma linha fechada — *"Parceria Reinauguração
+· encerrada"* — sem detalhe de vendas nem valores. A parceria nova mostra tudo.
+
+Motivo: os dados antigos vieram de planilha e os R$ 3.000 do @caiiuxo **já foram pagos
+por fora**. Mostrar em detalhe criaria cobrança sobre o que já foi acertado; esconder
+por completo faria o influenciador achar que o histórico sumiu. A linha fechada resolve
+os dois.
 | 5 | Menus, páginas e papéis | cada entrega arruma a sua parte |
 
 ---

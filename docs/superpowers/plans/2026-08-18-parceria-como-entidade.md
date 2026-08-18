@@ -32,7 +32,9 @@
 @mariananavi         R$ 200 · 45d · comissão R$ 300 a partir da 1ª venda
 ```
 
-**Critério que amarra a entrega inteira:** o "a pagar" do `@caiiuxo` tem que continuar **R$ 3.000** depois de tudo. Se mudar, a migração alterou termo de alguém.
+**Critério que amarra a entrega inteira:** a **comissão gerada** do `@caiiuxo` tem que continuar **R$ 3.000** depois de tudo. Se mudar, a migração alterou termo de alguém.
+
+Atenção: o "a pagar" **não** serve como critério. O César informou em 18/08 que esses R$ 3.000 **já foram pagos por fora** — ao marcar os cupons como pagos, o "a pagar" vira R$ 0 legitimamente. A comissão gerada é que é o invariante.
 
 ## Estrutura de arquivos
 
@@ -661,7 +663,7 @@ from public.influencers i left join public.coupons c on c.influencer_id = i.id
 where i.coupon_code = 'CAIIUXO300' group by i.instagram_handle;
 ```
 
-**Tem que dar R$ 3.000.** E a tela tem que mostrar o mesmo. Se mudar, algo quebrou.
+**Tem que dar R$ 3.000** de comissão gerada. A tela tem que mostrar o mesmo valor gerado; o "a pagar" pode ser R$ 0, porque esses R$ 3.000 já foram pagos por fora.
 
 - [ ] **Step 7: Commit**
 
@@ -875,7 +877,7 @@ git push origin master
 - [ ] 18 parcerias ativas, uma por influenciador, e nenhum cupom sem `partnership_id`
 - [ ] Nenhum influenciador mudou de termo na migração
 - [ ] O índice único recusa uma segunda parceria ativa
-- [ ] **O "a pagar" do `@caiiuxo` continua R$ 3.000**
+- [ ] **A comissão gerada do `@caiiuxo` continua R$ 3.000** (o "a pagar" pode ser R$ 0 — já foi pago por fora)
 - [ ] Renovar com valor novo **não** altera o desconto dos cupons antigos
 - [ ] O link continua o mesmo depois de renovar
 - [ ] `docs/BACKLOG.md` atualizado ao fim
