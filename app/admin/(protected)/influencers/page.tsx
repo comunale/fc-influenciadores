@@ -12,7 +12,7 @@ export default async function InfluencersPage() {
       .from('influencers')
       .select('*, campaigns(name, active), coupons(id, status, verified, paid, created_at, commission_per_sale)')
       .order('name'),
-    supabase.from('campaigns').select('id, name').eq('active', true),
+    supabase.from('campaigns').select('id, name, discount_type, discount_value, validity_days, coupon_title, coupon_description').eq('active', true),
   ])
 
   const enriched = (influencers || []).map((inf) => {

@@ -4,9 +4,10 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/supabase/client'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import type { ResumoComissao } from '@/lib/commission'
 import { mensagemDeErro } from '@/lib/db-errors'
+import { motivoLinkInativo } from '@/lib/influencer-status'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
@@ -24,13 +25,27 @@ interface InfluencerRow {
   campaign_id: string
   campaign_name: string
   campaign_active: boolean
+  discount_type: string
+  discount_value: number
+  validity_days: number
+  coupon_title: string | null
+  coupon_description: string | null
+  partnership_ends_at: string | null
   total_coupons: number
   used_coupons: number
   pending_coupons: number
   comissao: ResumoComissao
 }
 
-interface Campaign { id: string; name: string }
+interface Campaign {
+  id: string
+  name: string
+  discount_type: string
+  discount_value: number
+  validity_days: number
+  coupon_title: string
+  coupon_description: string
+}
 
 interface Props {
   influencers: InfluencerRow[]
@@ -47,6 +62,12 @@ const emptyForm = {
   commission_per_sale: '500',
   commission_starts_at: '2',
   active: true,
+  // A oferta desceu da campanha para o influencer em 18/08/2026.
+  discount_type: 'fixed',
+  discount_value: '200',
+  validity_days: '30',
+  coupon_title: '',
+  coupon_description: '',
 }
 
 export function InfluencersList({ influencers: initial, campaigns, canEdit = false }: Props) {
@@ -74,6 +95,11 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
       commission_per_sale: String(inf.commission_per_sale),
       commission_starts_at: String(inf.commission_starts_at),
       active: inf.active,
+      discount_type: inf.discount_type,
+      discount_value: String(inf.discount_value),
+      validity_days: String(inf.validity_days),
+      coupon_title: inf.coupon_title ?? '',
+      coupon_description: inf.coupon_description ?? '',
     })
     setShowForm(true)
   }
@@ -100,6 +126,11 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
       commission_per_sale: parseFloat(form.commission_per_sale) || 0,
       commission_starts_at: parseInt(form.commission_starts_at) || 2,
       active: form.active,
+      discount_type: form.discount_type,
+      discount_value: parseFloat(form.discount_value) || 0,
+      validity_days: parseInt(form.validity_days) || 30,
+      coupon_title: form.coupon_title.trim() || null,
+      coupon_description: form.coupon_description.trim() || null,
     }
 
     const { error } = editing
@@ -168,13 +199,62 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
                 <label className="text-sm text-gray-300 block mb-1.5">Campanha *</label>
                 <select
                   value={form.campaign_id}
-                  onChange={(e) => setForm((p) => ({ ...p, campaign_id: e.target.value }))}
+                  onChange={(e) => {
+                    const c = campaigns.find((x) => x.id === e.target.value)
+                    // A campanha e MODELO: preenche, nao manda. Depois disto os
+                    // valores sao deste influencer e podem ser editados a vontade.
+                    setForm((p) => ({
+                      ...p,
+                      campaign_id: e.target.value,
+                      ...(c ? {
+                        discount_type: c.discount_type,
+                        discount_value: String(c.discount_value),
+                        validity_days: String(c.validity_days),
+                        coupon_title: c.coupon_title ?? '',
+                        coupon_description: c.coupon_description ?? '',
+                      } : {}),
+                    }))
+                  }}
                   className="w-full h-12 px-4 rounded-lg border border-[#2a2a2a] bg-[#1e1e1e] text-white text-sm focus:border-[#00ff87] focus:outline-none"
                   disabled={loading}
                 >
                   {campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
+
+              <p className="text-xs text-gray-500 md:col-span-2 -mb-1">
+                A campanha preenche os campos abaixo, mas eles passam a ser deste
+                influencer. Editar aqui não afeta a campanha nem os outros.
+              </p>
+
+              <div>
+                <label className="text-sm text-gray-300 block mb-1.5">Tipo de desconto</label>
+                <select
+                  value={form.discount_type}
+                  onChange={(e) => setForm((p) => ({ ...p, discount_type: e.target.value }))}
+                  className="w-full h-12 px-4 rounded-lg border border-[#2a2a2a] bg-[#1e1e1e] text-white text-sm focus:border-[#00ff87] focus:outline-none"
+                  disabled={loading}
+                >
+                  <option value="fixed">Valor fixo (R$)</option>
+                  <option value="percentage">Percentual (%)</option>
+                </select>
+              </div>
+
+              <Input label="Desconto" type="number" value={form.discount_value}
+                onChange={(e) => setForm((p) => ({ ...p, discount_value: e.target.value }))}
+                disabled={loading} />
+
+              <Input label="Validade do cupom (dias)" type="number" value={form.validity_days}
+                onChange={(e) => setForm((p) => ({ ...p, validity_days: e.target.value }))}
+                disabled={loading} />
+
+              <Input label="Título do cupom" value={form.coupon_title}
+                onChange={(e) => setForm((p) => ({ ...p, coupon_title: e.target.value }))}
+                disabled={loading} />
+
+              <Input label="Descrição do cupom" value={form.coupon_description}
+                onChange={(e) => setForm((p) => ({ ...p, coupon_description: e.target.value }))}
+                disabled={loading} className="md:col-span-2" />
 
               <Input label="Nome completo *" value={form.name}
                 onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
@@ -238,11 +318,12 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
                     // Dois interruptores independentes. Antes desta etiqueta, um
                     // influenciador ativo dentro de campanha desligada parecia no ar
                     // -- foi o que deixou 17 links mortos sem ninguem entender por que.
-                    const estado = !inf.active
-                      ? { texto: 'Influencer inativo', cor: 'bg-[#1e1e1e] text-gray-400' }
-                      : !inf.campaign_active
-                        ? { texto: 'Campanha encerrada', cor: 'bg-red-950 text-red-400' }
-                        : { texto: 'Ativo', cor: 'bg-[#00ff87]/10 text-[#00ff87]' }
+                    // Mesma regra que decide se o link abre (lib/influencer-status.ts).
+                    // A campanha nao entra mais: desde 18/08/2026 ela nao derruba link.
+                    const motivo = motivoLinkInativo(inf)
+                    const estado = motivo
+                      ? { texto: motivo, cor: 'bg-red-950 text-red-400' }
+                      : { texto: 'Ativo', cor: 'bg-[#00ff87]/10 text-[#00ff87]' }
                     return (
                       <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${estado.cor}`}>
                         {estado.texto}
@@ -253,6 +334,9 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
                 <div className="text-gray-500 text-xs mt-0.5">
                   Campanha: {inf.campaign_name} · Código:{' '}
                   <span className="font-mono text-gray-300">{inf.coupon_code}</span>
+                  {inf.partnership_ends_at && (
+                    <> · Parceria até <span className="text-gray-300">{formatDate(inf.partnership_ends_at)}</span></>
+                  )}
                 </div>
               </div>
               {canEdit && (
