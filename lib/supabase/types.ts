@@ -137,6 +137,9 @@ export type Database = {
           paid_by: string | null
           invoice_number: string | null
           seller_id: string | null
+          discount_type: string | null
+          discount_value: number | null
+          commission_per_sale: number | null
         }
         Insert: {
           campaign_id: string
@@ -160,6 +163,9 @@ export type Database = {
           paid_by?: string | null
           invoice_number?: string | null
           seller_id?: string | null
+          discount_type?: string | null
+          discount_value?: number | null
+          commission_per_sale?: number | null
         }
         Update: {
           campaign_id?: string
@@ -183,6 +189,9 @@ export type Database = {
           paid_by?: string | null
           invoice_number?: string | null
           seller_id?: string | null
+          discount_type?: string | null
+          discount_value?: number | null
+          commission_per_sale?: number | null
         }
         Relationships: [
           {
@@ -214,6 +223,13 @@ export type Database = {
           campaign_id: string
           commission_per_sale: number
           commission_starts_at: number
+          discount_type: string
+          discount_value: number
+          validity_days: number
+          coupon_title: string | null
+          coupon_description: string | null
+          partnership_ends_at: string | null
+          commission_count_since: string | null
           coupon_code: string
           created_at: string
           fee_amount: number
@@ -226,6 +242,13 @@ export type Database = {
           campaign_id: string
           commission_per_sale?: number
           commission_starts_at?: number
+          discount_type?: string
+          discount_value?: number
+          validity_days?: number
+          coupon_title?: string | null
+          coupon_description?: string | null
+          partnership_ends_at?: string | null
+          commission_count_since?: string | null
           coupon_code: string
           created_at?: string
           fee_amount?: number
@@ -238,6 +261,13 @@ export type Database = {
           campaign_id?: string
           commission_per_sale?: number
           commission_starts_at?: number
+          discount_type?: string
+          discount_value?: number
+          validity_days?: number
+          coupon_title?: string | null
+          coupon_description?: string | null
+          partnership_ends_at?: string | null
+          commission_count_since?: string | null
           coupon_code?: string
           created_at?: string
           fee_amount?: number
