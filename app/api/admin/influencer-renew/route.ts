@@ -1,64 +1,95 @@
 import { requireRole, createClient } from '@/lib/supabase/server'
 import { mensagemDeErro } from '@/lib/db-errors'
 import { NextResponse } from 'next/server'
-import type { Database } from '@/lib/supabase/types'
-
-type InfluencerUpdate = Database['public']['Tables']['influencers']['Update']
 
 /**
  * Prorrogar e Renovar uma parceria.
  *
- * PRORROGAR: mesma negociação, prazo novo. Só mexe na data.
- * RENOVAR: negociação nova. Muda os termos e, opcionalmente, zera a contagem de
- *   vendas para a comissão.
+ * PRORROGAR: mesma negociação, prazo novo. Só mexe na data da parceria ativa.
+ * RENOVAR: encerra a ativa e abre outra, com os termos novos.
  *
- * Zerar ou não a contagem depende do que foi combinado caso a caso — por isso é
- * escolha na tela e não regra fixa. Zerando, a próxima venda volta a ser a
- * número 1 do acordo; mantendo, a contagem segue da parceria inteira.
- *
- * O link NUNCA muda em nenhuma das duas: `coupon_code` não é tocado aqui. Era o
- * requisito que derrubou a alternativa de "criar campanha nova a cada
- * renovação" — o link está na bio e no story do influenciador.
+ * O LINK NUNCA MUDA em nenhuma das duas. O `coupon_code` mora no influenciador,
+ * não na parceria — está na bio e no story dele. Renovar troca para onde o link
+ * OLHA, não o link.
  *
  * Os cupons já gerados também não mudam: cada um guarda o retrato do que valia
- * quando nasceu (migration 008).
+ * quando nasceu, e aponta para a parceria em que nasceu.
  */
 export async function POST(request: Request) {
   const auth = await requireRole(['admin'])
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
   const body = await request.json().catch(() => ({}))
-  const { id, acao, ends_at, termos, zerar_contagem } = body
+  const { influencer_id, acao, ends_at, termos, zerar_contagem } = body
 
-  if (!id) return NextResponse.json({ error: 'id obrigatório' }, { status: 400 })
+  if (!influencer_id) return NextResponse.json({ error: 'influencer_id obrigatório' }, { status: 400 })
   if (!['prorrogar', 'renovar'].includes(acao)) {
     return NextResponse.json({ error: 'Ação inválida.' }, { status: 400 })
   }
 
-  const update: InfluencerUpdate = {
-    // Data vazia significa "sem prazo", que é diferente de não mexer.
-    partnership_ends_at: ends_at || null,
-  }
-
-  if (acao === 'renovar') {
-    if (termos?.discount_type) update.discount_type = termos.discount_type
-    if (termos?.discount_value != null) update.discount_value = Number(termos.discount_value)
-    if (termos?.validity_days != null) update.validity_days = Number(termos.validity_days)
-    if (termos?.commission_per_sale != null) {
-      update.commission_per_sale = Number(termos.commission_per_sale)
-    }
-    if (termos?.commission_starts_at != null) {
-      update.commission_starts_at = Number(termos.commission_starts_at)
-    }
-    if (zerar_contagem) {
-      update.commission_count_since = new Date().toISOString().slice(0, 10)
-    }
-  }
-
   const supabase = await createClient()
-  const { error } = await supabase.from('influencers').update(update).eq('id', id)
-  if (error) {
-    return NextResponse.json({ error: mensagemDeErro(error.message, 'influencer') }, { status: 400 })
+
+  const { data: atual } = await supabase
+    .from('partnerships')
+    .select('*')
+    .eq('influencer_id', influencer_id)
+    .eq('status', 'ativa')
+    .maybeSingle()
+
+  if (!atual) {
+    return NextResponse.json({ error: 'Este influencer não tem parceria ativa.' }, { status: 400 })
+  }
+
+  if (acao === 'prorrogar') {
+    const { error } = await supabase
+      .from('partnerships')
+      .update({ ends_at: ends_at || null })
+      .eq('id', atual.id)
+    if (error) return NextResponse.json({ error: mensagemDeErro(error.message) }, { status: 400 })
+    return NextResponse.json({ ok: true })
+  }
+
+  // Encerrar ANTES de criar: o índice único recusa duas ativas.
+  const { error: erroEncerrar } = await supabase
+    .from('partnerships')
+    .update({ status: 'encerrada' })
+    .eq('id', atual.id)
+
+  if (erroEncerrar) {
+    return NextResponse.json({ error: mensagemDeErro(erroEncerrar.message) }, { status: 400 })
+  }
+
+  const { error: erroCriar } = await supabase.from('partnerships').insert({
+    influencer_id,
+    campaign_id: atual.campaign_id,
+    status: 'ativa',
+    starts_at: new Date().toISOString().slice(0, 10),
+    ends_at: ends_at || null,
+    fee_amount: Number(termos?.fee_amount ?? atual.fee_amount),
+    fee_timing: termos?.fee_timing ?? atual.fee_timing,
+    commission_per_sale: Number(termos?.commission_per_sale ?? atual.commission_per_sale),
+    commission_starts_at: Number(termos?.commission_starts_at ?? atual.commission_starts_at),
+    // Zerar ou não a contagem depende do que foi combinado, caso a caso.
+    commission_counts_from: zerar_contagem ? 'parceria' : 'historico',
+    payment_schedule: termos?.payment_schedule ?? atual.payment_schedule,
+    discount_type: termos?.discount_type ?? atual.discount_type,
+    discount_value: Number(termos?.discount_value ?? atual.discount_value),
+    validity_days: Number(termos?.validity_days ?? atual.validity_days),
+    coupon_title: atual.coupon_title,
+    coupon_description: atual.coupon_description,
+  })
+
+  if (erroCriar) {
+    // A antiga já foi encerrada e a nova falhou: o influencer ficou sem parceria
+    // ativa, e o link dele está fora do ar. Dizer isso, não falhar em silêncio.
+    return NextResponse.json(
+      {
+        error:
+          'A parceria anterior foi encerrada mas a nova não pôde ser criada — o link está fora do ar. ' +
+          'Crie a parceria nova agora. Detalhe: ' + mensagemDeErro(erroCriar.message),
+      },
+      { status: 500 }
+    )
   }
 
   return NextResponse.json({ ok: true })

@@ -179,7 +179,7 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        id: parceria.inf.id,
+        influencer_id: parceria.inf.id,
         acao: parceria.acao,
         ends_at: pForm.ends_at || null,
         ...(parceria.acao === 'renovar' ? {
