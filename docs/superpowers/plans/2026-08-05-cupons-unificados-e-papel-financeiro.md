@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16.2.6 (App Router), React 19, Tailwind v4, Supabase (Postgres + RLS), TypeScript, xlsx.
 
-## Estado da execução (atualizado em 2026-08-05)
+## Estado da execução (atualizado em 2026-08-18) — ENTREGA CONCLUÍDA
 
 | Task | Estado |
 |---|---|
@@ -17,8 +17,10 @@
 | 2 — Tipos e permissões | ✅ **feita** (`cfb2ae1`) |
 | 3 — Allowlist na API | ✅ **feita** (`864c34b`) |
 | 4 — Acesso do Financeiro | ✅ **feita** (`8797b4f`) — o financeiro já entra |
-| 5 — Criar/editar Financeiro pela tela | pendente |
-| 6 — Página unificada | pendente ← **é ela que mostra NF, Conferido e Pago na tela** |
+| 5 — Criar/editar Financeiro pela tela | ✅ **feita** (`7cf8f73`) |
+| 6 — Página unificada | ✅ **feita** (`87476e7`) |
+| extra — trava "pago exige conferido" | ✅ **feita** (`78b7b81`, migration 005) |
+| extra — testes automatizados | ✅ **feita** (`78b7b81`) — 12 rodando, 19 dormindo |
 
 **Já existe no banco:** o usuário `financeiro@foxcycles.com.br` com papel `finance`, ativo e com e-mail confirmado. Desde a Task 4 ele entra e navega em Dashboard, Cupons e Influencers.
 
@@ -45,7 +47,7 @@
 
 ## Global Constraints
 
-- Este projeto **não tem framework de teste**. Verificação = `npx tsc --noEmit`, `npx eslint .`, `npx next build`, asserções SQL via Supabase e smoke test HTTP com curl. Não adicionar Vitest/Jest nesta entrega.
+- ~~Este projeto não tem framework de teste.~~ **Desatualizado desde 2026-08-18:** o projeto passou a ter Vitest (`npm test`). Verificação = `npx tsc --noEmit`, `npx eslint .`, `npx next build` e `npm test`.
 - Arquivos abaixo de 500 linhas (regra do CLAUDE.md do repositório).
 - Ler o arquivo antes de editar. Nunca commitar segredos.
 - Nomes de coluna em **inglês**, para casar com o schema existente (`customer_name`, `used_at`, `used_by_admin`). Rótulos de tela em **português**.

@@ -1416,10 +1416,23 @@ git commit -m "feat: lojista so acessa validar e cupons"
 - [ ] `/api/coupons/validate` não aceita mais nome de validador vindo do corpo da requisição
 - [ ] Lojista logado não vê Influencers nem Campanhas, no menu nem digitando a URL
 
-## O que fica de fora desta entrega
+## Estado (atualizado em 2026-08-18)
 
-- **Task 6 do plano de 2026-08-05** — a tela unificada de Cupons, que é onde a coluna Vendedor vai aparecer para o Financeiro junto de NF, Conferido e Pago. É o próximo plano, e a ordem foi combinada assim de propósito: a tela nova nasce já com a coluna em vez de ser mexida duas vezes.
-- **Task 5 do plano de 2026-08-05** — criar/editar o usuário Financeiro pela tela. Continua pendente. Ao encostar em `UserManagement.tsx`, notar que ele tem um `ROLE_LABELS` local que ainda diz "Moderador (Loja)" e não conhece `finance`; a fonte única já existe em `lib/auth/roles.ts`.
+Tasks 1 a 6 **concluídas** e em produção. O merge da branch `feat/vendedores-no-balcao`
+para `master` só aconteceu em 18/08 (commit `8f14fe9`).
+
+**Lição cara desta entrega:** a migração 003 foi aplicada no banco de produção em 06/08,
+mas o código ficou na branch por 12 dias. O banco passou a exigir vendedor enquanto o
+código no ar não sabia enviá-lo, e nenhum vendedor estava cadastrado — **o balcão ficou
+sem conseguir validar cupom nesse período**. Quando uma migração muda regra de operação,
+ela e o código precisam subir juntos, ou a migração precisa ser tolerante até o código chegar.
+
+Vendedores cadastrados em 18/08: 2 por loja, nas 5 lojas. Balcão testado e funcionando.
+
+## O que ficou de fora desta entrega
+
+- ~~Task 6 do plano de 2026-08-05~~ — **feita em 18/08** (`87476e7`). A tela unificada nasceu já com a coluna Vendedor, como planejado.
+- ~~Task 5 do plano de 2026-08-05~~ — **feita em 18/08** (`7cf8f73`). O `ROLE_LABELS` local foi removido e a tela usa a fonte única de `lib/auth/roles.ts`.
 - PIN ou login individual por vendedor.
 - Tela de relatório separada — o export XLS da tela de Cupons resolve.
 - O fluxo do QR code anti-abuso (spec de 2026-07-28), que segue não implementado.
