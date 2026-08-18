@@ -3,6 +3,7 @@ import { InfluencersList } from '@/components/admin/InfluencersList'
 import { InfluencersFilters } from '@/components/admin/InfluencersFilters'
 import { calcularComissao } from '@/lib/commission'
 import { linkAtivo, venceEmAte } from '@/lib/influencer-status'
+import { type Role } from '@/lib/auth/roles'
 
 export const dynamic = 'force-dynamic'
 
@@ -89,6 +90,7 @@ export default async function InfluencersPage({
         influencers={lista}
         campaigns={campaigns || []}
         canEdit={role === 'admin'}
+        role={role as Role}
         filtros={
           <InfluencersFilters
             campaigns={todasCampanhas || []}

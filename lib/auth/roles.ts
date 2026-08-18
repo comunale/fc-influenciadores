@@ -20,6 +20,7 @@ export type Action =
   | 'validate'
   | 'dashboard'
   | 'influencers.edit'
+  | 'influencers.payment'
   | 'campaigns.edit'
   | 'settings'
 
@@ -33,6 +34,8 @@ const MATRIX: Record<Action, Role[]> = {
   'validate':         ['admin', 'moderator'],
   'dashboard':        ['admin', 'finance'],
   'influencers.edit': ['admin'],
+  // Dado bancario: so quem paga. O Lojista nao le nem pela API (RLS na tabela).
+  'influencers.payment': ['admin', 'finance'],
   'campaigns.edit':   ['admin'],
   'settings':         ['admin'],
 }

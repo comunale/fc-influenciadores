@@ -8,6 +8,8 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import type { ResumoComissao } from '@/lib/commission'
 import { mensagemDeErro } from '@/lib/db-errors'
 import { motivoLinkInativo } from '@/lib/influencer-status'
+import { can, type Role } from '@/lib/auth/roles'
+import { DadosBancarios } from './DadosBancarios'
 import { ParceriaPanel, type ParceriaForm } from './ParceriaPanel'
 import { InfluencerForm } from './InfluencerForm'
 import { Button } from '@/components/ui/button'
@@ -51,6 +53,7 @@ interface Props {
   influencers: InfluencerRow[]
   campaigns: Campaign[]
   canEdit?: boolean
+  role?: Role
   /** Barra de filtros, renderizada pela pagina que faz a filtragem. */
   filtros?: React.ReactNode
 }
@@ -72,10 +75,12 @@ const emptyForm = {
   coupon_description: '',
 }
 
-export function InfluencersList({ influencers: initial, campaigns, canEdit = false, filtros }: Props) {
+export function InfluencersList({ influencers: initial, campaigns, canEdit = false, role, filtros }: Props) {
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [excluindoId, setExcluindoId] = useState<string | null>(null)
+  const [bancarios, setBancarios] = useState<{ id: string; handle: string } | null>(null)
+  const podeVerBancarios = can(role, 'influencers.payment')
   const [parceria, setParceria] = useState<{ inf: InfluencerRow; acao: 'prorrogar' | 'renovar' } | null>(null)
   const [pForm, setPForm] = useState<ParceriaForm>({
     ends_at: '', discount_value: '', validity_days: '',
@@ -283,6 +288,16 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
                   )}
                 </div>
               </div>
+              {/* Financeiro tambem precisa deste botao, entao ele fica FORA do
+                  bloco de canEdit, que e so admin. */}
+              {podeVerBancarios && (
+                <button
+                  onClick={() => setBancarios({ id: inf.id, handle: inf.instagram_handle })}
+                  className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
+                >
+                  Bancários
+                </button>
+              )}
               {canEdit && (
                 <div className="flex gap-2 flex-shrink-0">
                 <button
@@ -384,6 +399,14 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
           </div>
         ))}
       </div>
+
+      {bancarios && (
+        <DadosBancarios
+          influencerId={bancarios.id}
+          handle={bancarios.handle}
+          onFechar={() => setBancarios(null)}
+        />
+      )}
 
       <ParceriaPanel
         parceria={parceria}

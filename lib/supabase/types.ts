@@ -217,6 +217,45 @@ export type Database = {
           },
         ]
       }
+      influencer_payment_info: {
+        Row: {
+          influencer_id: string
+          payment_method: string | null
+          pix_key: string | null
+          bank_name: string | null
+          bank_agency: string | null
+          bank_account: string | null
+          payment_document: string | null
+          payment_notes: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          influencer_id: string
+          payment_method?: string | null
+          pix_key?: string | null
+          bank_name?: string | null
+          bank_agency?: string | null
+          bank_account?: string | null
+          payment_document?: string | null
+          payment_notes?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          influencer_id?: string
+          payment_method?: string | null
+          pix_key?: string | null
+          bank_name?: string | null
+          bank_agency?: string | null
+          bank_account?: string | null
+          payment_document?: string | null
+          payment_notes?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       influencers: {
         Row: {
           active: boolean

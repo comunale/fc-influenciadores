@@ -16,10 +16,9 @@ Atualizado em 2026-08-18.
 
 ## Pedidos do César ainda não construídos
 
-### 1. Dados bancários dos influenciadores (área do Financeiro)
+### 1. ~~Dados bancários dos influenciadores~~ — ✅ FEITO em 18/08
 
-**Pedido em:** 2026-08-18, junto com os outros quatro itens.
-**Estado:** não existe nada. Nenhuma coluna, nenhuma tela.
+**Estado:** entregue. Tabela própria `influencer_payment_info` com RLS só de admin e Financeiro, rota `/api/admin/influencer-payment` e painel na tela de Influencers.
 
 Onde o Financeiro cadastra chave PIX / dados bancários de cada influenciador,
 para conseguir pagar sem sair do sistema.
@@ -50,7 +49,7 @@ esse histórico sem antes existir forma de separar "registro migrado" de
 valor que talvez já tenha sido pago por fora. Ver
 `docs/superpowers/specs/2026-08-18-termos-no-influenciador-design.md`.
 
-### 3. Aviso de parceria perto do fim
+### 3. ~~Aviso de parceria perto do fim~~ — ✅ FEITO em 18/08
 
 **Estado:** o `partnership_ends_at` já existe e já derruba o link na data. Falta
 o **aviso antes**, para o César fechar as vendas e pagar a comissão a tempo.
