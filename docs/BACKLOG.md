@@ -10,6 +10,8 @@ qualquer conversa, ler este arquivo.
 
 Atualizado em 2026-08-18.
 
+**Plano de execução dos itens 1, 3 e 4:** `docs/superpowers/plans/2026-08-18-pendencias-balcao-financeiro-parceria.md`. O item 2 (portal) segue bloqueado pela decisão sobre os dados migrados da planilha.
+
 ---
 
 ## Pedidos do César ainda não construídos
@@ -58,6 +60,8 @@ Não há canal externo (e-mail foi descartado), então o aviso vive dentro do
 sistema — um bloco no Dashboard.
 
 ### 4. Fluxo do QR code no balcão (anti-abuso)
+
+**Nota de 18/08:** a *leitura* do QR já funciona e ninguém sabia — o QR do cupom aponta para  e a tela lê o parâmetro sozinha. O que falta é o outro QR: o do LINK DO INFLUENCIADOR, para o cliente gerar o próprio cupom.
 
 **Spec aprovada em 2026-07-28**, nunca implementada.
 `docs/superpowers/specs/2026-07-28-cupom-express-anti-abuso-design.md`
