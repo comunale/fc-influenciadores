@@ -8,6 +8,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import type { ResumoComissao } from '@/lib/commission'
 import { mensagemDeErro } from '@/lib/db-errors'
 import { motivoLinkInativo } from '@/lib/influencer-status'
+import { ParceriaPanel, type ParceriaForm } from './ParceriaPanel'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
@@ -24,7 +25,6 @@ interface InfluencerRow {
   active: boolean
   campaign_id: string
   campaign_name: string
-  campaign_active: boolean
   discount_type: string
   discount_value: number
   validity_days: number
@@ -74,6 +74,11 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [excluindoId, setExcluindoId] = useState<string | null>(null)
+  const [parceria, setParceria] = useState<{ inf: InfluencerRow; acao: 'prorrogar' | 'renovar' } | null>(null)
+  const [pForm, setPForm] = useState<ParceriaForm>({
+    ends_at: '', discount_value: '', validity_days: '',
+    commission_per_sale: '', commission_starts_at: '', zerar_contagem: false,
+  })
   const [editing, setEditing] = useState<InfluencerRow | null>(null)
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ ...emptyForm, campaign_id: campaigns[0]?.id || '' })
@@ -144,6 +149,47 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
     }
     toast.success(editing ? 'Influencer atualizado!' : 'Influencer criado!')
     setShowForm(false)
+    router.refresh()
+  }
+
+  function abrirParceria(inf: InfluencerRow, acao: 'prorrogar' | 'renovar') {
+    setParceria({ inf, acao })
+    setPForm({
+      ends_at: inf.partnership_ends_at ?? '',
+      discount_value: String(inf.discount_value),
+      validity_days: String(inf.validity_days),
+      commission_per_sale: String(inf.commission_per_sale),
+      commission_starts_at: String(inf.commission_starts_at),
+      zerar_contagem: false,
+    })
+  }
+
+  async function salvarParceria() {
+    if (!parceria) return
+    setLoading(true)
+    const res = await fetch('/api/admin/influencer-renew', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: parceria.inf.id,
+        acao: parceria.acao,
+        ends_at: pForm.ends_at || null,
+        ...(parceria.acao === 'renovar' ? {
+          termos: {
+            discount_value: pForm.discount_value,
+            validity_days: pForm.validity_days,
+            commission_per_sale: pForm.commission_per_sale,
+            commission_starts_at: pForm.commission_starts_at,
+          },
+          zerar_contagem: pForm.zerar_contagem,
+        } : {}),
+      }),
+    })
+    const data = await res.json()
+    setLoading(false)
+    if (!res.ok) { toast.error(data.error || 'Erro ao salvar.'); return }
+    toast.success(parceria.acao === 'prorrogar' ? 'Parceria prorrogada!' : 'Parceria renovada!')
+    setParceria(null)
     router.refresh()
   }
 
@@ -340,12 +386,26 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
                 </div>
               </div>
               {canEdit && (
+                <div className="flex gap-2 flex-shrink-0">
+                <button
+                  onClick={() => abrirParceria(inf, 'prorrogar')}
+                  className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  Prorrogar
+                </button>
+                <button
+                  onClick={() => abrirParceria(inf, 'renovar')}
+                  className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  Renovar
+                </button>
                 <button
                   onClick={() => openEdit(inf)}
                   className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
                 >
                   Editar
                 </button>
+                </div>
               )}
             </div>
 
@@ -426,6 +486,15 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
           </div>
         ))}
       </div>
+
+      <ParceriaPanel
+        parceria={parceria}
+        form={pForm}
+        setForm={setPForm}
+        loading={loading}
+        onSalvar={salvarParceria}
+        onFechar={() => setParceria(null)}
+      />
     </>
   )
 }
