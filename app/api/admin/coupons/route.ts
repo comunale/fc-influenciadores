@@ -7,6 +7,26 @@ type CouponUpdate = Database['public']['Tables']['coupons']['Update']
 
 // Quais colunas cada papel pode escrever. O banco repete essa regra no trigger:
 // se as duas discordarem, o banco vence e a API devolve 500 — o que é o certo.
+
+// O Postgres devolve o nome da constraint, que nao diz nada para quem usa o
+// sistema. Aqui vira portugues. Se aparecer uma constraint nova sem traducao,
+// cai no texto generico em vez de vazar SQL na tela.
+function traduzErroDoBanco(msg: string): string {
+  if (msg.includes('coupons_verified_requires_invoice')) {
+    return 'Cupom conferido não pode ficar sem NF. Desmarque Conferido antes de apagar o número.'
+  }
+  if (msg.includes('coupons_paid_requires_verified')) {
+    return 'Confira o cupom antes de marcar como pago.'
+  }
+  if (msg.includes('coupons_customer_cpf_campaign_id_key')) {
+    return 'Este CPF já possui um cupom nesta campanha.'
+  }
+  if (msg.includes('coupons_coupon_number_key')) {
+    return 'Já existe um cupom com este código.'
+  }
+  return 'Não foi possível salvar a alteração.'
+}
+
 const FIELDS_BY_ROLE: Record<Role, string[]> = {
   admin: ['status', 'customer_name', 'customer_phone', 'customer_email', 'customer_cpf',
           'verified', 'paid', 'invoice_number'],
@@ -26,7 +46,7 @@ export async function DELETE(request: Request) {
 
   const supabase = await createClient()
   const { error: dbErr } = await supabase.from('coupons').delete().in('id', ids)
-  if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 })
+  if (dbErr) return NextResponse.json({ error: traduzErroDoBanco(dbErr.message) }, { status: 400 })
 
   return NextResponse.json({ deleted: ids.length })
 }
@@ -103,7 +123,7 @@ export async function PATCH(request: Request) {
     .from('coupons')
     .update(update as CouponUpdate)
     .eq('id', id)
-  if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 })
+  if (dbErr) return NextResponse.json({ error: traduzErroDoBanco(dbErr.message) }, { status: 400 })
 
   return NextResponse.json({ ok: true })
 }

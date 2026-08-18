@@ -30,6 +30,10 @@ export function CuponsRowItem({
   const [expanded, setExpanded] = useState(false)
   const [saving, setSaving] = useState(false)
   const [nf, setNf] = useState(c.invoice_number ?? '')
+  // Espelho local de verified/paid para o clique responder na hora, sem esperar
+  // a ida e volta do servidor. Se o servidor recusar, volta ao valor real.
+  const [verified, setVerified] = useState(c.verified)
+  const [paid, setPaid] = useState(c.paid)
 
   const podeExcluir = can(role, 'coupons.delete')
   const podeEditar = can(role, 'coupons.edit')
@@ -68,6 +72,16 @@ export function CuponsRowItem({
   async function salvarNF() {
     const valor = nf.trim()
     if (valor === (c.invoice_number ?? '')) return
+
+    // Apagar a NF de um cupom ja conferido quebraria a regra "sem NF nao confere".
+    // Acontece no gesto natural de editar: seleciona tudo, apaga, digita o novo.
+    // Em vez de deixar o banco recusar, devolve o valor e explica o caminho.
+    if (!valor && verified) {
+      setNf(c.invoice_number ?? '')
+      toast.error('Desmarque Conferido antes de apagar a NF.')
+      return
+    }
+
     if (await patch({ invoice_number: valor })) toast.success('NF salva.')
   }
 
@@ -125,29 +139,46 @@ export function CuponsRowItem({
         </td>
 
         <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+          <span title={semNF ? 'Preencha a NF antes de conferir' : undefined} className="inline-block">
           <input
             type="checkbox"
-            checked={c.verified}
+            checked={verified}
             disabled={!podeConferir || semNF || saving}
-            title={semNF ? 'Informe o número da NF antes de conferir' : undefined}
-            onChange={(e) => patch({ verified: e.target.checked, invoice_number: nf.trim() })}
+            onChange={async (e) => {
+              const alvo = e.target.checked
+              setVerified(alvo)
+              if (!(await patch({ verified: alvo, invoice_number: nf.trim() }))) setVerified(!alvo)
+              else if (!alvo) setPaid(false)
+            }}
             className="accent-[#00ff87] w-4 h-4 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
           />
-          {c.verified && c.verified_by && (
+          </span>
+          {semNF && podeConferir && (
+            <div className="text-[10px] text-gray-600 mt-0.5">falta NF</div>
+          )}
+          {verified && c.verified_by && (
             <div className="text-[10px] text-gray-500 mt-0.5">{c.verified_by}</div>
           )}
         </td>
 
         <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+          <span title={!verified ? 'Confira o cupom antes de marcar como pago' : undefined} className="inline-block">
           <input
             type="checkbox"
-            checked={c.paid}
-            disabled={!podePagar || !c.verified || saving}
-            title={!c.verified ? 'Confira o cupom antes de marcar como pago' : undefined}
-            onChange={(e) => patch({ paid: e.target.checked })}
+            checked={paid}
+            disabled={!podePagar || !verified || saving}
+            onChange={async (e) => {
+              const alvo = e.target.checked
+              setPaid(alvo)
+              if (!(await patch({ paid: alvo }))) setPaid(!alvo)
+            }}
             className="accent-[#00ff87] w-4 h-4 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
           />
-          {c.paid && c.paid_at && (
+          </span>
+          {!verified && podePagar && (
+            <div className="text-[10px] text-gray-600 mt-0.5">falta conferir</div>
+          )}
+          {paid && c.paid_at && (
             <div className="text-[10px] text-gray-500 mt-0.5">{formatDate(c.paid_at)}</div>
           )}
         </td>
