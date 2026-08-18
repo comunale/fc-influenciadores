@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { FoxLogo } from '@/components/FoxLogo'
 import { CouponForm } from '@/components/forms/CouponForm'
@@ -24,7 +24,10 @@ function rotuloDesconto(tipo: string, valor: number) {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { coupon_code } = await params
-  const supabase = await createClient()
+  // Lê pelo servidor, não pelo navegador: as tabelas deixaram de ser públicas
+  // em 18/08/2026. Antes, qualquer um com a chave anon baixava a base inteira
+  // de clientes — CPF e telefone inclusive.
+  const supabase = createAdminClient()
 
   const { data: influencer } = await supabase
     .from('influencers')
@@ -53,7 +56,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function CouponLandingPage({ params }: PageProps) {
   const { coupon_code } = await params
-  const supabase = await createClient()
+  // Lê pelo servidor, não pelo navegador: as tabelas deixaram de ser públicas
+  // em 18/08/2026. Antes, qualquer um com a chave anon baixava a base inteira
+  // de clientes — CPF e telefone inclusive.
+  const supabase = createAdminClient()
 
   const { data: influencer } = await supabase
     .from('influencers')

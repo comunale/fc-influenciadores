@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { validateCPF } from '@/lib/validators/cpf'
 import { addDays } from '@/lib/utils'
 import { insertCouponWithRetry } from '@/lib/coupons/insert'
@@ -41,7 +41,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Telefone inválido. Informe com DDD.' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    // Rota pública: lê e grava pelo servidor. As tabelas deixaram de ser
+    // públicas em 18/08/2026 — quem tivesse a chave anon lia a base inteira de
+    // clientes e ainda conseguia inserir cupom direto, driblando o rate limit.
+    const supabase = createAdminClient()
 
     // Buscar influencer pelo código
     const { data: influencer, error: inflError } = await supabase

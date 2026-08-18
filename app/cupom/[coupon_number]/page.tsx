@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { FoxLogo } from '@/components/FoxLogo'
 import { CouponCard } from '@/components/CouponCard'
@@ -18,7 +18,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function CouponPage({ params }: PageProps) {
   const { coupon_number } = await params
-  const supabase = await createClient()
+  // Lê pelo servidor: a tabela de cupons deixou de ser pública em 18/08/2026.
+  const supabase = createAdminClient()
 
   const { data: coupon } = await supabase
     .from('coupons')
