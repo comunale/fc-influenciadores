@@ -25,9 +25,13 @@ export type CouponRow = {
   // Vendedor reivindicado no balcão. É um fato DIFERENTE de used_by_admin,
   // que é o login que operou o sistema. O par é o que revela padrão.
   seller_id: string | null
+  // Retrato gravado no cupom (migration 008): o que valia quando ele nasceu.
+  discount_type: string | null
+  discount_value: number | null
+  commission_per_sale: number | null
   sellers: { id: string; name: string; store_name: string } | null
   influencers: { id: string; name: string; instagram_handle: string } | null
-  campaigns: { name: string; discount_value: number; discount_type: string } | null
+  campaigns: { name: string } | null
 }
 
 export type InfluencerOption = { id: string; name: string; instagram_handle: string }
@@ -43,9 +47,12 @@ export function formatCpf(cpf: string) {
   return cpf?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') ?? ''
 }
 
+/**
+ * O desconto vem do RETRATO gravado no cupom (migration 008). Antes era lido da
+ * campanha, o que faria os cupons antigos mudarem de valor a cada renovacao do
+ * influenciador.
+ */
 export function discountLabel(c: CouponRow) {
-  if (!c.campaigns) return '—'
-  return c.campaigns.discount_type === 'fixed'
-    ? `R$ ${c.campaigns.discount_value}`
-    : `${c.campaigns.discount_value}%`
+  if (c.discount_type == null || c.discount_value == null) return '—'
+  return c.discount_type === 'fixed' ? `R$ ${c.discount_value}` : `${c.discount_value}%`
 }

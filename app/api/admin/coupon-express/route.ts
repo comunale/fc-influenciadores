@@ -115,7 +115,7 @@ export async function POST(request: Request) {
       used_at: now.toISOString(),
       used_by_admin: auth.name,
       seller_id,
-    }, '*, influencers(name, instagram_handle), campaigns(name, discount_value, discount_type, coupon_title)')
+    }, '*, influencers(name, instagram_handle), campaigns(name)')
 
     if (!result.ok) {
       if (result.reason === 'duplicate_cpf') {

@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     // Buscar cupom com dados relacionados
     const { data: coupon, error } = await supabase
       .from('coupons')
-      .select('*, influencers(name, instagram_handle), campaigns(name, discount_value, discount_type, coupon_title)')
+      .select('*, influencers(name, instagram_handle), campaigns(name)')
       .eq('coupon_number', coupon_number.toUpperCase().trim())
       .single()
 
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
         seller_id,
       })
       .eq('id', coupon.id)
-      .select('*, influencers(name, instagram_handle), campaigns(name, discount_value, discount_type, coupon_title)')
+      .select('*, influencers(name, instagram_handle), campaigns(name)')
       .single()
 
     if (updateError || !updated) {
@@ -115,7 +115,7 @@ export async function GET(request: Request) {
 
     const { data: coupon, error } = await supabase
       .from('coupons')
-      .select('*, influencers(name, instagram_handle), campaigns(name, discount_value, discount_type, coupon_title)')
+      .select('*, influencers(name, instagram_handle), campaigns(name)')
       .eq('coupon_number', coupon_number.toUpperCase().trim())
       .single()
 

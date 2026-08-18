@@ -28,7 +28,7 @@ export default async function CuponsPage({
     supabase
       .from('coupons')
       .select(
-        '*, influencers(id, name, instagram_handle), campaigns(name, discount_value, discount_type), sellers(id, name, store_name)'
+        '*, influencers(id, name, instagram_handle), campaigns(name), sellers(id, name, store_name)'
       )
       .order('created_at', { ascending: false })
       .limit(500),

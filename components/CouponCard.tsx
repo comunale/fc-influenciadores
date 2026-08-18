@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import toast from 'react-hot-toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import type { Coupon, Influencer, Campaign } from '@/lib/supabase/types'
+import type { Coupon, Influencer } from '@/lib/supabase/types'
 
 interface CouponCardProps {
   coupon: Coupon & {
-    influencers: Pick<Influencer, 'name' | 'instagram_handle'>
-    campaigns: Pick<Campaign, 'discount_value' | 'discount_type' | 'coupon_title' | 'coupon_description'>
+    // O desconto vem do RETRATO no proprio cupom (migration 008). Os textos
+    // vem do influencer, que passou a ser dono dos termos.
+    influencers: Pick<Influencer, 'name' | 'instagram_handle' | 'coupon_title' | 'coupon_description'>
   }
 }
 
@@ -30,9 +31,9 @@ export function CouponCard({ coupon }: CouponCardProps) {
   }, [qrUrl])
 
   const discountLabel =
-    coupon.campaigns.discount_type === 'fixed'
-      ? formatCurrency(coupon.campaigns.discount_value)
-      : `${coupon.campaigns.discount_value}%`
+    coupon.discount_type === 'fixed'
+      ? formatCurrency(coupon.discount_value ?? 0)
+      : `${coupon.discount_value ?? 0}%`
 
   const isExpired = new Date(coupon.expires_at) < new Date()
   const isUsed = coupon.status === 'used'
@@ -122,7 +123,7 @@ export function CouponCard({ coupon }: CouponCardProps) {
         {/* Topo colorido */}
         <div className="bg-[#00ff87] px-6 py-4 flex flex-col items-center gap-1">
           <div className="text-black text-xs font-bold uppercase tracking-widest">FoxCycles</div>
-          <div className="text-black text-lg font-black">{coupon.campaigns.coupon_title}</div>
+          <div className="text-black text-lg font-black">{coupon.influencers.coupon_title}</div>
         </div>
 
         {/* Separador dentilhado */}
@@ -193,7 +194,7 @@ export function CouponCard({ coupon }: CouponCardProps) {
 
           {/* Descrição */}
           <div className="text-xs text-gray-500 text-center leading-relaxed border-t border-[#1e1e1e] pt-3">
-            {coupon.campaigns.coupon_description}
+            {coupon.influencers.coupon_description}
           </div>
         </div>
       </div>
