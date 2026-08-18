@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
-import { formatCurrency, formatDateTime } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
+import { venceEmAte } from '@/lib/influencer-status'
+import Link from 'next/link'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -20,7 +22,7 @@ export default async function AdminDashboard() {
       .order('created_at', { ascending: false })
       .limit(10),
     supabase.from('influencers')
-      .select('id, name, instagram_handle, coupons(status)')
+      .select('id, name, instagram_handle, partnership_ends_at, active, coupons(status)')
       .eq('active', true),
   ])
 
@@ -39,6 +41,13 @@ export default async function AdminDashboard() {
     }
   }).sort((a, b) => b.used - a.used)
 
+  // Parcerias que vencem nos proximos 30 dias. Depois da data o link para de
+  // funcionar sozinho -- este bloco existe para o Cesar fechar as vendas e
+  // pagar a comissao antes disso acontecer.
+  const vencendo = (influencers || [])
+    .filter((i) => venceEmAte(i, 30))
+    .sort((a, b) => (a.partnership_ends_at ?? '').localeCompare(b.partnership_ends_at ?? ''))
+
   const metrics = [
     { label: 'Cupons Gerados', value: total, color: 'text-white' },
     { label: 'Vendas Realizadas', value: used, color: 'text-[#00ff87]' },
@@ -49,6 +58,30 @@ export default async function AdminDashboard() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 flex flex-col gap-8">
       <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+
+      {vencendo.length > 0 && (
+        <div className="bg-yellow-950/30 border border-yellow-900 rounded-xl p-5">
+          <h2 className="text-yellow-400 font-bold">
+            {vencendo.length} parceria{vencendo.length !== 1 ? 's' : ''} vencendo em 30 dias
+          </h2>
+          <p className="text-gray-400 text-xs mt-1 mb-3">
+            Depois da data o link para de funcionar. Prorrogue ou renove antes, e feche
+            as comissões do período.
+          </p>
+          <div className="flex flex-col gap-1">
+            {vencendo.map((i) => (
+              <div key={i.id} className="flex items-center justify-between text-sm">
+                <span className="text-white">{i.instagram_handle}</span>
+                <span className="text-yellow-400">até {formatDate(i.partnership_ends_at!)}</span>
+              </div>
+            ))}
+          </div>
+          <Link href="/admin/influencers?vencendo=1"
+            className="inline-block mt-3 text-xs text-yellow-400 hover:text-yellow-300 underline">
+            Ver na lista de influencers
+          </Link>
+        </div>
+      )}
 
       {/* Métricas */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
