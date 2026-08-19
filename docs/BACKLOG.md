@@ -63,7 +63,7 @@ cada um uma entrega que funciona sozinha:
 | 2 | Fechamentos e pagamentos | depende do 1 |
 | 3 | Funil de prospecção | independente |
 | 4 | Portal do influenciador | ✅ **concluído em 19/08** |
-| 6 | Contrato e aceite | 📋 **spec escrita em 19/08**, aguardando revisão — `specs/2026-08-19-contrato-e-aceite-design.md` |
+| 6 | Contrato e aceite | 🔨 **spec aprovada, plano escrito em 19/08** — `plans/2026-08-19-contrato-e-aceite.md`, 8 tasks |
 
 **Visibilidade no portal, decidida em 18/08:** a visibilidade é **por parceria**, não
 por cupom. A parceria antiga aparece como uma linha fechada — *"Parceria Reinauguração

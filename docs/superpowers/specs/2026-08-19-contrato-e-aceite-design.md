@@ -16,9 +16,17 @@ Decidido pelo César em 19/08 sobre as alternativas de não travar nada ou trava
 
 É o que dá dente ao contrato. Sem isso, "assinar" vira uma etapa paralela que alguém esquece — e o esquecimento só aparece quando dá problema. Com o link amarrado ao aceite, é impossível ter alguém divulgando sem contrato: o link simplesmente não existe antes.
 
-**As parcerias de @caiiuxo e @mariananavi ficam isentas.** Elas começaram antes do contrato existir no sistema, e desligar o link delas para cobrar uma assinatura retroativa seria punir as duas por uma decisão nossa. Mecanismo: `partnerships.contract_required`, que nasce `true`; a migração marca essas duas como `false`.
+### A trava vale só para o que vier
 
-**@carolvilex fica ativa e NÃO isenta.** A parceria dela seguiu de pé (uma venda em maio), mas o César não a incluiu na isenção. Consequência a confirmar antes de subir: quando este módulo entrar no ar, o link dela para até ela aceitar um contrato.
+Reafirmado pelo César em 19/08: *"ambos os links já estão sendo usados, então não dá para travar. O conceito travar fica para as novas campanhas que ainda serão criadas."*
+
+As duas parcerias vigentes — @caiiuxo e @mariananavi — ficam **isentas**. Os links delas estão em bio e story desde antes, e o do Caio é o mesmo `CAIIUXO300` de sempre; desligá-los para cobrar assinatura retroativa quebraria divulgação que já está no ar por uma decisão nossa.
+
+Vale inclusive para a parceria que o Caio ganhou em 19/08, quando o sistema recomeçou a contar: é parceria nova, mas **o link é o mesmo e já está publicado**. O que a trava protege é link novo, que ninguém ainda usou.
+
+Mecanismo: `partnerships.contract_required`, que nasce `true`. A migração marca essas duas como `false`. Toda parceria criada a partir daí exige aceite antes de o link ligar.
+
+@carolvilex foi encerrada em 19/08 e sai da conta.
 
 ## O contrato não é escrito por IA
 
