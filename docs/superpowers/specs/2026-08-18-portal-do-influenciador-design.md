@@ -1,7 +1,7 @@
 # Portal do influenciador
 
 **Data:** 2026-08-18
-**Status:** aguardando aprovação
+**Status:** aprovada pelo César em 19/08/2026
 **Subsistema 4 de 5** da reestruturação do fc-influenciadores
 
 ## O que é
@@ -29,17 +29,26 @@ O `proxy.ts` passa a mandar quem tem esse papel para `/portal`, e a bloquear `/a
 
 ## O que ele vê
 
-### Dados do cliente: nada
+### Dados do cliente: primeiro nome e nada mais
 
-O influenciador vê **quantidade**, nunca **quem**.
+Decidido pelo César em 19/08. O influenciador vê o **primeiro nome** e a data, para
+reconhecer quem ele indicou:
 
 ```
 ✅  "12 cupons gerados · 5 viraram venda · 3 aprovadas"
-✅  "Venda em 12/06, aprovada"
-❌  nome, CPF, telefone, e-mail de qualquer cliente
+✅  "Marcos · venda em 12/06 · aprovada"
+❌  sobrenome, CPF, telefone, e-mail
 ```
 
-O motivo é direto: são clientes da FoxCycles, não dele. Ele trouxe a indicação; isso não lhe dá acesso ao cadastro de ninguém. E é dado sensível sob a LGPD, que a empresa responde por.
+**O corte acontece no servidor, não na tela.** A consulta do portal seleciona
+`customer_name` e devolve apenas o primeiro termo; o nome completo nunca entra na
+resposta que chega ao navegador. Cortar no componente deixaria o resto no HTML — quem
+abrir o inspetor leria tudo. CPF, telefone e e-mail não são selecionados em nenhum
+momento.
+
+O limite existe porque são clientes da FoxCycles, não dele: ele trouxe a indicação,
+o que não lhe dá o cadastro de ninguém. E é dado pessoal sob a LGPD, que a empresa
+responde por.
 
 ### Por parceria
 
@@ -63,7 +72,13 @@ Reaproveita `calcularComissao`, que já existe e já lê o retrato gravado em ca
 
 ## O que ele NÃO faz
 
-Não edita nada. O portal é somente leitura. Nem os próprios dados bancários — mudar chave PIX por uma tela que um terceiro acessa é superfície de fraude que não se justifica pelo ganho.
+Não edita nada. O portal é somente leitura.
+
+**Dado bancário não aparece no portal — nem para ler.** Decidido pelo César em 19/08:
+é controle interno do Financeiro e não se expõe. Então `influencer_payment_info` fica
+fora de toda consulta do portal, e a política da tabela continua restrita a admin e
+Financeiro. Não é só uma tela que deixou de existir: é uma tabela que o papel novo não
+alcança por baixo.
 
 ## Segurança
 
@@ -77,7 +92,32 @@ A regra de que ele só vê o que é dele vale em três camadas, como todo o rest
 
 A camada do banco é a que importa: sem ela, um influenciador trocaria um id na URL e veria os números de outro.
 
-**Atenção — `coupons` hoje tem `select` público** (`coupons_select_public_by_number`), porque a página `/cupom/CODIGO` precisa funcionar sem login. Isso significa que hoje qualquer um que descubra um código lê aquele cupom, inclusive CPF e telefone do cliente. **Isso já é um problema, e o portal o agrava** — vale corrigir junto, restringindo as colunas públicas.
+### O que o portal obriga a apertar antes
+
+A leitura pública foi fechada em 18/08 (migration 013). Mas ela foi substituída por
+políticas `to authenticated using (true)` — **qualquer usuário logado lê tudo**. Isso
+era seguro enquanto só existiam três papéis internos. O portal quebra essa premissa:
+o influenciador passa a ser um usuário logado, e entraria pela mesma porta.
+
+Levantado no banco em 19/08, o que o papel novo herdaria sem nenhuma mudança:
+
+| Política | O que ele conseguiria |
+|---|---|
+| `coupons_select_authenticated` — `true` | ler **todos** os cupons, com CPF, telefone e e-mail |
+| `coupons_insert_authenticated` — sem restrição | criar cupom em nome de qualquer influenciador |
+| `coupons_update_admin_or_validation` — `status = 'pending'` | **validar cupom**, ou seja, marcar a própria venda |
+| `authenticated_read_profiles` — `true` | ler nome, e-mail e papel de todo mundo da FoxCycles |
+| `influencers_select_authenticated` — `true` | ver todos os outros influenciadores e os acordos deles |
+
+A terceira é a pior: ele aprovaria a venda que gera a própria comissão.
+
+**Por isso o aperto vem primeiro, na mesma entrega e antes de existir qualquer
+usuário com o papel novo.** Cada uma dessas políticas passa a exigir `eh_interno()` —
+admin, Financeiro ou Lojista — e o influenciador ganha políticas próprias, estreitas,
+que só enxergam o que é dele.
+
+É a mesma classe de falha corrigida em 18/08: uma regra escrita larga porque, no dia
+em que foi escrita, não havia ninguém do lado de fora para se aproveitar dela.
 
 ## Estrutura
 
