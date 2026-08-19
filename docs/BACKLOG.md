@@ -63,7 +63,7 @@ cada um uma entrega que funciona sozinha:
 | 2 | Fechamentos e pagamentos | depende do 1 |
 | 3 | Funil de prospecção | independente |
 | 4 | Portal do influenciador | ✅ **concluído em 19/08** |
-| 6 | Contrato e aceite | 💡 pedido em 19/08, sem spec ainda |
+| 6 | Contrato e aceite | 📋 **spec escrita em 19/08**, aguardando revisão — `specs/2026-08-19-contrato-e-aceite-design.md` |
 
 **Visibilidade no portal, decidida em 18/08:** a visibilidade é **por parceria**, não
 por cupom. A parceria antiga aparece como uma linha fechada — *"Parceria Reinauguração
@@ -178,6 +178,32 @@ mesma armadilha vai reaparecer:
 Regra que sai daqui: **toda vez que um papel novo entra no sistema, as políticas
 existentes precisam ser relidas.** Elas foram escritas assumindo quem existia na
 época.
+
+## 15 parcerias encerradas em 19/08
+
+O César acreditava ter 2 parcerias ativas. O sistema tinha **18**, todas sem
+`ends_at` — e parceria sem prazo não vence, então eram 18 links no ar.
+
+Vieram da planilha da reinauguração, que não tinha campo de data de fim. Das 18,
+**15 nunca geraram um cupom**. O risco era real: um story antigo salvo ou um
+print repassado geraria cupom válido, custando o desconto mais R$ 500 de comissão
+de um acordo encerrado em maio.
+
+Migration 018 encerrou as 15 (critério: ativa e sem nenhum cupom), com `ends_at`
+retroativo a 23/05. Sobraram 3 ativas: @caiiuxo, @carolvilex e @mariananavi.
+
+**A confirmar com o César:** @carolvilex ficou ativa mas fora da isenção de
+contrato. Quando o subsistema 6 subir, o link dela para até ela aceitar.
+
+## Pendências que o contrato cria em outras áreas
+
+- **Restituição de fee** — dinheiro que ENTRA, o oposto do que o Financeiro faz
+  hoje. Pertence ao subsistema 2; o 6 só registra a pendência.
+- **Renovação desliga o link** até o novo contrato ser aceito. A tela de renovar
+  precisa avisar antes de confirmar.
+- **Forma de pagamento e nota fiscal** — o contrato não diz se o influenciador
+  emite nota. PF e PJ têm tratamento tributário diferente. É conversa do César
+  com o contador, não decisão técnica.
 
 ## Correção de segurança feita em 18/08
 
