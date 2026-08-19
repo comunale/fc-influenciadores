@@ -32,6 +32,8 @@ const FIELDS_BY_ROLE: Record<Role, string[]> = {
           'verified', 'paid', 'invoice_number'],
   finance: ['verified', 'paid', 'invoice_number'],
   moderator: [],
+  // O influenciador nao edita cupom nenhum: o portal dele e so leitura.
+  influencer: [],
 }
 
 // DELETE — exclui um ou mais cupons

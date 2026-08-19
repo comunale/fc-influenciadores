@@ -18,6 +18,7 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          influencer_id: string | null
           name: string
           role: string
           store_name: string | null
@@ -27,6 +28,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id: string
+          influencer_id?: string | null
           name: string
           role?: string
           store_name?: string | null
@@ -36,11 +38,20 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          influencer_id?: string | null
           name?: string
           role?: string
           store_name?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "admin_profiles_influencer_id_fkey"
+            columns: ["influencer_id"]
+            isOneToOne: false
+            referencedRelation: "influencers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       app_settings: {
         Row: {
@@ -318,6 +329,7 @@ export type Database = {
           commission_starts_at: number
           commission_counts_from: string
           payment_schedule: string
+          portal_visible: boolean
           discount_type: string
           discount_value: number
           validity_days: number
@@ -338,6 +350,7 @@ export type Database = {
           commission_starts_at?: number
           commission_counts_from?: string
           payment_schedule?: string
+          portal_visible?: boolean
           discount_type: string
           discount_value: number
           validity_days: number
@@ -358,6 +371,7 @@ export type Database = {
           commission_starts_at?: number
           commission_counts_from?: string
           payment_schedule?: string
+          portal_visible?: boolean
           discount_type?: string
           discount_value?: number
           validity_days?: number

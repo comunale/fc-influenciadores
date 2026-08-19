@@ -1,5 +1,14 @@
-export type Role = 'admin' | 'finance' | 'moderator'
+export type Role = 'admin' | 'finance' | 'moderator' | 'influencer'
 
+/**
+ * Os papeis INTERNOS -- os que aparecem no seletor de Configuracoes e os unicos
+ * que /api/admin/create-user aceita.
+ *
+ * 'influencer' fica de fora de proposito. Ele so existe amarrado a um registro
+ * de influenciador (constraint admin_profiles_vinculo_coerente, migration 014),
+ * entao nasce apenas pela rota dedicada. Criar um pela tela de usuarios
+ * produziria uma conta sem dono, que o banco recusa -- melhor nem oferecer.
+ */
 export const ROLES: Role[] = ['admin', 'finance', 'moderator']
 
 // Rótulo de tela. "moderator" é o lojista — o valor de banco ficou por
@@ -8,6 +17,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   admin: 'Administrador',
   finance: 'Financeiro',
   moderator: 'Lojista',
+  influencer: 'Influenciador',
 }
 
 export type Action =
@@ -25,6 +35,13 @@ export type Action =
   | 'campaigns.edit'
   | 'settings'
 
+/**
+ * O que cada papel pode no sistema interno.
+ *
+ * 'influencer' nao aparece em linha nenhuma, e isso e a regra: can() responde
+ * false para tudo. O portal dele nao passa por esta matriz -- e uma area
+ * separada, so de leitura, e o que ele ve la e decidido pela RLS.
+ */
 const MATRIX: Record<Action, Role[]> = {
   'coupons.read':     ['admin', 'finance', 'moderator'],
   'coupons.edit':     ['admin'],

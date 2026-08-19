@@ -91,3 +91,24 @@ describe('papel ausente ou desconhecido', () => {
     }
   })
 })
+
+describe('papel influencer', () => {
+  it('nao pode nada na matriz interna', () => {
+    // Ele nao aparece em nenhuma linha do MATRIX. O padrao e negar.
+    expect(can('influencer', 'coupons.read')).toBe(false)
+    expect(can('influencer', 'validate')).toBe(false)
+    expect(can('influencer', 'influencers.payment')).toBe(false)
+    expect(can('influencer', 'dashboard')).toBe(false)
+    expect(can('influencer', 'settings')).toBe(false)
+  })
+
+  it('fica fora do seletor de usuarios internos', () => {
+    // Conta de influenciador so nasce pela rota que amarra o vinculo.
+    expect(ROLES).not.toContain('influencer')
+    expect(isRole('influencer')).toBe(false)
+  })
+
+  it('tem rotulo proprio de tela', () => {
+    expect(ROLE_LABELS.influencer).toBe('Influenciador')
+  })
+})

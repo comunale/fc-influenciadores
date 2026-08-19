@@ -14,6 +14,9 @@ const ROLE_HINT: Record<Role, string> = {
   admin: ' — acesso total',
   finance: ' — confere NF, marca pago e exporta',
   moderator: ' — só valida cupons no balcão',
+  // Nao aparece neste seletor: conta de influenciador nasce pela tela de
+  // Influencers, que amarra o vinculo. Existe aqui so para o tipo fechar.
+  influencer: ' — portal do influenciador',
 }
 
 interface UserProfile {
