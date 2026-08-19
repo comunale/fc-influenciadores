@@ -57,6 +57,20 @@ export function ParceriaPanel({
         </div>
 
         <div className="p-6 flex flex-col gap-4">
+          {/* Renovar desliga o link até o novo contrato ser aceito. Dizer isso
+              ANTES de confirmar: sem o aviso, quem renova numa sexta passa o fim
+              de semana sem link sem entender por quê. */}
+          {renovando && (
+            <div className="bg-yellow-950/30 border border-yellow-900/50 rounded-xl p-3">
+              <p className="text-yellow-500 text-xs leading-relaxed">
+                <span className="font-semibold">O link fica desligado até ele assinar.</span>{' '}
+                Renovar cria uma parceria nova, e parceria nova exige contrato
+                aceito. Avise a pessoa para entrar no portal — o link volta no
+                instante em que ela aceitar.
+              </p>
+            </div>
+          )}
+
           <p className="text-xs text-gray-500">
             {renovando
               ? 'Muda a negociação a partir de agora. O link não muda, e os cupons já gerados mantêm os valores antigos.'

@@ -12,6 +12,68 @@ export type Database = {
   }
   public: {
     Tables: {
+      contract_templates: {
+        Row: {
+          id: string; versao: number; titulo: string; corpo: string
+          ativo: boolean; created_at: string; created_by: string | null
+        }
+        Insert: {
+          id?: string; versao: number; titulo: string; corpo: string
+          ativo?: boolean; created_at?: string; created_by?: string | null
+        }
+        Update: {
+          id?: string; versao?: number; titulo?: string; corpo?: string
+          ativo?: boolean; created_at?: string; created_by?: string | null
+        }
+        Relationships: []
+      }
+      contracts: {
+        Row: {
+          id: string; partnership_id: string; template_id: string | null
+          template_versao: number | null; corpo: string; status: string
+          imagem_meses: number; accepted_at: string | null
+          accepted_ip: string | null; accepted_user_agent: string | null
+          fee_a_restituir: number | null; created_at: string
+        }
+        Insert: {
+          id?: string; partnership_id: string; template_id?: string | null
+          template_versao?: number | null; corpo: string; status?: string
+          imagem_meses?: number; accepted_at?: string | null
+          accepted_ip?: string | null; accepted_user_agent?: string | null
+          fee_a_restituir?: number | null; created_at?: string
+        }
+        Update: {
+          id?: string; partnership_id?: string; template_id?: string | null
+          template_versao?: number | null; corpo?: string; status?: string
+          imagem_meses?: number; accepted_at?: string | null
+          accepted_ip?: string | null; accepted_user_agent?: string | null
+          fee_a_restituir?: number | null; created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contracts_partnership_id_fkey"
+            columns: ["partnership_id"]
+            isOneToOne: true
+            referencedRelation: "partnerships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      influencer_contract_data: {
+        Row: {
+          influencer_id: string; cpf: string | null; estado_civil: string | null
+          endereco: string | null; cep: string | null; updated_at: string
+        }
+        Insert: {
+          influencer_id: string; cpf?: string | null; estado_civil?: string | null
+          endereco?: string | null; cep?: string | null; updated_at?: string
+        }
+        Update: {
+          influencer_id?: string; cpf?: string | null; estado_civil?: string | null
+          endereco?: string | null; cep?: string | null; updated_at?: string
+        }
+        Relationships: []
+      }
       admin_profiles: {
         Row: {
           active: boolean
@@ -330,6 +392,8 @@ export type Database = {
           commission_counts_from: string
           payment_schedule: string
           portal_visible: boolean
+          contract_required: boolean
+          contract_accepted_at: string | null
           discount_type: string
           discount_value: number
           validity_days: number
@@ -351,6 +415,8 @@ export type Database = {
           commission_counts_from?: string
           payment_schedule?: string
           portal_visible?: boolean
+          contract_required?: boolean
+          contract_accepted_at?: string | null
           discount_type: string
           discount_value: number
           validity_days: number
@@ -372,6 +438,8 @@ export type Database = {
           commission_counts_from?: string
           payment_schedule?: string
           portal_visible?: boolean
+          contract_required?: boolean
+          contract_accepted_at?: string | null
           discount_type?: string
           discount_value?: number
           validity_days?: number
@@ -425,6 +493,32 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      portal_meu_contrato: {
+        Args: Record<string, never>
+        Returns: {
+          id: string; corpo: string; status: string
+          accepted_at: string | null; falta_dados: boolean
+        }[]
+      }
+      portal_meus_dados: {
+        Args: Record<string, never>
+        Returns: {
+          cpf: string | null; estado_civil: string | null
+          endereco: string | null; cep: string | null
+        }[]
+      }
+      portal_salvar_meus_dados: {
+        Args: { p_cpf: string; p_estado_civil: string; p_endereco: string; p_cep: string }
+        Returns: undefined
+      }
+      portal_aceitar_contrato: {
+        Args: { p_ip: string; p_agent: string }
+        Returns: undefined
+      }
+      registrar_descumprimento: {
+        Args: { p_contrato: string }
+        Returns: undefined
+      }
       portal_vendas: {
         Args: Record<string, never>
         Returns: {

@@ -92,3 +92,33 @@ describe('venceEmAte', () => {
     expect(venceEmAte(p(daquiA20, 'encerrada'), 30)).toBe(false)
   })
 })
+
+describe('trava do contrato', () => {
+  const base = { active: true }
+  const comContrato = (aceito: boolean) =>
+    ({ ...p(null), contract_required: true, contract_accepted_at: aceito ? '2026-08-19T10:00:00Z' : null })
+
+  it('parceria isenta liga o link sem contrato nenhum', () => {
+    // As duas de 19/08: o link ja estava em bio e story.
+    expect(linkAtivo(base, { ...p(null), contract_required: false })).toBe(true)
+  })
+
+  it('parceria que exige contrato so liga depois do aceite', () => {
+    expect(linkAtivo(base, comContrato(false))).toBe(false)
+    expect(linkAtivo(base, comContrato(true))).toBe(true)
+  })
+
+  it('dado antigo, sem a coluna, continua ligando', () => {
+    // Recusar link por causa de coluna ausente seria pior que o problema.
+    expect(linkAtivo(base, p(null))).toBe(true)
+  })
+
+  it('diz o motivo certo quando falta assinar', () => {
+    expect(motivoLinkInativo(base, comContrato(false))).toBe('Contrato não aceito')
+    expect(motivoLinkInativo(base, comContrato(true))).toBeNull()
+  })
+
+  it('influenciador inativo pesa mais que contrato aceito', () => {
+    expect(motivoLinkInativo({ active: false }, comContrato(true))).toBe('Influencer inativo')
+  })
+})

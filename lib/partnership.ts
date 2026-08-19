@@ -26,6 +26,21 @@ export type Parceria = {
   validity_days: number
   coupon_title: string | null
   coupon_description: string | null
+  /**
+   * A parceria exige contrato aceito para o link ligar.
+   *
+   * Nasce true. As duas parcerias vigentes em 19/08 -- @caiiuxo e @mariananavi --
+   * ficaram isentas: os links delas ja estavam em bio e story, e desliga-los
+   * para cobrar assinatura retroativa quebraria divulgacao no ar por decisao
+   * nossa. A trava protege link NOVO, que ninguem ainda usou.
+   */
+  contract_required?: boolean
+  /**
+   * Quando o influenciador aceitou. Copia do que esta em `contracts`, guardada
+   * aqui para a regra do link nao precisar de uma consulta a mais nos sete
+   * lugares que a chamam. A prova continua sendo o contrato.
+   */
+  contract_accepted_at?: string | null
 }
 
 /** A parceria ativa do influenciador. So existe uma (indice unico no banco). */

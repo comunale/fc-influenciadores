@@ -174,13 +174,31 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
       ? await supabase.from('partnerships').update(termosDoAcordo).eq('id', parceriaId)
       : await supabase.from('partnerships').insert({
           ...termosDoAcordo, influencer_id: influencerId, status: 'ativa',
-        })
+        }).select('id').single()
 
     setLoading(false)
     if (rp.error) {
       toast.error('Dados salvos, mas os termos da parceria falharam: ' + rp.error.message)
       return
     }
+
+    // Parceria nova nasce com contrato, e o link dela fica desligado até o
+    // influenciador aceitar. Quem já estava no ar em 19/08 seguiu isento --
+    // ver lib/influencer-status.ts.
+    const novaParceria = (rp.data as { id: string } | null)?.id
+    if (novaParceria) {
+      const rc = await fetch('/api/admin/contracts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ partnership_id: novaParceria }),
+      })
+      if (!rc.ok) {
+        // Não some com o aviso: sem contrato o link não liga, e ninguém
+        // entenderia por quê.
+        toast.error('Parceria criada, mas o contrato não foi gerado. Gere em Contratos.')
+      }
+    }
+
     toast.success(editing ? 'Influencer atualizado!' : 'Influencer criado!')
     setShowForm(false)
     router.refresh()

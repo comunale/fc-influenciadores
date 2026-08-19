@@ -54,6 +54,27 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
+function LinkForaDoAr() {
+  return (
+    <main className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center px-4">
+      <FoxLogo size="lg" />
+      <h1 className="text-white font-bold text-xl mt-6 text-center">
+        Este link não está ativo no momento
+      </h1>
+      <p className="text-gray-500 text-sm mt-2 text-center max-w-sm leading-relaxed">
+        A oferta que ele apontava pode ter terminado. Dá uma olhada no perfil de
+        quem te indicou — se houver uma nova, o link estará por lá.
+      </p>
+      <a
+        href="https://foxcycles.com.br"
+        className="mt-6 text-[#00ff87] hover:underline text-sm"
+      >
+        Conhecer as motos FoxCycles
+      </a>
+    </main>
+  )
+}
+
 export default async function CouponLandingPage({ params }: PageProps) {
   const { coupon_code } = await params
   // Lê pelo servidor, não pelo navegador: as tabelas deixaram de ser públicas
@@ -67,10 +88,16 @@ export default async function CouponLandingPage({ params }: PageProps) {
     .eq('coupon_code', coupon_code.toUpperCase())
     .maybeSingle()
 
-  // O link depende do influenciador estar ativo e da PARCERIA estar vigente.
-  // Ver lib/influencer-status.ts.
+  // O link depende do influenciador estar ativo, da PARCERIA estar vigente e,
+  // desde 19/08/2026, do contrato aceito. Ver lib/influencer-status.ts.
   const parceria = parceriaAtiva(influencer?.partnerships as Parceria[] | null)
-  if (!influencer || !linkAtivo(influencer, parceria)) notFound()
+
+  // Código que não existe continua 404. Mas link que EXISTE e está fora do ar
+  // merece uma frase: quem chega aqui veio de um story, e um 404 faz a pessoa
+  // achar que digitou errado e tentar de novo. A frase é neutra de propósito --
+  // o visitante não tem por que saber se foi prazo, contrato ou cadastro.
+  if (!influencer) notFound()
+  if (!linkAtivo(influencer, parceria)) return <LinkForaDoAr />
 
   const discountLabel = rotuloDesconto(parceria!.discount_type, parceria!.discount_value)
   const campanha = (influencer.campaigns as { name: string } | null)?.name ?? ''

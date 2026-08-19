@@ -1,3 +1,4 @@
+import { sincronizarContrato } from '@/lib/contracts/gerar'
 import { requireRole, createClient } from '@/lib/supabase/server'
 import { mensagemDeErro } from '@/lib/db-errors'
 import { NextResponse } from 'next/server'
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: mensagemDeErro(erroEncerrar.message) }, { status: 400 })
   }
 
-  const { error: erroCriar } = await supabase.from('partnerships').insert({
+  const { data: nova, error: erroCriar } = await supabase.from('partnerships').insert({
     influencer_id,
     campaign_id: atual.campaign_id,
     status: 'ativa',
@@ -77,7 +78,7 @@ export async function POST(request: Request) {
     validity_days: Number(termos?.validity_days ?? atual.validity_days),
     coupon_title: atual.coupon_title,
     coupon_description: atual.coupon_description,
-  })
+  }).select('id').single()
 
   if (erroCriar) {
     // A antiga já foi encerrada e a nova falhou: o influencer ficou sem parceria
@@ -91,6 +92,11 @@ export async function POST(request: Request) {
       { status: 500 }
     )
   }
+
+  // Renovar gera contrato novo, e o link fica desligado até o influenciador
+  // aceitar. É a borda mais afiada desta entrega: quem renova numa sexta pode
+  // passar o fim de semana sem link se não avisar a pessoa.
+  if (nova?.id) await sincronizarContrato(nova.id)
 
   return NextResponse.json({ ok: true })
 }

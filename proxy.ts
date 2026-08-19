@@ -13,6 +13,9 @@ const ALLOWED_BY_ROLE: Record<string, RouteRule[]> = {
     { path: '/admin/cupons' },
     { path: '/admin', exact: true },
     { path: '/admin/influencers' },
+    // Lê contrato para saber se pode pagar. Não edita — a página de um
+    // contrato só abre para admin.
+    { path: '/admin/contratos' },
   ],
   moderator: [
     { path: '/admin/validar' },
