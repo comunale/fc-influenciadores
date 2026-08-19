@@ -192,8 +192,20 @@ de um acordo encerrado em maio.
 Migration 018 encerrou as 15 (critério: ativa e sem nenhum cupom), com `ends_at`
 retroativo a 23/05. Sobraram 3 ativas: @caiiuxo, @carolvilex e @mariananavi.
 
-**A confirmar com o César:** @carolvilex ficou ativa mas fora da isenção de
-contrato. Quando o subsistema 6 subir, o link dela para até ela aceitar.
+Em 19/08 o César confirmou que só @caiiuxo e @mariananavi seguem ativos, e a
+@carolvilex foi encerrada também (migration 019). **Restam 2 parcerias ativas**,
+as duas isentas de contrato.
+
+### Pendências abertas que o encerramento não resolve
+
+- **@carolvilex tem uma venda não conferida.** Cupom `FOX-ZE679B`, de 22/05,
+  status *usado* — a moto saiu — mas o Financeiro nunca conferiu. Não conta para
+  comissão e ninguém pagou. Parada há três meses. A parceria dela também tem
+  R$ 500 de fee registrado, sem registro de pagamento.
+- **O influenciador não consegue trocar a própria senha.** O portal é só leitura,
+  então a senha inicial que o César define é a única que existe. Para conta de
+  terceiro isso não se sustenta por muito tempo. Depende da mesma decisão sobre
+  o portal aceitar escrita.
 
 ## Pendências que o contrato cria em outras áreas
 
