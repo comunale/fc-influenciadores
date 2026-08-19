@@ -29,12 +29,26 @@ o login de verdade — não tenho, nem devo ter, a senha dele.
 > colocar esse contrato no sistema e criar um sistema de aceite? Para proteger
 > ambos os lados. Direito de uso de imagem e etc."
 
-Ainda **não desenhado**. Encaixa naturalmente no portal, que agora existe e já é
-o lugar onde o influenciador entra autenticado. Pontos a decidir antes de
-qualquer código: o texto vale por parceria ou por influenciador; o que conta como
-prova de aceite (data, hora, IP, versão do texto); se o aceite trava alguma coisa
-(o link só liga depois de aceitar?); e como versionar o contrato sem invalidar
-aceites antigos. Vale uma spec própria.
+Ainda **não desenhado**. Encaixa no portal, que agora existe e já é o lugar onde
+o influenciador entra autenticado.
+
+**Decidido em 19/08:** o direito de uso de imagem vale **6 meses**.
+
+**Aguardando:** o César está escrevendo o contrato e vai mandar o texto para
+análise. Sem o texto não dá para desenhar — é ele que diz quais campos existem.
+
+Ainda em aberto, para decidir junto com o texto na mão:
+
+- O contrato vale **por parceria** ou **por influenciador**? Se as condições
+  mudam a cada renovação, o aceite provavelmente também precisa ser renovado.
+- O aceite **trava** alguma coisa? Ex.: o link só liga depois de aceitar. É o
+  que dá dente ao contrato, e muda bastante o desenho.
+- Como versionar o texto sem invalidar aceite antigo. Ninguém pode ficar
+  vinculado a um texto que mudou depois de assinar.
+- Os 6 meses de imagem contam **do aceite** ou **do fim da parceria**? Muda
+  quando o prazo vence e o que o sistema precisa avisar.
+
+Vale uma spec própria: isto é prova jurídica, não um checkbox.
 
 ---
 
