@@ -433,10 +433,6 @@ export type Database = {
           primeiro_nome: string
         }[]
       }
-      portal_parcerias_encerradas: {
-        Args: Record<string, never>
-        Returns: { id: string; starts_at: string; ends_at: string | null }[]
-      }
       check_rate_limit: {
         Args: {
           p_key: string

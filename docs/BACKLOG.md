@@ -220,6 +220,18 @@ as duas isentas de contrato.
   emite nota. PF e PJ têm tratamento tributário diferente. É conversa do César
   com o contador, não decisão técnica.
 
+## "O sistema começa agora" — regra dada em 19/08
+
+> *"A partir de agora a gente contabiliza. O que é passado é passado. O sistema
+> começou agora com o Caio e com a Mariana."*
+
+Encerra a discussão sobre o que o portal mostra do histórico: **nada**. Parceria
+anterior não aparece nem como linha vazia. Migration 021 encerrou a parceria
+antiga do @caiiuxo em 18/08 e abriu uma nova em 19/08 com os mesmos termos; as 6
+vendas antigas ficam presas à parceria antiga e seguem no controle interno.
+
+Vale para tudo daqui pra frente: número que o influenciador vê nasceu no sistema.
+
 ## Correção de segurança feita em 18/08
 
 **As tabelas eram legíveis por qualquer um.** `coupons`, `influencers`,

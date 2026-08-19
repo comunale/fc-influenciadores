@@ -108,17 +108,3 @@ export function montarPortal(
                visivel: true, resumo, vendas }
     })
 }
-
-/**
- * A linha fechada de uma parceria encerrada: existe, tem periodo, e nada mais.
- *
- * Vem da funcao portal_parcerias_encerradas() (migration 016), que devolve so
- * as datas. Esconder a parceria inteira faria o influenciador achar que o
- * historico dele sumiu; abrir a linha exporia valores ja acertados por fora.
- */
-export function linhaFechada(p: { id: string; starts_at: string; ends_at: string | null }): ParceriaNoPortal {
-  return {
-    id: p.id, starts_at: p.starts_at, ends_at: p.ends_at,
-    encerrada: true, visivel: false, resumo: null, vendas: [],
-  }
-}
