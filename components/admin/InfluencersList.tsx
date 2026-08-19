@@ -342,7 +342,7 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
                   }`}
                   title={acessos[inf.id] ? `Acessa como ${acessos[inf.id]}` : 'Sem acesso ao portal'}
                 >
-                  {acessos[inf.id] ? 'Portal ✓' : 'Portal'}
+                  {acessos[inf.id] ? 'Portal ✓' : 'Criar portal'}
                 </button>
                 <button
                   onClick={() => abrirParceria(inf, 'prorrogar')}

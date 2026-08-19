@@ -194,6 +194,21 @@ export function UserManagement({
         </div>
       )}
 
+      {/* Esta tela cria usuários INTERNOS. O acesso do influenciador ao portal
+          nasce na tela de Influencers, porque precisa ficar amarrado ao registro
+          dele -- o banco recusa uma conta de portal sem dono. Sem este aviso a
+          pessoa procura aqui e não acha. */}
+      <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl px-5 py-4 flex items-start gap-3">
+        <span className="text-[#00ff87] text-lg leading-none mt-0.5">→</span>
+        <p className="text-gray-400 text-sm leading-relaxed">
+          Procurando o acesso de um <span className="text-white">influenciador</span> ao
+          portal dele? Ele se cria em{' '}
+          <a href="/admin/influencers" className="text-[#00ff87] hover:underline">Influencers</a>,
+          no botão <span className="text-gray-200 font-medium">Portal</span> da linha
+          de cada um — assim a conta já nasce ligada ao cadastro certo.
+        </p>
+      </div>
+
       {/* Lista de usuários */}
       <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl overflow-hidden divide-y divide-[#1a1a1a]">
         {users.length === 0 && (
