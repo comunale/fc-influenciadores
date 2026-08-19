@@ -8,7 +8,7 @@ pedidos do César quase se perderam assim.
 Regra: ao terminar qualquer entrega, atualizar este arquivo. Ao começar
 qualquer conversa, ler este arquivo.
 
-Atualizado em 2026-08-18.
+Atualizado em 2026-08-19.
 
 **Plano de execução dos itens 1, 3 e 4:** `docs/superpowers/plans/2026-08-18-pendencias-balcao-financeiro-parceria.md`. O item 2 (portal) segue bloqueado pela decisão sobre os dados migrados da planilha.
 
@@ -16,19 +16,25 @@ Atualizado em 2026-08-18.
 
 ## Retomando o trabalho — leia isto primeiro
 
-**Última sessão: 18/08/2026.** Estado: tudo commitado e no ar, nada pela metade.
+**Última sessão: 19/08/2026.** Tudo commitado e no ar, nada pela metade.
 
-Antes de construir o portal, **duas confirmações do César estão pendentes** (ele
-saiu antes de responder):
+**O portal do influenciador está construído** (subsistema 4). Falta o César
+testar de ponta a ponta: criar um acesso pela tela de Influencers, entrar em
+`/portal` com ele e conferir. Eu testei a camada de dados no banco, mas não fiz
+o login de verdade — não tenho, nem devo ter, a senha dele.
 
-1. **O influenciador não vê dado nenhum de cliente** — nem nome, nem CPF, nem
-   telefone. Só números: *"12 cupons · 5 vendas · 3 aprovadas"*. São clientes da
-   FoxCycles, não dele.
-2. **O portal é somente leitura** — não edita nada, nem os próprios dados
-   bancários. Mudar chave PIX por uma tela que um terceiro acessa é superfície de
-   fraude sem ganho que compense.
+### Pedido novo do César, 19/08 — contrato com aceite
 
-As duas estão na spec. Não começar o portal sem a resposta.
+> "Temos um contratinho simples que enviamos para a pessoa assinar. Temos como
+> colocar esse contrato no sistema e criar um sistema de aceite? Para proteger
+> ambos os lados. Direito de uso de imagem e etc."
+
+Ainda **não desenhado**. Encaixa naturalmente no portal, que agora existe e já é
+o lugar onde o influenciador entra autenticado. Pontos a decidir antes de
+qualquer código: o texto vale por parceria ou por influenciador; o que conta como
+prova de aceite (data, hora, IP, versão do texto); se o aceite trava alguma coisa
+(o link só liga depois de aceitar?); e como versionar o contrato sem invalidar
+aceites antigos. Vale uma spec própria.
 
 ---
 
@@ -42,7 +48,8 @@ cada um uma entrega que funciona sozinha:
 | 1 | **Parceria como entidade** | ✅ **concluído em 18/08** |
 | 2 | Fechamentos e pagamentos | depende do 1 |
 | 3 | Funil de prospecção | independente |
-| 4 | Portal do influenciador | 📋 **spec escrita, aguardando 2 confirmações** — `specs/2026-08-18-portal-do-influenciador-design.md` |
+| 4 | Portal do influenciador | ✅ **concluído em 19/08** |
+| 6 | Contrato e aceite | 💡 pedido em 19/08, sem spec ainda |
 
 **Visibilidade no portal, decidida em 18/08:** a visibilidade é **por parceria**, não
 por cupom. A parceria antiga aparece como uma linha fechada — *"Parceria Reinauguração
@@ -134,6 +141,29 @@ Conferido, Pago, vendedor nomeado) ataca pela auditoria, depois da venda. Os
 dois se complementam — hoje o vendedor ainda cria e valida um cupom sozinho.
 
 ---
+
+## Subsistema 4 — portal do influenciador, concluído em 19/08
+
+Plano: `plans/2026-08-19-portal-do-influenciador.md`. Migrations 014, 016 e 017.
+
+Decidido pelo César em 19/08:
+- ele vê o **primeiro nome** do cliente, mais nada. O corte acontece no SQL.
+- **dado bancário não aparece no portal**, nem para ler. É controle interno.
+
+**Dois erros meus que o teste no banco pegou** — ficam registrados porque a
+mesma armadilha vai reaparecer:
+
+1. Dei ao influenciador uma política de leitura sobre os próprios cupons. RLS
+   filtra **linha, não coluna**: com o token dele, `/rest/v1/coupons?select=*`
+   devolveria CPF, telefone e e-mail dos clientes. A tela estava certa e a trava
+   não. Corrigido tirando o acesso à tabela e pondo `portal_vendas()` no lugar.
+2. A política escondia a parceria encerrada por completo, e a spec pedia que ela
+   aparecesse como linha fechada. Resolvido com `portal_parcerias_encerradas()`,
+   que devolve só as datas.
+
+Regra que sai daqui: **toda vez que um papel novo entra no sistema, as políticas
+existentes precisam ser relidas.** Elas foram escritas assumindo quem existia na
+época.
 
 ## Correção de segurança feita em 18/08
 
