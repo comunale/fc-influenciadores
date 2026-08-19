@@ -96,9 +96,18 @@ export async function proxy(request: NextRequest) {
       )
     }
 
-    // Já logado numa tela de login → vai para a casa do papel dele
+    // Já logado numa tela de login.
+    //
+    // O influenciador vai direto para o portal, de qualquer uma das duas portas.
+    // O usuário interno também, quando erra a porta do próprio admin.
+    //
+    // Mas um interno que abre /portal/login NÃO é expulso: normalmente é o
+    // próprio César querendo entrar como influenciador para conferir o portal, e
+    // devolvê-lo ao admin sem explicação parece um bug do sistema. A página
+    // conta o que está acontecendo e oferece sair.
     if (isLoginPage) {
-      return NextResponse.redirect(new URL(casa, request.url))
+      if (ehInfluencer) return NextResponse.redirect(new URL('/portal', request.url))
+      if (pathname === '/admin/login') return NextResponse.redirect(new URL(casa, request.url))
     }
 
     // A trava cruzada: cada um na sua área.
