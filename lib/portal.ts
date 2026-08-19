@@ -18,11 +18,15 @@
 import { calcularComissao, type ResumoComissao, type VendaParaComissao } from './commission'
 import type { Parceria } from './partnership'
 
-/** Um cupom, como o portal precisa dele. Note o que NAO esta aqui: cpf, telefone, email. */
+/**
+ * Uma venda, como o portal a recebe.
+ *
+ * Vem da funcao portal_vendas() (migration 017), nao da tabela: o influenciador
+ * nao alcanca `coupons`. Note o que NAO existe aqui -- cpf, telefone, email,
+ * numero do cupom. E o nome ja chega cortado pelo SQL.
+ */
 export type CupomDoPortal = VendaParaComissao & {
-  customer_name: string | null
-  coupon_number: string
-  status: string
+  primeiro_nome: string
 }
 
 export type VendaNoPortal = {
@@ -93,7 +97,9 @@ export function montarPortal(
         .sort((a, b) => b.created_at.localeCompare(a.created_at))
         .map((c) => ({
           id: c.id,
-          primeiro_nome: primeiroNome(c.customer_name),
+          // Ja vem cortado do banco. Cortar de novo nao custa nada e mantem a
+          // garantia se a consulta um dia mudar.
+          primeiro_nome: primeiroNome(c.primeiro_nome),
           data: c.created_at,
           aprovada: c.verified,
         }))
@@ -101,4 +107,18 @@ export function montarPortal(
       return { id: p.id, starts_at: p.starts_at, ends_at: p.ends_at, encerrada,
                visivel: true, resumo, vendas }
     })
+}
+
+/**
+ * A linha fechada de uma parceria encerrada: existe, tem periodo, e nada mais.
+ *
+ * Vem da funcao portal_parcerias_encerradas() (migration 016), que devolve so
+ * as datas. Esconder a parceria inteira faria o influenciador achar que o
+ * historico dele sumiu; abrir a linha exporia valores ja acertados por fora.
+ */
+export function linhaFechada(p: { id: string; starts_at: string; ends_at: string | null }): ParceriaNoPortal {
+  return {
+    id: p.id, starts_at: p.starts_at, ends_at: p.ends_at,
+    encerrada: true, visivel: false, resumo: null, vendas: [],
+  }
 }

@@ -11,6 +11,7 @@ import { motivoLinkInativo } from '@/lib/influencer-status'
 import type { Parceria } from '@/lib/partnership'
 import { can, type Role } from '@/lib/auth/roles'
 import { DadosBancarios } from './DadosBancarios'
+import { AcessoPortal } from './AcessoPortal'
 import { ParceriaPanel, type ParceriaForm } from './ParceriaPanel'
 import { InfluencerForm } from './InfluencerForm'
 import { Button } from '@/components/ui/button'
@@ -46,6 +47,8 @@ interface Props {
   influencers: InfluencerRow[]
   campaigns: Campaign[]
   canEdit?: boolean
+  /** E-mail de acesso ao portal, por influencer. Ausente = ainda nao tem. */
+  acessos?: Record<string, string>
   role?: Role
   /** Barra de filtros, renderizada pela pagina que faz a filtragem. */
   filtros?: React.ReactNode
@@ -68,11 +71,12 @@ const emptyForm = {
   coupon_description: '',
 }
 
-export function InfluencersList({ influencers: initial, campaigns, canEdit = false, role, filtros }: Props) {
+export function InfluencersList({ influencers: initial, campaigns, canEdit = false, role, filtros, acessos = {} }: Props) {
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [excluindoId, setExcluindoId] = useState<string | null>(null)
   const [bancarios, setBancarios] = useState<{ id: string; handle: string } | null>(null)
+  const [acesso, setAcesso] = useState<{ id: string; handle: string } | null>(null)
   const podeVerBancarios = can(role, 'influencers.payment')
   const [parceria, setParceria] = useState<{ inf: InfluencerRow; acao: 'prorrogar' | 'renovar' } | null>(null)
   const [pForm, setPForm] = useState<ParceriaForm>({
@@ -330,6 +334,17 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
               {canEdit && (
                 <div className="flex gap-2 flex-shrink-0">
                 <button
+                  onClick={() => setAcesso({ id: inf.id, handle: inf.instagram_handle })}
+                  className={`text-xs border px-3 py-1.5 rounded-lg transition-colors ${
+                    acessos[inf.id]
+                      ? 'border-[#00ff87]/40 text-[#00ff87] hover:bg-[#00ff87]/10'
+                      : 'border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87]'
+                  }`}
+                  title={acessos[inf.id] ? `Acessa como ${acessos[inf.id]}` : 'Sem acesso ao portal'}
+                >
+                  {acessos[inf.id] ? 'Portal ✓' : 'Portal'}
+                </button>
+                <button
                   onClick={() => abrirParceria(inf, 'prorrogar')}
                   className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] px-3 py-1.5 rounded-lg transition-colors"
                 >
@@ -428,6 +443,15 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
           </div>
         ))}
       </div>
+
+      {acesso && (
+        <AcessoPortal
+          influencerId={acesso.id}
+          handle={acesso.handle}
+          emailAtual={acessos[acesso.id] ?? null}
+          onFechar={(mudou) => { setAcesso(null); if (mudou) router.refresh() }}
+        />
+      )}
 
       {bancarios && (
         <DadosBancarios

@@ -64,37 +64,55 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   const isAdminRoute = pathname.startsWith('/admin') && pathname !== '/admin/login'
+  // O portal do influenciador é uma área separada, não uma versão reduzida do
+  // admin. Quem é de dentro não tem o que fazer lá, e quem é de fora não sai de lá.
+  const isPortalRoute = pathname.startsWith('/portal') && pathname !== '/portal/login'
+  const isLoginPage = pathname === '/admin/login' || pathname === '/portal/login'
 
-  // Não autenticado → login (preserva destino via ?next=)
-  if (isAdminRoute && !user) {
+  // Não autenticado → login da área correspondente (preserva destino via ?next=)
+  if ((isAdminRoute || isPortalRoute) && !user) {
     const next = encodeURIComponent(request.nextUrl.pathname + request.nextUrl.search)
-    return NextResponse.redirect(new URL(`/admin/login?next=${next}`, request.url))
+    const login = isPortalRoute ? '/portal/login' : '/admin/login'
+    return NextResponse.redirect(new URL(`${login}?next=${next}`, request.url))
   }
 
-  // Já logado tentando acessar /admin/login → vai pro dashboard
-  if (pathname === '/admin/login' && user) {
-    return NextResponse.redirect(new URL('/admin', request.url))
-  }
-
-  // Verificar permissão de moderador
-  if (isAdminRoute && user) {
+  if ((isAdminRoute || isPortalRoute || isLoginPage) && user) {
     const { data: profile } = await supabase
       .from('admin_profiles')
       .select('role, active')
       .eq('id', user.id)
       .single()
 
-    // Perfil inativo ou ausente → desloga
+    const ehInfluencer = profile?.role === 'influencer'
+    const casa = ehInfluencer
+      ? '/portal'
+      : ALLOWED_BY_ROLE[profile?.role ?? '']?.[0]?.path ?? '/admin'
+
+    // Perfil inativo ou ausente → desloga na porta por onde entrou
     if (profile && !profile.active) {
       await supabase.auth.signOut()
-      return NextResponse.redirect(new URL('/admin/login', request.url))
+      return NextResponse.redirect(
+        new URL(ehInfluencer ? '/portal/login' : '/admin/login', request.url)
+      )
     }
 
-    // Papéis não-admin só entram nas rotas da sua lista
-    if (profile?.role && profile.role !== 'admin') {
+    // Já logado numa tela de login → vai para a casa do papel dele
+    if (isLoginPage) {
+      return NextResponse.redirect(new URL(casa, request.url))
+    }
+
+    // A trava cruzada: cada um na sua área.
+    if (ehInfluencer && isAdminRoute) {
+      return NextResponse.redirect(new URL('/portal', request.url))
+    }
+    if (!ehInfluencer && isPortalRoute) {
+      return NextResponse.redirect(new URL(casa, request.url))
+    }
+
+    // Papéis internos não-admin só entram nas rotas da sua lista
+    if (isAdminRoute && profile?.role && profile.role !== 'admin') {
       if (!isAllowed(profile.role, pathname)) {
-        const home = ALLOWED_BY_ROLE[profile.role]?.[0]?.path ?? '/admin/validar'
-        return NextResponse.redirect(new URL(home, request.url))
+        return NextResponse.redirect(new URL(casa, request.url))
       }
     }
   }
@@ -103,5 +121,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/c/:path*'],
+  matcher: ['/admin/:path*', '/portal/:path*', '/c/:path*'],
 }

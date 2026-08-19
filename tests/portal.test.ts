@@ -17,7 +17,7 @@ function cupom(id: string, over: Partial<CupomDoPortal> = {}): CupomDoPortal {
   return {
     id, created_at: '2026-08-10T12:00:00Z', verified: true, paid: false,
     commission_per_sale: 500, partnership_id: 'p1',
-    customer_name: 'Marcos Ribeiro Silva', coupon_number: 'FOX-1', status: 'used', ...over,
+    primeiro_nome: 'Marcos', ...over,
   }
 }
 
@@ -72,7 +72,8 @@ describe('montarPortal', () => {
   })
 
   it('a venda so expoe primeiro nome, data e situacao', () => {
-    const r = montarPortal([parceria('p1')], [cupom('c1')])
+    // Mesmo se o banco devolvesse o nome inteiro, o corte se repete aqui.
+    const r = montarPortal([parceria('p1')], [cupom('c1', { primeiro_nome: 'Marcos Ribeiro Silva' })])
     expect(r[0].vendas[0]).toEqual({
       id: 'c1', primeiro_nome: 'Marcos', data: '2026-08-10T12:00:00Z', aprovada: true,
     })

@@ -39,6 +39,19 @@ export default async function InfluencersPage({
     supabase.from('campaigns').select('id, name').order('name'),
   ])
 
+  // Quem ja tem acesso ao portal. Consulta separada porque admin_profiles nao
+  // e filha de influencers -- o vinculo aponta para o outro lado.
+  const { data: perfisPortal } = await supabase
+    .from('admin_profiles')
+    .select('influencer_id, email')
+    .eq('role', 'influencer')
+
+  const acessos = Object.fromEntries(
+    (perfisPortal ?? [])
+      .filter((p) => p.influencer_id)
+      .map((p) => [p.influencer_id as string, p.email ?? ''])
+  )
+
   const enriched = (influencers || []).map((inf) => {
     const couponsArr = (inf.coupons as { status: string }[]) || []
     const parceria = parceriaAtiva(inf.partnerships as Parceria[] | null)
@@ -95,6 +108,7 @@ export default async function InfluencersPage({
         influencers={lista}
         campaigns={campaigns || []}
         canEdit={role === 'admin'}
+        acessos={acessos}
         role={role as Role}
         filtros={
           <InfluencersFilters
