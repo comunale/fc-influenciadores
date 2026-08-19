@@ -99,3 +99,36 @@ describe('camposDoModelo', () => {
       .toEqual(['influenciador.nome', 'parceria.comissao'])
   })
 })
+
+describe('blocos condicionais', () => {
+  const comFee = { parceria: { fee: 500, comissao: 500 } }
+  const semFee = { parceria: { fee: 0, comissao: 500 } }
+
+  it('mantem o bloco quando o valor existe', () => {
+    const r = preencher('a{{#se parceria.fee}} fee {{parceria.fee}} {{/se}}b', comFee)
+    expect(r.corpo).toBe('a fee R$ 500,00 b')
+  })
+
+  it('remove o bloco quando o valor e zero', () => {
+    // O caso que motivou: sem isto o contrato do @caiiuxo teria uma clausula
+    // dizendo "R$ 0,00 (zero reais)".
+    const r = preencher('a{{#se parceria.fee}} fee {{parceria.fee}} {{/se}}b', semFee)
+    expect(r.corpo).toBe('ab')
+  })
+
+  it('remove o bloco quando o campo nem existe', () => {
+    expect(preencher('a{{#se parceria.fee}}x{{/se}}b', {}).corpo).toBe('ab')
+  })
+
+  it('nao cobra campo que ficou dentro de bloco removido', () => {
+    // O {{parceria.fee_extenso}} sumiu junto: nao pode aparecer como faltando.
+    const r = preencher('{{#se parceria.fee}}{{parceria.fee_extenso}}{{/se}}', semFee)
+    expect(r.faltando).toEqual([])
+    expect(r.corpo).toBe('')
+  })
+
+  it('cobra normalmente o campo que ficou dentro de bloco mantido', () => {
+    const r = preencher('{{#se parceria.fee}}{{influenciador.cpf}}{{/se}}', comFee)
+    expect(r.faltando).toEqual(['influenciador.cpf'])
+  })
+})
