@@ -43,13 +43,13 @@ export default async function InfluencersPage({
   // e filha de influencers -- o vinculo aponta para o outro lado.
   const { data: perfisPortal } = await supabase
     .from('admin_profiles')
-    .select('influencer_id, email')
+    .select('id, influencer_id, email')
     .eq('role', 'influencer')
 
   const acessos = Object.fromEntries(
     (perfisPortal ?? [])
       .filter((p) => p.influencer_id)
-      .map((p) => [p.influencer_id as string, p.email ?? ''])
+      .map((p) => [p.influencer_id as string, { email: p.email ?? '', userId: p.id }])
   )
 
   const enriched = (influencers || []).map((inf) => {

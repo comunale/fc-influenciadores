@@ -47,8 +47,8 @@ interface Props {
   influencers: InfluencerRow[]
   campaigns: Campaign[]
   canEdit?: boolean
-  /** E-mail de acesso ao portal, por influencer. Ausente = ainda nao tem. */
-  acessos?: Record<string, string>
+  /** Acesso ao portal por influencer: e-mail e id do usuario. Ausente = nao tem. */
+  acessos?: Record<string, { email: string; userId: string }>
   role?: Role
   /** Barra de filtros, renderizada pela pagina que faz a filtragem. */
   filtros?: React.ReactNode
@@ -340,7 +340,7 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
                       ? 'border-[#00ff87]/40 text-[#00ff87] hover:bg-[#00ff87]/10'
                       : 'border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87]'
                   }`}
-                  title={acessos[inf.id] ? `Acessa como ${acessos[inf.id]}` : 'Sem acesso ao portal'}
+                  title={acessos[inf.id] ? `Acessa como ${acessos[inf.id].email}` : 'Sem acesso ao portal'}
                 >
                   {acessos[inf.id] ? 'Portal ✓' : 'Criar portal'}
                 </button>
@@ -448,7 +448,8 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
         <AcessoPortal
           influencerId={acesso.id}
           handle={acesso.handle}
-          emailAtual={acessos[acesso.id] ?? null}
+          emailAtual={acessos[acesso.id]?.email ?? null}
+          userIdAtual={acessos[acesso.id]?.userId ?? null}
           onFechar={(mudou) => { setAcesso(null); if (mudou) router.refresh() }}
         />
       )}

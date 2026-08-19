@@ -202,10 +202,13 @@ as duas isentas de contrato.
   status *usado* — a moto saiu — mas o Financeiro nunca conferiu. Não conta para
   comissão e ninguém pagou. Parada há três meses. A parceria dela também tem
   R$ 500 de fee registrado, sem registro de pagamento.
-- **O influenciador não consegue trocar a própria senha.** O portal é só leitura,
-  então a senha inicial que o César define é a única que existe. Para conta de
-  terceiro isso não se sustenta por muito tempo. Depende da mesma decisão sobre
-  o portal aceitar escrita.
+- ~~O influenciador não consegue trocar a própria senha.~~ **Resolvido em 19/08.**
+  O César liberou a escrita no portal com a condição de ficar separada do resto.
+  A troca de senha vive em `/portal/senha` e não toca em tabela nenhuma nossa —
+  a senha é do Auth do Supabase. O admin também redefine, pelo botão Portal na
+  tela de Influencers, para o caso de esquecimento (não há e-mail de recuperação).
+- **A @carolvilex tem venda e fee em aberto** — o César vai validar com o
+  Financeiro. Não mexer sem ele.
 
 ## Pendências que o contrato cria em outras áreas
 

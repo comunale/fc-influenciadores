@@ -19,6 +19,7 @@ export function PortalNav({ nome, handle }: { nome: string; handle: string }) {
   const itens = [
     { href: '/portal', label: 'Resumo' },
     { href: '/portal/vendas', label: 'Vendas' },
+    { href: '/portal/senha', label: 'Senha' },
   ]
 
   return (

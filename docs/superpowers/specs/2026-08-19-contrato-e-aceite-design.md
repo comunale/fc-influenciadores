@@ -59,9 +59,23 @@ O contrato precisa de CPF, estado civil e endereço do influenciador — dados q
 
 Deixar o influenciador preencher poupa o César de digitar endereço e CPF a cada parceria nova, e a Cláusula 12ª já o faz declarar que as informações são verdadeiras — então ter sido ele a digitar fortalece a prova em vez de enfraquecê-la.
 
-**Isto muda a regra de "o portal é somente leitura", definida em 19/08.** Ela já ia mudar de qualquer forma: aceitar um contrato é uma escrita. A regra passa a ser mais precisa — *o influenciador escreve apenas o que é dele e o que o contrato exige, e nada mais*. Continua sem tocar em dado bancário, em cupom, em venda ou em qualquer registro da FoxCycles.
+**Isto muda a regra de "o portal é somente leitura", definida em 19/08.** O César liberou a escrita no mesmo dia, com uma condição: *"só separa do restante para não ter problemas de segurança"*.
 
-Precisa do aval do César, porque contraria uma decisão anterior dele.
+### Como a escrita fica separada
+
+A regra: **o influenciador nunca recebe política de INSERT ou UPDATE em tabela nenhuma.** Toda escrita passa por uma função `security definer` que descobre sozinha de quem é o registro, via `meu_influencer_id()`. Ele não consegue sequer dizer qual linha quer alterar — o alvo é derivado da sessão, não vem do pedido.
+
+É a mesma forma da leitura, decidida ontem depois de descobrir que RLS filtra linha e não coluna. Vale repetir o padrão porque ele resolve a mesma classe de problema: superfície estreita, alvo não escolhível.
+
+| O que ele escreve | Por onde | O que NÃO alcança |
+|---|---|---|
+| a própria senha | Auth do Supabase | nenhuma tabela nossa está envolvida |
+| os próprios dados do contrato | `portal_salvar_meus_dados()` | só `influencer_contract_data`, só a linha dele |
+| o aceite do contrato | `portal_aceitar_contrato()` | muda `status` para aceito e grava data/IP. Não toca em valor, prazo nem texto |
+
+A última é a mais delicada: um influenciador que consiga editar o corpo do próprio contrato depois de gerado destrói toda a prova. Por isso a função grava o aceite e nada mais — não existe caminho que aceite um corpo de texto vindo dele.
+
+**A troca de senha já está no ar** (19/08), e é o caso mais limpo da regra: a senha vive no Auth do Supabase, que é outro sistema. Não há tabela, política ou coluna do fc-influenciadores envolvida — a separação é estrutural, não uma escolha que alguém possa desfazer sem perceber.
 
 Os dados vão para uma tabela própria, `influencer_contract_data`, alcançável por admin e pelo próprio influenciador. Fora de `influencers`, que o Lojista lê — ele não tem por que ver o endereço de ninguém.
 

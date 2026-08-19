@@ -16,15 +16,18 @@ export function AcessoPortal({
   influencerId,
   handle,
   emailAtual,
+  userIdAtual,
   onFechar,
 }: {
   influencerId: string
   handle: string
   emailAtual: string | null
+  userIdAtual: string | null
   onFechar: (mudou: boolean) => void
 }) {
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ email: '', password: '' })
+  const [novaSenha, setNovaSenha] = useState('')
 
   async function criar(e: React.FormEvent) {
     e.preventDefault()
@@ -40,6 +43,24 @@ export function AcessoPortal({
     if (!res.ok) return toast.error(json.error || 'Erro ao criar o acesso.')
     toast.success('Acesso criado.')
     onFechar(true)
+  }
+
+  // Nao ha e-mail de recuperacao neste projeto: se ele esquecer a senha, o
+  // admin e a unica saida.
+  async function redefinir(e: React.FormEvent) {
+    e.preventDefault()
+    if (novaSenha.length < 8) return toast.error('A senha precisa ter ao menos 8 caracteres.')
+    setLoading(true)
+    const res = await fetch('/api/admin/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: userIdAtual, password: novaSenha }),
+    })
+    const json = await res.json()
+    setLoading(false)
+    if (!res.ok) return toast.error(json.error || 'Erro ao redefinir.')
+    toast.success('Senha redefinida. Passe a nova para ele.')
+    setNovaSenha('')
   }
 
   async function remover() {
@@ -72,8 +93,26 @@ export function AcessoPortal({
             </div>
             <p className="text-gray-600 text-xs mt-3 leading-relaxed">
               Ele vê os próprios números e nada mais — nem dado de cliente, nem
-              dado bancário. O portal é só leitura.
+              dado bancário.
             </p>
+
+            <form onSubmit={redefinir} className="flex flex-col gap-3 mt-4 pt-4 border-t border-[#1e1e1e]">
+              <Input
+                label="Redefinir senha"
+                type="text"
+                placeholder="nova senha, ao menos 8 caracteres"
+                value={novaSenha}
+                onChange={(e) => setNovaSenha(e.target.value)}
+                disabled={loading}
+              />
+              <Button type="submit" variant="outline" loading={loading} disabled={!novaSenha}>
+                Redefinir
+              </Button>
+              <p className="text-gray-600 text-xs leading-relaxed">
+                Use se ele esquecer a senha. Ele também pode trocar sozinho,
+                dentro do portal.
+              </p>
+            </form>
             <div className="flex gap-2 mt-5">
               <Button type="button" variant="ghost" onClick={() => onFechar(false)} className="flex-1">
                 Fechar
