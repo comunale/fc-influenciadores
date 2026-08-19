@@ -16,39 +16,60 @@ Atualizado em 2026-08-19.
 
 ## Retomando o trabalho — leia isto primeiro
 
-**Última sessão: 19/08/2026.** Tudo commitado e no ar, nada pela metade.
+**Última sessão: 19/08/2026.** Tudo commitado, no ar e sincronizado. Nada pela
+metade. 110 testes passando, build limpo.
 
-**O portal do influenciador está construído** (subsistema 4). Falta o César
-testar de ponta a ponta: criar um acesso pela tela de Influencers, entrar em
-`/portal` com ele e conferir. Eu testei a camada de dados no banco, mas não fiz
-o login de verdade — não tenho, nem devo ter, a senha dele.
+### O que entrou em 19/08
 
-### Pedido novo do César, 19/08 — contrato com aceite
+Foi um dia grande. Três entregas e um inventário:
 
-> "Temos um contratinho simples que enviamos para a pessoa assinar. Temos como
-> colocar esse contrato no sistema e criar um sistema de aceite? Para proteger
-> ambos os lados. Direito de uso de imagem e etc."
+1. **Portal do influenciador** (subsistema 4) — login próprio, números da
+   parceria, link, vendas com só o primeiro nome do cliente, e troca de senha.
+2. **Contrato com aceite eletrônico** (subsistema 6) — modelo versionado,
+   texto congelado no aceite com data e IP, e o link só liga depois da assinatura.
+3. **Inventário das parcerias** — o César achava ter 2 ativas; havia 18, todas
+   sem data de fim e com o link no ar. 16 foram encerradas.
 
-Ainda **não desenhado**. Encaixa no portal, que agora existe e já é o lugar onde
-o influenciador entra autenticado.
+### O que o César precisa fazer
 
-**Decidido em 19/08:** o direito de uso de imagem vale **6 meses**.
+- **Testar o portal de ponta a ponta.** Os acessos existem: @caiiuxo
+  (contato@caiuxo.com) e @mariananavi (mariananavi12@gmail.com). Entram em
+  `/portal/login`. Eu testei a camada de dados no banco, não o login de verdade
+  — não tenho, nem devo ter, a senha de ninguém.
+- **Ler e ajustar o texto do contrato**, em Contratos → Editar modelo. As sete
+  correções que fiz estão descritas na migration 023. **O texto merece revisão
+  jurídica** — o sistema garante o processo, não o mérito das cláusulas.
+- **A venda da @carolvilex** (cupom `FOX-ZE679B`, de 22/05, usada e nunca
+  conferida) — ele vai ver com o Financeiro. Não mexer sem ele.
+- **Forma de pagamento e nota fiscal** no contrato: PF e PJ têm tratamento
+  tributário diferente, e o texto não diz nada. É conversa com o contador.
 
-**Aguardando:** o César está escrevendo o contrato e vai mandar o texto para
-análise. Sem o texto não dá para desenhar — é ele que diz quais campos existem.
+### O estado real do sistema agora
 
-Ainda em aberto, para decidir junto com o texto na mão:
+| | |
+|---|---|
+| Parcerias ativas | **2** — @caiiuxo e @mariananavi, as duas isentas de contrato |
+| Parcerias encerradas | 16 |
+| Contratos gerados | 0 — a trava vale para a **próxima** parceria criada |
+| Modelo de contrato | versão 1, gravada |
+| Acessos ao portal | 2, funcionando |
 
-- O contrato vale **por parceria** ou **por influenciador**? Se as condições
-  mudam a cada renovação, o aceite provavelmente também precisa ser renovado.
-- O aceite **trava** alguma coisa? Ex.: o link só liga depois de aceitar. É o
-  que dá dente ao contrato, e muda bastante o desenho.
-- Como versionar o texto sem invalidar aceite antigo. Ninguém pode ficar
-  vinculado a um texto que mudou depois de assinar.
-- Os 6 meses de imagem contam **do aceite** ou **do fim da parceria**? Muda
-  quando o prazo vence e o que o sistema precisa avisar.
+**A trava do link ainda não afeta ninguém.** As duas parcerias vigentes têm
+`contract_required = false`, porque os links já estavam em bio e story. A
+primeira parceria nova que o César criar vai nascer com contrato, e o link dela
+só liga depois do aceite.
 
-Vale uma spec própria: isto é prova jurídica, não um checkbox.
+### Duas regras deste projeto que se pagam
+
+**Escrita de quem é de fora nunca ganha política de tabela.** Passa por função
+`security definer` que descobre o dono pela sessão. Aprendido do jeito difícil
+em 19/08: RLS filtra **linha, não coluna**, e uma política "estreita" sobre os
+cupons do influenciador teria entregado CPF e telefone dos clientes pela API.
+
+**"O sistema começa agora"** — decidido pelo César. O que é anterior ao sistema
+não aparece para o influenciador, nem como linha vazia. Simplificou o código:
+sumiu uma função inteira do banco.
+
 
 ---
 
