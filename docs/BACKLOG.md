@@ -279,3 +279,48 @@ antes derrubaria o site — foi assim que o balcão ficou 12 dias fora do ar.
 | **`campaigns.active` perdeu a função** | Desde 18/08 não derruba mais link. Vale avaliar se o campo ainda faz sentido ou se confunde. |
 | **Marcar comissão como paga é cupom a cupom** | Com volume maior vai pedir um "pagar tudo deste influenciador". |
 | **`coupons` tem policies de UPDATE/DELETE amplas** | Já restritas a admin/finance, mas vale reauditar quando o portal do influenciador entrar. |
+
+---
+
+## Dois buracos achados em 02/09, na validação do Indique um Amigo
+
+Não são daquela campanha — são do que já está no ar. Ficam aqui, e não na spec, porque
+a spec fecha e o backlog não. Ambos com dono do César.
+
+### 1. `invoice_number` não tem unicidade — a mesma NF cabe em N cupons
+
+Verificado no banco de produção: nenhum índice, nenhuma constraint, nenhum EXCLUDE.
+`invoice_number` é `text` nullable, e a única regra é o CHECK da 002 (`verified` exige
+NF preenchida).
+
+Hoje isso significa que **uma venda pode gerar comissão duas vezes**. Com o Indique um
+Amigo, a mesma moto poderia carregar R$300 de desconto do indicador, R$300 do amigo e
+R$300 de PIX, tudo amarrado à mesma nota.
+
+O conserto é um `unique index (invoice_number) where invoice_number is not null`. Antes
+precisa de uma consulta de leitura: **criar o índice com duplicata viva falha**, e não
+se sabe se já existe NF repetida na base.
+
+### 2. O Financeiro pode reescrever o retrato de comissão do cupom que ele paga
+
+`coupons_guard_non_admin_update` (`003:70-86`) lista campo a campo o que o Financeiro
+não pode alterar: `customer_*`, `coupon_number`, `influencer_id`, `campaign_id`,
+`expires_at`, `created_at`, `status`, `seller_id`.
+
+**Ficaram de fora:** `partnership_id`, `discount_type`, `discount_value` e
+`commission_per_sale` — justamente o retrato que a migration 008 criou para impedir que
+renovar parceria reescrevesse comissão já paga. A policy de UPDATE deixa o Financeiro
+passar, então o trigger é a única camada, e ela tem o buraco.
+
+Sem indício de uso. É lacuna, não incidente. O conserto é somar os quatro campos à lista.
+
+### E uma coisa que não é buraco, mas todo mundo vai supor errado
+
+**Os dois triggers de `coupons` não valem no caminho real de criação.** Os dois começam
+com `if auth.uid() is null or public.is_admin() then return new; end if;` (`003:141-143`
+e `003:66-68`), e `auth.uid()` é NULL para `service_role` — que é o que
+`createAdminClient()` usa, nas duas rotas que criam cupom.
+
+Eles existem para barrar um lojista batendo direto na API REST com o token dele, e
+nisso funcionam. Mas **regra nova escrita como trigger nesse padrão nasce sem efeito.**
+O que sobrevive ao `service_role` é `unique index`, `check constraint` e FK.
