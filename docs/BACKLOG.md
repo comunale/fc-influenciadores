@@ -8,7 +8,7 @@ pedidos do César quase se perderam assim.
 Regra: ao terminar qualquer entrega, atualizar este arquivo. Ao começar
 qualquer conversa, ler este arquivo.
 
-Atualizado em 2026-08-19.
+Atualizado em 2026-09-02.
 
 **Plano de execução dos itens 1, 3 e 4:** `docs/superpowers/plans/2026-08-18-pendencias-balcao-financeiro-parceria.md`. O item 2 (portal) segue bloqueado pela decisão sobre os dados migrados da planilha.
 
@@ -16,8 +16,55 @@ Atualizado em 2026-08-19.
 
 ## Retomando o trabalho — leia isto primeiro
 
-**Última sessão: 19/08/2026.** Tudo commitado, no ar e sincronizado. Nada pela
-metade. 110 testes passando, build limpo.
+**Última sessão: 02/09/2026.** Sessão de desenho, **nenhuma linha de código tocada**.
+Saiu uma spec, dois buracos novos no backlog e três perguntas que travam o próximo passo.
+
+### O que aconteceu em 02/09
+
+O César trouxe a promoção **"Indique um Amigo"**: R$300 de desconto na moto, o amigo
+indicado também ganha R$300, e se o amigo comprar o indicador recebe R$300 no PIX.
+
+Desenhamos, escrevi a spec — e o César leu e travou com a frase que virou a régua do
+documento: *"Influenciador é 1 coisa. Indique o Amigo é outra. Vamos usar a mesma base.
+Mas as mecânicas são diferentes."* Mandou validar tudo contra o código antes de construir.
+
+Validei. **A primeira versão da spec tinha dez erros**, listados no fim da versão nova.
+Ela foi reescrita do zero e é a que vale:
+`docs/superpowers/specs/2026-09-02-indique-um-amigo-design.md` (commit `7f7d56f`; a
+versão errada é a `6ed63ca`).
+
+**Os três achados que mudam como se constrói neste projeto:**
+
+1. **Os triggers de `coupons` não valem no caminho real.** Os dois começam com
+   `if auth.uid() is null or public.is_admin() then return new`, e `auth.uid()` é NULL
+   para `service_role` — que é o que as duas rotas de criação usam. Regra nova escrita
+   como trigger nasce sem efeito. Ver a nota no fim deste arquivo.
+2. **Os tipos mentem e o compilador não ajuda.** Tornar `influencer_id` nulável não gera
+   nenhum erro de build; três crashes ficam para o runtime, o pior deles na tela do
+   balcão (`ValidarClient.tsx:333`), sem error boundary.
+3. **`UNIQUE (customer_cpf, campaign_id)` não olha status.** O CPF queima na campanha
+   para sempre, mesmo com cupom vencido. Isso já custa venda hoje, no braço do
+   influenciador. Na promoção nova, virou a solução: **a campanha é o lote.**
+
+### O que trava o próximo passo — três perguntas para o César
+
+Estão na spec, mas ficam aqui porque é aqui que se procura:
+
+1. **A NF da moto sai no ato da venda?** Se for financiada e sair depois, "Financeiro
+   paga ao validar" não funciona — `verified` exige NF por CHECK (migration 002).
+2. **Autoriza consulta de leitura na base** para ver se já existe NF repetida? Sem isso
+   não dá para criar o índice único de `invoice_number`.
+3. **Busca por CPF no balcão** — hoje não existe; CPF digitado cai no ramo de
+   influenciador e volta "Código não encontrado". Entra, ou a pessoa é obrigada a chegar
+   com o código?
+
+Respondidas as três, o próximo passo é o **plano de implementação** da spec.
+
+---
+
+### Sessão anterior — 19/08/2026
+
+Tudo commitado, no ar e sincronizado. Nada pela metade. 110 testes passando, build limpo.
 
 ### O que entrou em 19/08
 
