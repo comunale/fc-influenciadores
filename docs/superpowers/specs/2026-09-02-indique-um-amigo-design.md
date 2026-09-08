@@ -306,26 +306,34 @@ de Google Ads da FOX.
 Não é escopo **enviar** ao Google. É escopo **gravar** de um jeito que enviar depois seja
 trivial.
 
-## Perguntas em aberto — precisam do César
+## Respondidas pelo César em 08/09
 
-1. **A NF da moto sai no ato da venda?** A primeira versão afirmou que sim; era
-   suposição, não fato. Se a venda é financiada e a NF sai dias depois, "Financeiro paga
-   ao validar" **não funciona**, porque `verified` exige `invoice_number` por CHECK.
-2. **Fechar a unicidade de `invoice_number`?** Mexe no braço do influenciador. Autoriza a
-   consulta de leitura para saber se já há NF repetida hoje?
-3. **O A indicou, o cupom do A venceu, e o B compra depois.** O A recebe? A proposta é
+**1. A NF sai no ato da venda? SIM, sempre.** O fluxo do PIX vale como está desenhado:
+a loja valida e lança a NF, o Financeiro confere e paga no mesmo dia. Não é preciso
+inventar gatilho alternativo para venda financiada.
+
+**2. Busca por CPF no balcão? ENTRA.** Hoje um CPF digitado cai no ramo de influenciador
+e volta "Código não encontrado". Como o cupom é nominal e a compra de uma moto demora,
+quem esquecer o código não teria caminho nenhum.
+
+**3. Unicidade de `invoice_number`? FECHADA em 08/09** (migration 025). Ele autorizou a
+consulta antes: **nenhuma NF repetida na base** — 6 cupons com NF, de 8. O índice nasceu
+sem conflito, e relançar uma NF existente passou a ser recusado pelo banco.
+
+Conferido junto, para a pergunta 7 abaixo: **zero telefones repetidos em CPFs
+diferentes** hoje. O detector não geraria falso positivo na base atual.
+
+## Perguntas ainda em aberto — precisam do César
+
+1. **O A indicou, o cupom do A venceu, e o B compra depois.** O A recebe? A proposta é
    que sim — o direito ao PIX segue o cupom do B, não a validade do cupom do A.
-4. **Busca por CPF no balcão.** Hoje `/admin/validar` só aceita `FOX-…` ou código de
-   influenciador; um CPF digitado cai no ramo errado e volta "Código não encontrado". Se
-   a pessoa esquecer o código, não há caminho. Entra a busca por CPF, ou a pessoa tem
-   obrigatoriamente que chegar com o código?
-5. **A janela de verificação.** A spec de 28/07 registrou que "janela de verificação
+2. **A janela de verificação.** A spec de 28/07 registrou que "janela de verificação
    antes de pagar comissão" era a melhoria de maior impacto do programa. O PIX no mesmo
    dia vai na direção oposta. Decisão consciente?
-6. **O tratamento fiscal do PIX recorrente** — do César, com o contador. Mesmo problema
+3. **O tratamento fiscal do PIX recorrente** — do César, com o contador. Mesmo problema
    já aberto no contrato de influenciador: PF contra PJ, nota fiscal, o que é premiação e
    o que é comissão. Aqui é cliente comum, sem contrato. Levar **antes** de rodar.
-7. **Telefone repetido cruzando os dois braços** — é o sinal que pegaria o
+4. **Telefone repetido cruzando os dois braços** — é o sinal que pegaria o
    vendedor-cunhada. Conferir o volume de falso positivo antes de confiar nele.
 
 ## Erros da primeira versão

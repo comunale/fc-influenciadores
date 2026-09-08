@@ -46,19 +46,39 @@ versão errada é a `6ed63ca`).
    para sempre, mesmo com cupom vencido. Isso já custa venda hoje, no braço do
    influenciador. Na promoção nova, virou a solução: **a campanha é o lote.**
 
-### O que trava o próximo passo — três perguntas para o César
+### Respondido em 08/09 — o desenho destravou
 
-Estão na spec, mas ficam aqui porque é aqui que se procura:
+O César recuperou o fio (os commits de 24/08 e 02/09 estavam **sem push**, e era por
+isso que ele não achava o histórico) e respondeu as três que travavam:
 
-1. **A NF da moto sai no ato da venda?** Se for financiada e sair depois, "Financeiro
-   paga ao validar" não funciona — `verified` exige NF por CHECK (migration 002).
-2. **Autoriza consulta de leitura na base** para ver se já existe NF repetida? Sem isso
-   não dá para criar o índice único de `invoice_number`.
-3. **Busca por CPF no balcão** — hoje não existe; CPF digitado cai no ramo de
-   influenciador e volta "Código não encontrado". Entra, ou a pessoa é obrigada a chegar
-   com o código?
+1. **A NF sai no ato da venda: sempre.** O fluxo do PIX vale como desenhado — a loja
+   valida e lança a NF, o Financeiro confere e paga no mesmo dia.
+2. **Busca por CPF no balcão: entra.** O cupom é nominal e a compra de uma moto demora;
+   sem isso, quem esquece o código fica sem caminho.
+3. **Unicidade de `invoice_number`: fechada** (migration 025). Ele autorizou a consulta
+   antes, e a base estava limpa — nenhuma NF repetida, 6 cupons com NF de 8. Relançar
+   uma NF existente passou a ser recusado pelo banco.
 
-Respondidas as três, o próximo passo é o **plano de implementação** da spec.
+Conferido de brinde: **zero telefones repetidos em CPFs diferentes** hoje. O detector
+não geraria falso positivo na base atual.
+
+### O que ainda falta decidir
+
+Na spec, seção "Perguntas ainda em aberto". Nenhuma delas trava começar a construir:
+
+- **O A indicou, o cupom do A venceu, e o B compra depois — o A recebe?** A proposta é
+  que sim: o direito ao PIX segue o cupom do B.
+- **A janela de verificação.** A spec de 28/07 dizia que esperar antes de pagar era a
+  melhoria de maior impacto. PIX no mesmo dia vai na direção oposta — decisão consciente?
+- **Tratamento fiscal do PIX** — do César, com o contador. Aqui é cliente comum, sem
+  contrato. Levar **antes** de rodar.
+
+### O próximo passo
+
+Escrever o **plano de implementação** da spec. A ordem já está definida nela, e importa
+mais que o conteúdo: corrigir os três crashes com `influencer_id` ainda NOT NULL,
+separar os números do admin, e só então a migration.
+
 
 ---
 
