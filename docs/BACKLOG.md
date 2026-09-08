@@ -73,11 +73,20 @@ Na spec, seção "Perguntas ainda em aberto". Nenhuma delas trava começar a con
 - **Tratamento fiscal do PIX** — do César, com o contador. Aqui é cliente comum, sem
   contrato. Levar **antes** de rodar.
 
-### O próximo passo
+### O plano está escrito
 
-Escrever o **plano de implementação** da spec. A ordem já está definida nela, e importa
-mais que o conteúdo: corrigir os três crashes com `influencer_id` ainda NOT NULL,
-separar os números do admin, e só então a migration.
+`docs/superpowers/plans/2026-09-08-indique-um-amigo.md` — 6 tasks, na ordem que a spec
+definiu. Pronto para executar.
+
+A ordem é a parte que importa: a Task 1 blinda as telas **sem mudar comportamento
+nenhum** e é reversível; a Task 3 (`influencer_id` nulável) é irreversível na prática.
+Entre elas, a Task 2 separa os números do admin **antes** de existir cupom que os
+contamine — inverter isso significa métrica errada que ninguém percebe, porque o número
+continua plausível.
+
+Confirmado contra o código em 08/09: os três crashes estão onde a spec disse, e há um
+**quarto** que ela não listou — o dashboard também embute `influencers` na lista de
+cupons recentes.
 
 
 ---
