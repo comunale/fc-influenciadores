@@ -27,10 +27,32 @@ function lerEnv(chave: string): string | undefined {
   return undefined
 }
 
-export const DB_URL = lerEnv('SUPABASE_DB_URL')
+const DB_URL_BRUTA = lerEnv('SUPABASE_DB_URL')
+
+/**
+ * Só vale como string de conexão o que começa com `postgres://` ou
+ * `postgresql://`.
+ *
+ * Antes bastava a variável existir. Em 08/09/2026 ela estava preenchida com o
+ * endereço do servidor apenas (`db.xxx.supabase.co`), sem usuário, senha nem
+ * banco -- e a suíte inteira passou a falhar com um erro de DNS incompreensível
+ * (`getaddrinfo ENOTFOUND base`) em vez de simplesmente pular.
+ *
+ * Meia configuração é pior que nenhuma: quebra o `npm test` de quem nunca pediu
+ * para rodar teste de banco.
+ */
+export const DB_URL = /^postgres(ql)?:\/\//.test(DB_URL_BRUTA ?? '') ? DB_URL_BRUTA : undefined
 
 /** Os testes de banco são pulados quando a string de conexão não está configurada. */
 export const temBanco = Boolean(DB_URL)
+
+/** Dito uma vez, para a variável meio preenchida não virar um mistério. */
+if (DB_URL_BRUTA && !DB_URL) {
+  console.warn(
+    '[tests/db] SUPABASE_DB_URL não é uma string de conexão (falta postgresql://usuario:senha@…). ' +
+    'Os testes de banco foram pulados.'
+  )
+}
 
 export async function conectar(): Promise<Client> {
   if (!DB_URL) throw new Error('SUPABASE_DB_URL não configurada')
