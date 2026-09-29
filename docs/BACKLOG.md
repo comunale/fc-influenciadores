@@ -16,77 +16,39 @@ Atualizado em 2026-09-02.
 
 ## Retomando o trabalho — leia isto primeiro
 
-**Última sessão: 02/09/2026.** Sessão de desenho, **nenhuma linha de código tocada**.
-Saiu uma spec, dois buracos novos no backlog e três perguntas que travam o próximo passo.
+**Última sessão: 29/09/2026.** Tudo commitado e sincronizado.
 
-### O que aconteceu em 02/09
+O César pediu o mapa do que está em aberto, **deixando o Indique um Amigo de lado**.
+Ele tem spec e plano prontos (`plans/2026-09-08-indique-um-amigo.md`, 6 tasks) e está
+pausado por decisão dele.
 
-O César trouxe a promoção **"Indique um Amigo"**: R$300 de desconto na moto, o amigo
-indicado também ganha R$300, e se o amigo comprar o indicador recebe R$300 no PIX.
+### O que está em aberto, do maior para o menor
 
-Desenhamos, escrevi a spec — e o César leu e travou com a frase que virou a régua do
-documento: *"Influenciador é 1 coisa. Indique o Amigo é outra. Vamos usar a mesma base.
-Mas as mecânicas são diferentes."* Mandou validar tudo contra o código antes de construir.
+**1. Subsistema 2 — Fechamentos e pagamentos.** Spec escrita em 24/08, **sem plano e
+sem código**. É o maior buraco funcional: hoje marcar comissão como paga é cupom a
+cupom, o pagamento do fee fixo não tem onde ser registrado, e a restituição de fee que
+o contrato criou não tem tela. Três dívidas técnicas desta lista morrem junto com ele.
 
-Validei. **A primeira versão da spec tinha dez erros**, listados no fim da versão nova.
-Ela foi reescrita do zero e é a que vale:
-`docs/superpowers/specs/2026-09-02-indique-um-amigo-design.md` (commit `7f7d56f`; a
-versão errada é a `6ed63ca`).
+**2. Subsistema 3 — Funil de prospecção.** Não tem spec. O César escolheu "funil
+completo" em 18/08 e o assunto não voltou.
 
-**Os três achados que mudam como se constrói neste projeto:**
+**3. O Financeiro pode reescrever o retrato de comissão do cupom que ele paga.**
+Segunda camada furada — ver "Dois buracos", item 2. O allowlist da rota já barra; o
+trigger é o backstop e tem o buraco. Conserto pequeno: somar quatro campos à lista.
 
-1. **Os triggers de `coupons` não valem no caminho real.** Os dois começam com
-   `if auth.uid() is null or public.is_admin() then return new`, e `auth.uid()` é NULL
-   para `service_role` — que é o que as duas rotas de criação usam. Regra nova escrita
-   como trigger nasce sem efeito. Ver a nota no fim deste arquivo.
-2. **Os tipos mentem e o compilador não ajuda.** Tornar `influencer_id` nulável não gera
-   nenhum erro de build; três crashes ficam para o runtime, o pior deles na tela do
-   balcão (`ValidarClient.tsx:333`), sem error boundary.
-3. **`UNIQUE (customer_cpf, campaign_id)` não olha status.** O CPF queima na campanha
-   para sempre, mesmo com cupom vencido. Isso já custa venda hoje, no braço do
-   influenciador. Na promoção nova, virou a solução: **a campanha é o lote.**
+**4. Dívidas técnicas** — a lista própria mais abaixo.
 
-### Respondido em 08/09 — o desenho destravou
+**5. Subsistema 5 — Menus, páginas e papéis.** Difuso de propósito: cada entrega
+arruma a sua parte. Não é trabalho em si.
 
-O César recuperou o fio (os commits de 24/08 e 02/09 estavam **sem push**, e era por
-isso que ele não achava o histórico) e respondeu as três que travavam:
+### Do César, não técnico
 
-1. **A NF sai no ato da venda: sempre.** O fluxo do PIX vale como desenhado — a loja
-   valida e lança a NF, o Financeiro confere e paga no mesmo dia.
-2. **Busca por CPF no balcão: entra.** O cupom é nominal e a compra de uma moto demora;
-   sem isso, quem esquece o código fica sem caminho.
-3. **Unicidade de `invoice_number`: fechada** (migration 025). Ele autorizou a consulta
-   antes, e a base estava limpa — nenhuma NF repetida, 6 cupons com NF de 8. Relançar
-   uma NF existente passou a ser recusado pelo banco.
-
-Conferido de brinde: **zero telefones repetidos em CPFs diferentes** hoje. O detector
-não geraria falso positivo na base atual.
-
-### O que ainda falta decidir
-
-Na spec, seção "Perguntas ainda em aberto". Nenhuma delas trava começar a construir:
-
-- **O A indicou, o cupom do A venceu, e o B compra depois — o A recebe?** A proposta é
-  que sim: o direito ao PIX segue o cupom do B.
-- **A janela de verificação.** A spec de 28/07 dizia que esperar antes de pagar era a
-  melhoria de maior impacto. PIX no mesmo dia vai na direção oposta — decisão consciente?
-- **Tratamento fiscal do PIX** — do César, com o contador. Aqui é cliente comum, sem
-  contrato. Levar **antes** de rodar.
-
-### O plano está escrito
-
-`docs/superpowers/plans/2026-09-08-indique-um-amigo.md` — 6 tasks, na ordem que a spec
-definiu. Pronto para executar.
-
-A ordem é a parte que importa: a Task 1 blinda as telas **sem mudar comportamento
-nenhum** e é reversível; a Task 3 (`influencer_id` nulável) é irreversível na prática.
-Entre elas, a Task 2 separa os números do admin **antes** de existir cupom que os
-contamine — inverter isso significa métrica errada que ninguém percebe, porque o número
-continua plausível.
-
-Confirmado contra o código em 08/09: os três crashes estão onde a spec disse, e há um
-**quarto** que ela não listou — o dashboard também embute `influencers` na lista de
-cupons recentes.
+- **Revisar o texto do contrato** em Contratos → Editar modelo, e passar por um
+  advogado. O sistema garante o processo, não o mérito das cláusulas.
+- **Forma de pagamento e nota fiscal** do influenciador — PF e PJ têm tratamento
+  diferente. Conversa com o contador, e vale antes de rodar o Indique um Amigo, que
+  paga PIX a cliente comum.
+- **Testar o portal** de ponta a ponta com os acessos do @caiiuxo e da @mariananavi.
 
 
 ---
@@ -199,10 +161,12 @@ Cuidados já conhecidos:
 - Dado sensível. Visível só para `admin` e `finance` — nunca para o Lojista.
 - Precisa das três camadas de sempre: tela, allowlist na API e RLS no banco.
 
-### 2. Portal do influenciador
+### 2. ~~Portal do influenciador~~ — ✅ FEITO em 19/08
 
 **Pedido em:** 2026-08-18. Era o item 5, o maior de todos.
-**Estado:** não existe nada. Sem rota, sem papel, sem tela.
+**Estado:** entregue. Papel `influencer`, `/portal` com resumo, vendas, contrato e
+troca de senha, e acesso criado pelo botão **Portal** na tela de Influencers. Detalhe
+na seção "Subsistema 4" mais abaixo.
 
 O influenciador acessa e acompanha: quantos cupons foram gerados pelo link dele,
 quem usou, quais foram validados na loja, quais o Financeiro aprovou, e quanto
@@ -214,12 +178,10 @@ Já decidido:
 - Se apoia em `calcularComissao` (`lib/commission.ts`), que já existe e já lê o
   retrato gravado em cada cupom.
 
-**Pré-requisito que não pode ser ignorado:** os dados atuais vieram de uma
-planilha e estão sendo acertados retroativamente. O portal **não pode** exibir
-esse histórico sem antes existir forma de separar "registro migrado" de
-"registro nascido no sistema" — senão um influenciador abre a tela e cobra um
-valor que talvez já tenha sido pago por fora. Ver
-`docs/superpowers/specs/2026-08-18-termos-no-influenciador-design.md`.
+**O pré-requisito da planilha foi resolvido** pela regra "o sistema começa agora"
+(19/08): parceria anterior ao sistema não aparece no portal, nem como linha vazia. A
+parceria do @caiiuxo foi encerrada em 18/08 e uma nova nasceu em 19/08 com os mesmos
+termos, então o portal dele parte do zero e o histórico fica no controle interno.
 
 ### 3. ~~Aviso de parceria perto do fim~~ — ✅ FEITO em 18/08
 
@@ -311,8 +273,9 @@ as duas isentas de contrato.
 
 - **Restituição de fee** — dinheiro que ENTRA, o oposto do que o Financeiro faz
   hoje. Pertence ao subsistema 2; o 6 só registra a pendência.
-- **Renovação desliga o link** até o novo contrato ser aceito. A tela de renovar
-  precisa avisar antes de confirmar.
+- ~~**Renovação desliga o link** até o novo contrato ser aceito.~~ ✅ O aviso entrou
+  junto com a Task 4 do contrato, em 19/08: o painel de renovar diz "o link fica
+  desligado até ele assinar" **antes** de confirmar.
 - **Forma de pagamento e nota fiscal** — o contrato não diz se o influenciador
   emite nota. PF e PJ têm tratamento tributário diferente. É conversa do César
   com o contador, não decisão técnica.
@@ -363,7 +326,16 @@ antes derrubaria o site — foi assim que o balcão ficou 12 dias fora do ar.
 Não são daquela campanha — são do que já está no ar. Ficam aqui, e não na spec, porque
 a spec fecha e o backlog não. Ambos com dono do César.
 
-### 1. `invoice_number` não tem unicidade — a mesma NF cabe em N cupons
+### 1. ~~`invoice_number` não tem unicidade~~ — ✅ FECHADO em 08/09 (migration 025)
+
+O César autorizou a consulta antes de criar o índice, e ela era necessária: criar com
+duplicata viva teria falhado. **A base estava limpa** — nenhuma NF repetida, 6 cupons
+com NF de 8 no total. Provado depois em transação com rollback: relançar uma NF
+existente em outro cupom é recusado pelo banco.
+
+O texto original do achado fica abaixo, porque explica por que a trava importa.
+
+#### O achado, como foi registrado em 02/09
 
 Verificado no banco de produção: nenhum índice, nenhuma constraint, nenhum EXCLUDE.
 `invoice_number` é `text` nullable, e a única regra é o CHECK da 002 (`verified` exige
