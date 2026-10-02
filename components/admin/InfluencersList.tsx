@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
@@ -341,6 +342,14 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
               </div>
               {/* Financeiro tambem precisa deste botao, entao ele fica FORA do
                   bloco de canEdit, que e so admin. */}
+              {podeVerBancarios && (
+                <Link
+                  href={`/admin/influencers/${inf.id}`}
+                  className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
+                >
+                  Ficha
+                </Link>
+              )}
               {podeVerBancarios && (
                 <button
                   onClick={() => setBancarios({ id: inf.id, handle: inf.instagram_handle })}

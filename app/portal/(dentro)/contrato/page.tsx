@@ -12,7 +12,7 @@ export default async function ContratoPage() {
   const supabase = await createClient()
 
   // Pelas funções, não pelas tabelas: ele não alcança `contracts` nem
-  // `influencer_contract_data` de forma alguma. Ver migration 022.
+  // `influencer_ficha` de forma alguma. Ver migrations 022 e 027.
   const [{ data: contratos }, { data: dados }] = await Promise.all([
     supabase.rpc('portal_meu_contrato'),
     supabase.rpc('portal_meus_dados'),

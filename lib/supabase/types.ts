@@ -59,17 +59,23 @@ export type Database = {
           },
         ]
       }
-      influencer_contract_data: {
+      influencer_ficha: {
         Row: {
           influencer_id: string; cpf: string | null; estado_civil: string | null
+          telefone: string | null; cidade: string | null; nicho: string | null
+          seguidores: number | null; observacoes: string | null
           endereco: string | null; cep: string | null; updated_at: string
         }
         Insert: {
           influencer_id: string; cpf?: string | null; estado_civil?: string | null
+          telefone?: string | null; cidade?: string | null; nicho?: string | null
+          seguidores?: number | null; observacoes?: string | null
           endereco?: string | null; cep?: string | null; updated_at?: string
         }
         Update: {
           influencer_id?: string; cpf?: string | null; estado_civil?: string | null
+          telefone?: string | null; cidade?: string | null; nicho?: string | null
+          seguidores?: number | null; observacoes?: string | null
           endereco?: string | null; cep?: string | null; updated_at?: string
         }
         Relationships: []

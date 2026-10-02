@@ -84,7 +84,7 @@ export async function montarContrato(
   if (!inf) return null
 
   const { data: pessoais } = await db
-    .from('influencer_contract_data')
+    .from('influencer_ficha')
     .select('cpf, estado_civil, endereco, cep')
     .eq('influencer_id', inf.id)
     .maybeSingle()
