@@ -112,6 +112,54 @@ export async function POST(request: Request) {
   }
 }
 
+/**
+ * Redefine a senha, gerando uma nova.
+ *
+ * O admin não escolhe -- mesma razão da criação: esta senha serve para UM
+ * acesso, e logo depois o influenciador é obrigado a criar a dele.
+ *
+ * Zera `senha_definida_at`: a senha voltou a ser conhecida por outra pessoa,
+ * então o portal fecha de novo até ele definir a sua. É o que mantém o aceite
+ * do contrato defensável.
+ */
+export async function PATCH(request: Request) {
+  try {
+    const auth = await requireAdmin()
+    if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status })
+
+    const { influencer_id } = await request.json()
+    if (!influencer_id) {
+      return NextResponse.json({ error: 'Influenciador é obrigatório.' }, { status: 400 })
+    }
+
+    const admin = createAdminClient()
+
+    const { data: perfil } = await admin
+      .from('admin_profiles')
+      .select('id, email')
+      .eq('influencer_id', influencer_id)
+      .maybeSingle()
+
+    if (!perfil) {
+      return NextResponse.json({ error: 'Este influenciador não tem acesso.' }, { status: 404 })
+    }
+
+    const password = senhaInicial()
+    const { error } = await admin.auth.admin.updateUserById(perfil.id, { password })
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+    await admin
+      .from('admin_profiles')
+      .update({ senha_definida_at: null })
+      .eq('id', perfil.id)
+
+    return NextResponse.json({ success: true, email: perfil.email, senha: password })
+  } catch (err) {
+    console.error('portal-access reset error:', err)
+    return NextResponse.json({ error: 'Erro interno.' }, { status: 500 })
+  }
+}
+
 /** Remove o acesso ao portal. O influenciador continua existindo. */
 export async function DELETE(request: Request) {
   try {

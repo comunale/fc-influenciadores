@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { AcessoPortal } from '@/components/admin/AcessoPortal'
 import { createClient } from '@/lib/supabase/client'
 import { mensagemDeErro } from '@/lib/db-errors'
 
@@ -21,18 +20,16 @@ import { mensagemDeErro } from '@/lib/db-errors'
  * sexta sem saber disso passa o fim de semana sem link.
  */
 export function AcoesFicha({
-  influencerId, handle, nome, temParceria, acesso, podeRenovar,
+  influencerId, handle, temParceria, podeRenovar,
 }: {
   influencerId: string
   handle: string
-  nome: string
   temParceria: boolean
-  acesso: { id: string; email: string | null } | null
   podeRenovar: boolean
 }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [modal, setModal] = useState<'renovar' | 'prorrogar' | 'portal' | null>(null)
+  const [modal, setModal] = useState<'renovar' | 'prorrogar' | null>(null)
   const [ate, setAte] = useState('')
 
   async function parceriaAcao(acao: 'renovar' | 'prorrogar') {
@@ -76,9 +73,6 @@ export function AcoesFicha({
             </Button>
           </>
         )}
-        <Button variant="outline" size="sm" onClick={() => setModal('portal')}>
-          {acesso?.email ? 'Acesso ao portal' : 'Criar acesso ao portal'}
-        </Button>
         <button
           onClick={excluir}
           disabled={loading}
@@ -135,16 +129,6 @@ export function AcoesFicha({
         </div>
       )}
 
-      {modal === 'portal' && (
-        <AcessoPortal
-          influencerId={influencerId}
-          handle={handle}
-          nome={nome}
-          emailAtual={acesso?.email ?? null}
-          userIdAtual={acesso?.id ?? null}
-          onFechar={(mudou) => { setModal(null); if (mudou) router.refresh() }}
-        />
-      )}
     </>
   )
 }
