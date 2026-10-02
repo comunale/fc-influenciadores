@@ -5,6 +5,8 @@ import { calcularComissao } from '@/lib/commission'
 import { parceriaAtiva, type Parceria } from '@/lib/partnership'
 import { motivoLinkInativo } from '@/lib/influencer-status'
 import { FichaInfluencer } from '@/components/admin/ficha/FichaInfluencer'
+import { AcoesFicha } from '@/components/admin/ficha/AcoesFicha'
+import { can, type Role } from '@/lib/auth/roles'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,8 +39,9 @@ export default async function FichaPage({
   if (!influencer) notFound()
 
   // As outras quatro fontes da mesma pessoa.
-  const [{ data: ficha }, { data: acesso }, { data: contrato }] = await Promise.all([
+  const [{ data: ficha }, { data: banco }, { data: acesso }, { data: contrato }] = await Promise.all([
     supabase.from('influencer_ficha').select('*').eq('influencer_id', id).maybeSingle(),
+    supabase.from('influencer_payment_info').select('*').eq('influencer_id', id).maybeSingle(),
     supabase.from('admin_profiles').select('id, email').eq('influencer_id', id).maybeSingle(),
     supabase.from('contracts')
       .select('id, status, accepted_at, partnership_id')
@@ -81,6 +84,8 @@ export default async function FichaPage({
           campanha: (influencer.campaigns as { name: string } | null)?.name ?? '',
         }}
         ficha={ficha ?? null}
+        banco={banco ?? null}
+        podeVerBanco={can(role as Role, 'influencers.payment')}
         parceria={parceria}
         motivoLinkInativo={motivoLinkInativo(influencer, parceria)}
         comissao={comissao}
@@ -88,6 +93,15 @@ export default async function FichaPage({
         acesso={acesso ?? null}
         contrato={contrato && contrato.partnership_id === parceria?.id ? contrato : null}
         podeEditar={role === 'admin'}
+        acoes={
+          <AcoesFicha
+            influencerId={influencer.id}
+            handle={influencer.instagram_handle}
+            temParceria={!!parceria}
+            acesso={acesso ?? null}
+            podeRenovar={role === 'admin'}
+          />
+        }
       />
     </div>
   )

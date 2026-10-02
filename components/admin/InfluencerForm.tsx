@@ -70,22 +70,7 @@ export function InfluencerForm({
             <label className="text-sm text-gray-300 block mb-1.5">Campanha *</label>
             <select
               value={form.campaign_id}
-              onChange={(e) => {
-                const c = campaigns.find((x) => x.id === e.target.value)
-                // A campanha e MODELO: preenche, nao manda. Depois disto os
-                // valores sao deste influencer e podem ser editados a vontade.
-                setForm((p) => ({
-                  ...p,
-                  campaign_id: e.target.value,
-                  ...(c ? {
-                    discount_type: c.discount_type,
-                    discount_value: String(c.discount_value),
-                    validity_days: String(c.validity_days),
-                    coupon_title: c.coupon_title ?? '',
-                    coupon_description: c.coupon_description ?? '',
-                  } : {}),
-                }))
-              }}
+              onChange={(e) => setForm((p) => ({ ...p, campaign_id: e.target.value }))}
               className="w-full h-12 px-4 rounded-lg border border-[#2a2a2a] bg-[#1e1e1e] text-white text-sm focus:border-[#00ff87] focus:outline-none"
               disabled={loading}
             >
@@ -93,39 +78,32 @@ export function InfluencerForm({
             </select>
           </div>
 
-          <p className="text-xs text-gray-500 md:col-span-2 -mb-1">
-            A campanha preenche os campos abaixo, mas eles passam a ser deste
-            influencer. Editar aqui não afeta a campanha nem os outros.
-          </p>
-
-          <div>
-            <label className="text-sm text-gray-300 block mb-1.5">Tipo de desconto</label>
-            <select
-              value={form.discount_type}
-              onChange={(e) => setForm((p) => ({ ...p, discount_type: e.target.value }))}
-              className="w-full h-12 px-4 rounded-lg border border-[#2a2a2a] bg-[#1e1e1e] text-white text-sm focus:border-[#00ff87] focus:outline-none"
-              disabled={loading}
-            >
-              <option value="fixed">Valor fixo (R$)</option>
-              <option value="percentage">Percentual (%)</option>
-            </select>
-          </div>
-
-          <Input label="Desconto" type="number" value={form.discount_value}
-            onChange={(e) => setForm((p) => ({ ...p, discount_value: e.target.value }))}
-            disabled={loading} />
-
-          <Input label="Validade do cupom (dias)" type="number" value={form.validity_days}
-            onChange={(e) => setForm((p) => ({ ...p, validity_days: e.target.value }))}
-            disabled={loading} />
-
-          <Input label="Título do cupom" value={form.coupon_title}
-            onChange={(e) => setForm((p) => ({ ...p, coupon_title: e.target.value }))}
-            disabled={loading} />
-
-          <Input label="Descrição do cupom" value={form.coupon_description}
-            onChange={(e) => setForm((p) => ({ ...p, coupon_description: e.target.value }))}
-            disabled={loading} className="md:col-span-2" />
+          {/* O cupom é da CAMPANHA. Aqui só se mostra o que ela dá, para não
+              existir a mesma informação em dois lugares editáveis. Se este
+              influenciador precisar de condição diferente, muda-se na ficha
+              dele, depois de criado. */}
+          {(() => {
+            const c = campaigns.find((x) => x.id === form.campaign_id)
+            if (!c) return null
+            return (
+              <div className="bg-[#0f0f0f] border border-[#1e1e1e] rounded-xl p-4">
+                <div className="text-gray-500 text-xs uppercase tracking-wide">
+                  O cupom desta campanha
+                </div>
+                <div className="text-gray-300 text-sm mt-1">
+                  {c.discount_type === 'fixed' ? `R$ ${c.discount_value}` : `${c.discount_value}%`}
+                  {' '}de desconto · vale {c.validity_days} dias
+                </div>
+                {c.coupon_title && (
+                  <div className="text-gray-500 text-xs mt-1">{c.coupon_title}</div>
+                )}
+                <p className="text-gray-600 text-xs mt-2 leading-relaxed">
+                  Vem da campanha. Para mudar só para esta pessoa, abra a ficha
+                  dela depois de criar.
+                </p>
+              </div>
+            )
+          })()}
 
           <Input label="Nome completo *" value={form.name}
             onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}

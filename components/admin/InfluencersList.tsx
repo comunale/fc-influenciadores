@@ -11,9 +11,6 @@ import { mensagemDeErro } from '@/lib/db-errors'
 import { motivoLinkInativo } from '@/lib/influencer-status'
 import type { Parceria } from '@/lib/partnership'
 import { can, type Role } from '@/lib/auth/roles'
-import { DadosBancarios } from './DadosBancarios'
-import { AcessoPortal } from './AcessoPortal'
-import { ParceriaPanel, type ParceriaForm } from './ParceriaPanel'
 import { InfluencerForm } from './InfluencerForm'
 import { Button } from '@/components/ui/button'
 
@@ -76,16 +73,9 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [excluindoId, setExcluindoId] = useState<string | null>(null)
-  const [bancarios, setBancarios] = useState<{ id: string; handle: string } | null>(null)
-  const [acesso, setAcesso] = useState<{ id: string; handle: string } | null>(null)
   const podeVerBancarios = can(role, 'influencers.payment')
-  const [parceria, setParceria] = useState<{ inf: InfluencerRow; acao: 'prorrogar' | 'renovar' } | null>(null)
-  const [pForm, setPForm] = useState<ParceriaForm>({
-    ends_at: '', discount_value: '', validity_days: '',
-    commission_per_sale: '', commission_starts_at: '',
-    fee_amount: '', fee_timing: 'inicio', payment_schedule: 'fim',
-    zerar_contagem: false,
-  })
+  // Prorrogar, renovar, portal e bancário saíram desta tela em 02/10/2026:
+  // viraram ações da ficha, que é onde o influenciador mora agora.
   const [editing, setEditing] = useState<InfluencerRow | null>(null)
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ ...emptyForm, campaign_id: campaigns[0]?.id || '' })
@@ -93,27 +83,6 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
   function openCreate() {
     setEditing(null)
     setForm({ ...emptyForm, campaign_id: campaigns[0]?.id || '' })
-    setShowForm(true)
-  }
-
-  function openEdit(inf: InfluencerRow) {
-    setEditing(inf)
-    setForm({
-      campaign_id: inf.campaign_id,
-      name: inf.name,
-      instagram_handle: inf.instagram_handle,
-      coupon_code: inf.coupon_code,
-      active: inf.active,
-      // Os termos vem da PARCERIA ativa, nao mais do influenciador.
-      fee_amount: String(inf.parceria?.fee_amount ?? 0),
-      commission_per_sale: String(inf.parceria?.commission_per_sale ?? 0),
-      commission_starts_at: String(inf.parceria?.commission_starts_at ?? 1),
-      discount_type: inf.parceria?.discount_type ?? 'fixed',
-      discount_value: String(inf.parceria?.discount_value ?? 0),
-      validity_days: String(inf.parceria?.validity_days ?? 30),
-      coupon_title: inf.parceria?.coupon_title ?? '',
-      coupon_description: inf.parceria?.coupon_description ?? '',
-    })
     setShowForm(true)
   }
 
@@ -139,16 +108,23 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
       active: form.active,
     }
 
+    // Os termos do CUPOM -- desconto, validade e textos -- vêm da CAMPANHA, que
+    // é o modelo. Antes eram digitados aqui também, então a mesma informação
+    // vivia em dois lugares e nada dizia qual valia.
+    //
+    // O que é do ACORDO e não do cupom (comissão e fee) continua aqui: é o que
+    // você combina com cada pessoa, e é diferente por parceria.
+    const modelo = campaigns.find((c) => c.id === form.campaign_id)
     const termosDoAcordo = {
       campaign_id: form.campaign_id,
       fee_amount: parseFloat(form.fee_amount) || 0,
       commission_per_sale: parseFloat(form.commission_per_sale) || 0,
       commission_starts_at: parseInt(form.commission_starts_at) || 1,
-      discount_type: form.discount_type,
-      discount_value: parseFloat(form.discount_value) || 0,
-      validity_days: parseInt(form.validity_days) || 30,
-      coupon_title: form.coupon_title.trim() || null,
-      coupon_description: form.coupon_description.trim() || null,
+      discount_type: modelo?.discount_type ?? 'fixed',
+      discount_value: Number(modelo?.discount_value ?? 0),
+      validity_days: Number(modelo?.validity_days ?? 30),
+      coupon_title: modelo?.coupon_title ?? null,
+      coupon_description: modelo?.coupon_description ?? null,
     }
 
     let influencerId = editing?.id ?? ''
@@ -202,53 +178,6 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
 
     toast.success(editing ? 'Influencer atualizado!' : 'Influencer criado!')
     setShowForm(false)
-    router.refresh()
-  }
-
-  function abrirParceria(inf: InfluencerRow, acao: 'prorrogar' | 'renovar') {
-    setParceria({ inf, acao })
-    setPForm({
-      ends_at: inf.parceria?.ends_at ?? '',
-      discount_value: String(inf.parceria?.discount_value ?? 0),
-      validity_days: String(inf.parceria?.validity_days ?? 30),
-      commission_per_sale: String(inf.parceria?.commission_per_sale ?? 0),
-      commission_starts_at: String(inf.parceria?.commission_starts_at ?? 1),
-      fee_amount: String(inf.parceria?.fee_amount ?? 0),
-      fee_timing: inf.parceria?.fee_timing ?? 'inicio',
-      payment_schedule: inf.parceria?.payment_schedule ?? 'fim',
-      zerar_contagem: false,
-    })
-  }
-
-  async function salvarParceria() {
-    if (!parceria) return
-    setLoading(true)
-    const res = await fetch('/api/admin/influencer-renew', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        influencer_id: parceria.inf.id,
-        acao: parceria.acao,
-        ends_at: pForm.ends_at || null,
-        ...(parceria.acao === 'renovar' ? {
-          termos: {
-            discount_value: pForm.discount_value,
-            validity_days: pForm.validity_days,
-            commission_per_sale: pForm.commission_per_sale,
-            commission_starts_at: pForm.commission_starts_at,
-            fee_amount: pForm.fee_amount,
-            fee_timing: pForm.fee_timing,
-            payment_schedule: pForm.payment_schedule,
-          },
-          zerar_contagem: pForm.zerar_contagem,
-        } : {}),
-      }),
-    })
-    const data = await res.json()
-    setLoading(false)
-    if (!res.ok) { toast.error(data.error || 'Erro ao salvar.'); return }
-    toast.success(parceria.acao === 'prorrogar' ? 'Parceria prorrogada!' : 'Parceria renovada!')
-    setParceria(null)
     router.refresh()
   }
 
@@ -338,58 +267,22 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
                   {inf.parceria?.ends_at && (
                     <> · Parceria até <span className="text-gray-300">{formatDate(inf.parceria.ends_at)}</span></>
                   )}
+                  {acessos[inf.id] && (
+                    <> · <span className="text-[#00ff87]">portal ✓</span></>
+                  )}
                 </div>
               </div>
-              {/* Financeiro tambem precisa deste botao, entao ele fica FORA do
-                  bloco de canEdit, que e so admin. */}
+              {/* UM botão. A ficha é o lugar do influenciador -- pessoa, acordo,
+                  acesso, bancário e contrato. Até 02/10/2026 esta linha tinha SEIS
+                  botões e nenhum editava tudo; o César leu a tela e disse o que ela
+                  era: "uma coberta cheia de remendos". */}
               {podeVerBancarios && (
                 <Link
                   href={`/admin/influencers/${inf.id}`}
-                  className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
+                  className="text-xs font-medium border border-[#2a2a2a] text-gray-300 hover:text-black hover:bg-[#00ff87] hover:border-[#00ff87] px-4 py-1.5 rounded-lg transition-colors flex-shrink-0"
                 >
-                  Ficha
+                  Abrir ficha
                 </Link>
-              )}
-              {podeVerBancarios && (
-                <button
-                  onClick={() => setBancarios({ id: inf.id, handle: inf.instagram_handle })}
-                  className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
-                >
-                  Bancários
-                </button>
-              )}
-              {canEdit && (
-                <div className="flex gap-2 flex-shrink-0">
-                <button
-                  onClick={() => setAcesso({ id: inf.id, handle: inf.instagram_handle })}
-                  className={`text-xs border px-3 py-1.5 rounded-lg transition-colors ${
-                    acessos[inf.id]
-                      ? 'border-[#00ff87]/40 text-[#00ff87] hover:bg-[#00ff87]/10'
-                      : 'border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87]'
-                  }`}
-                  title={acessos[inf.id] ? `Acessa como ${acessos[inf.id].email}` : 'Sem acesso ao portal'}
-                >
-                  {acessos[inf.id] ? 'Portal ✓' : 'Criar portal'}
-                </button>
-                <button
-                  onClick={() => abrirParceria(inf, 'prorrogar')}
-                  className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] px-3 py-1.5 rounded-lg transition-colors"
-                >
-                  Prorrogar
-                </button>
-                <button
-                  onClick={() => abrirParceria(inf, 'renovar')}
-                  className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] px-3 py-1.5 rounded-lg transition-colors"
-                >
-                  Renovar
-                </button>
-                <button
-                  onClick={() => openEdit(inf)}
-                  className="text-xs border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
-                >
-                  Editar
-                </button>
-                </div>
               )}
             </div>
 
@@ -471,32 +364,6 @@ export function InfluencersList({ influencers: initial, campaigns, canEdit = fal
         ))}
       </div>
 
-      {acesso && (
-        <AcessoPortal
-          influencerId={acesso.id}
-          handle={acesso.handle}
-          emailAtual={acessos[acesso.id]?.email ?? null}
-          userIdAtual={acessos[acesso.id]?.userId ?? null}
-          onFechar={(mudou) => { setAcesso(null); if (mudou) router.refresh() }}
-        />
-      )}
-
-      {bancarios && (
-        <DadosBancarios
-          influencerId={bancarios.id}
-          handle={bancarios.handle}
-          onFechar={() => setBancarios(null)}
-        />
-      )}
-
-      <ParceriaPanel
-        parceria={parceria}
-        form={pForm}
-        setForm={setPForm}
-        loading={loading}
-        onSalvar={salvarParceria}
-        onFechar={() => setParceria(null)}
-      />
     </>
   )
 }
