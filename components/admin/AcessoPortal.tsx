@@ -16,12 +16,15 @@ import { montarConvite } from '@/lib/portal/convite'
 export function AcessoPortal({
   influencerId,
   handle,
+  nome,
   emailAtual,
   userIdAtual,
   onFechar,
 }: {
   influencerId: string
   handle: string
+  /** O nome de verdade. A mensagem trata a pessoa pelo primeiro nome, não pelo @. */
+  nome: string
   emailAtual: string | null
   userIdAtual: string | null
   onFechar: (mudou: boolean) => void
@@ -47,7 +50,7 @@ export function AcessoPortal({
     if (!res.ok) return toast.error(json.error || 'Erro ao criar o acesso.')
     toast.success('Acesso criado.')
     setConvite(montarConvite({
-      nome: handle.replace(/^@/, ''), email: json.email, senha: json.senha,
+      nome, email: json.email, senha: json.senha,
       contratoPendente: true,
     }))
   }
@@ -56,7 +59,7 @@ export function AcessoPortal({
   // admin e a unica saida.
   async function redefinir(e: React.FormEvent) {
     e.preventDefault()
-    if (novaSenha.length < 8) return toast.error('A senha precisa ter ao menos 8 caracteres.')
+    if (novaSenha.length < 12) return toast.error('A senha precisa ter ao menos 12 caracteres.')
     setLoading(true)
     const res = await fetch('/api/admin/change-password', {
       method: 'POST',
@@ -68,7 +71,7 @@ export function AcessoPortal({
     if (!res.ok) return toast.error(json.error || 'Erro ao redefinir.')
     toast.success('Senha redefinida.')
     setConvite(montarConvite({
-      nome: handle.replace(/^@/, ''), email: emailAtual ?? '', senha: novaSenha,
+      nome, email: emailAtual ?? '', senha: novaSenha,
     }))
     setNovaSenha('')
   }
@@ -138,7 +141,7 @@ export function AcessoPortal({
               <Input
                 label="Redefinir senha"
                 type="text"
-                placeholder="nova senha, ao menos 8 caracteres"
+                placeholder="nova senha, ao menos 12 caracteres"
                 value={novaSenha}
                 onChange={(e) => setNovaSenha(e.target.value)}
                 disabled={loading}

@@ -97,6 +97,7 @@ export default async function FichaPage({
           <AcoesFicha
             influencerId={influencer.id}
             handle={influencer.instagram_handle}
+            nome={influencer.name}
             temParceria={!!parceria}
             acesso={acesso ?? null}
             podeRenovar={role === 'admin'}

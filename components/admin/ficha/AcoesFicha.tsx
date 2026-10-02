@@ -21,10 +21,11 @@ import { mensagemDeErro } from '@/lib/db-errors'
  * sexta sem saber disso passa o fim de semana sem link.
  */
 export function AcoesFicha({
-  influencerId, handle, temParceria, acesso, podeRenovar,
+  influencerId, handle, nome, temParceria, acesso, podeRenovar,
 }: {
   influencerId: string
   handle: string
+  nome: string
   temParceria: boolean
   acesso: { id: string; email: string | null } | null
   podeRenovar: boolean
@@ -138,6 +139,7 @@ export function AcoesFicha({
         <AcessoPortal
           influencerId={influencerId}
           handle={handle}
+          nome={nome}
           emailAtual={acesso?.email ?? null}
           userIdAtual={acesso?.id ?? null}
           onFechar={(mudou) => { setModal(null); if (mudou) router.refresh() }}
