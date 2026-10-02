@@ -82,7 +82,7 @@ export async function proxy(request: NextRequest) {
   if ((isAdminRoute || isPortalRoute || isLoginPage) && user) {
     const { data: profile } = await supabase
       .from('admin_profiles')
-      .select('role, active')
+      .select('role, active, senha_definida_at')
       .eq('id', user.id)
       .single()
 
@@ -116,6 +116,21 @@ export async function proxy(request: NextRequest) {
     // A trava cruzada: cada um na sua área.
     if (ehInfluencer && isAdminRoute) {
       return NextResponse.redirect(new URL('/portal', request.url))
+    }
+
+    // Senha ainda é a que o admin gerou e mandou por WhatsApp: o portal fica
+    // fechado até ele definir a dele — contrato incluído. Não é sobre a força
+    // da senha, é sobre a assinatura: um aceite dado com uma senha que o
+    // contratante também conhece é um aceite que se contesta sozinho.
+    //
+    // Mora aqui, e não no layout, porque o layout não recebe o caminho e
+    // redirecionaria a própria tela de senha para si mesma.
+    if (
+      ehInfluencer && isPortalRoute &&
+      !profile?.senha_definida_at &&
+      !pathname.startsWith('/portal/senha')
+    ) {
+      return NextResponse.redirect(new URL('/portal/senha', request.url))
     }
     if (!ehInfluencer && isPortalRoute) {
       return NextResponse.redirect(new URL(casa, request.url))

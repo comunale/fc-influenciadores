@@ -31,6 +31,14 @@ export async function POST(request: Request) {
     const { error } = await adminClient.auth.admin.updateUserById(userId, { password })
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
+    // Senha redefinida pelo admin volta a ser "senha que outra pessoa conhece".
+    // Zerar o carimbo obriga o influenciador a criar a dele de novo antes de
+    // voltar ao portal -- senão o aceite seguinte nasceria contestável.
+    await adminClient
+      .from('admin_profiles')
+      .update({ senha_definida_at: null })
+      .eq('id', userId)
+
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error('change-password error:', err)

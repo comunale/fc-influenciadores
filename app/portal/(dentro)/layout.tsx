@@ -13,6 +13,7 @@ export default async function PortalLayout({ children }: { children: React.React
   const influencer = await getInfluencerDaSessao()
   if (!influencer) redirect('/portal/login')
 
+
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
       <PortalNav nome={influencer.nome} handle={influencer.handle} />

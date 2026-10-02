@@ -19,6 +19,8 @@ export const getInfluencerDaSessao = cache(async (): Promise<{
   handle: string
   couponCode: string
   ativo: boolean
+  /** Nulo = ainda esta com a senha inicial que o admin gerou. */
+  senhaDefinidaAt: string | null
 } | null> => {
   const supabase = await createClient()
 
@@ -27,7 +29,7 @@ export const getInfluencerDaSessao = cache(async (): Promise<{
 
   const { data: perfil } = await supabase
     .from('admin_profiles')
-    .select('role, active, influencer_id')
+    .select('role, active, influencer_id, senha_definida_at')
     .eq('id', user.id)
     .single()
 
@@ -48,5 +50,6 @@ export const getInfluencerDaSessao = cache(async (): Promise<{
     handle: inf.instagram_handle,
     couponCode: inf.coupon_code,
     ativo: inf.active,
+    senhaDefinidaAt: perfil.senha_definida_at,
   }
 })

@@ -27,7 +27,7 @@ export function AcessoPortal({
   onFechar: (mudou: boolean) => void
 }) {
   const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({ email: '', password: '' })
+  const [email, setEmail] = useState('')
   const [novaSenha, setNovaSenha] = useState('')
   // A senha so existe AQUI, no instante em que e definida. Depois disto nem o
   // sistema a conhece -- e o motivo de a mensagem pronta aparecer agora.
@@ -39,7 +39,7 @@ export function AcessoPortal({
     const res = await fetch('/api/admin/portal-access', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ influencer_id: influencerId, ...form }),
+      body: JSON.stringify({ influencer_id: influencerId, email }),
     })
     const json = await res.json()
     setLoading(false)
@@ -47,7 +47,7 @@ export function AcessoPortal({
     if (!res.ok) return toast.error(json.error || 'Erro ao criar o acesso.')
     toast.success('Acesso criado.')
     setConvite(montarConvite({
-      nome: handle.replace(/^@/, ''), email: form.email, senha: form.password,
+      nome: handle.replace(/^@/, ''), email: json.email, senha: json.senha,
       contratoPendente: true,
     }))
   }
@@ -170,25 +170,22 @@ export function AcessoPortal({
             <Input
               label="E-mail do influenciador"
               type="email"
-              value={form.email}
-              onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
               disabled={loading}
             />
-            <Input
-              label="Senha inicial"
-              type="text"
-              placeholder="ao menos 8 caracteres"
-              value={form.password}
-              onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-              required
-              minLength={8}
-              disabled={loading}
-            />
-            <p className="text-gray-600 text-xs leading-relaxed">
-              Passe a senha para ele por onde vocês já conversam. O sistema não
-              envia e-mail.
-            </p>
+            <div className="bg-[#0f0f0f] border border-[#1e1e1e] rounded-xl p-3">
+              <p className="text-gray-400 text-xs leading-relaxed">
+                A senha é gerada pelo sistema e serve para o primeiro acesso.
+                Assim que ele entrar, é obrigado a criar a dele — e a partir daí
+                nem você sabe qual é.
+              </p>
+              <p className="text-gray-600 text-xs mt-2 leading-relaxed">
+                É isso que torna o aceite do contrato defensável: ninguém além
+                dele conhece a senha no momento em que assina.
+              </p>
+            </div>
             <div className="flex gap-2">
               <Button type="button" variant="ghost" onClick={() => onFechar(false)} className="flex-1">
                 Cancelar

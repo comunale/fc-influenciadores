@@ -1,5 +1,24 @@
 import { requireAdmin, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { randomBytes } from 'crypto'
+
+/**
+ * A senha inicial é gerada aqui, não escolhida pelo César.
+ *
+ * Gente escolhe senha fácil e repete entre contas. E, principalmente: esta
+ * senha serve para UMA coisa -- o primeiro acesso. No primeiro login o
+ * influenciador é obrigado a criar a dele, e a partir daí nem o César sabe qual
+ * é. É o que sustenta o aceite do contrato.
+ */
+function senhaInicial(): string {
+  // 16 caracteres de um alfabeto sem 0/O e 1/l, que confundem quem digita.
+  const alfabeto = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
+  const bytes = randomBytes(16)
+  let s = ''
+  for (const b of bytes) s += alfabeto[b % alfabeto.length]
+  // Um símbolo e um dígito garantidos, para passar em qualquer política.
+  return s + '#' + (bytes[0] % 10)
+}
 
 /**
  * Cria o acesso de um influenciador ao portal dele.
@@ -16,17 +35,16 @@ export async function POST(request: Request) {
     const auth = await requireAdmin()
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
-    const { influencer_id, email, password } = await request.json()
+    const { influencer_id, email } = await request.json()
 
-    if (!influencer_id || !email?.trim() || !password) {
+    if (!influencer_id || !email?.trim()) {
       return NextResponse.json(
-        { error: 'Influenciador, e-mail e senha são obrigatórios.' },
+        { error: 'Influenciador e e-mail são obrigatórios.' },
         { status: 400 }
       )
     }
-    if (password.length < 8) {
-      return NextResponse.json({ error: 'Senha deve ter ao menos 8 caracteres.' }, { status: 400 })
-    }
+
+    const password = senhaInicial()
 
     const admin = createAdminClient()
 
@@ -85,7 +103,9 @@ export async function POST(request: Request) {
       )
     }
 
-    return NextResponse.json({ success: true, email }, { status: 201 })
+    // A senha volta UMA vez, para a tela montar a mensagem. Não fica guardada
+    // em lugar nenhum legível: o Auth só tem o hash.
+    return NextResponse.json({ success: true, email, senha: password }, { status: 201 })
   } catch (err) {
     console.error('portal-access error:', err)
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 })

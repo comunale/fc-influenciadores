@@ -90,6 +90,7 @@ export type Database = {
           name: string
           role: string
           store_name: string | null
+          senha_definida_at: string | null
         }
         Insert: {
           active?: boolean
@@ -100,6 +101,7 @@ export type Database = {
           name: string
           role?: string
           store_name?: string | null
+          senha_definida_at?: string | null
         }
         Update: {
           active?: boolean
@@ -110,6 +112,7 @@ export type Database = {
           name?: string
           role?: string
           store_name?: string | null
+          senha_definida_at?: string | null
         }
         Relationships: [
           {
