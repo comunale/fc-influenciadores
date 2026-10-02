@@ -8,7 +8,7 @@ pedidos do César quase se perderam assim.
 Regra: ao terminar qualquer entrega, atualizar este arquivo. Ao começar
 qualquer conversa, ler este arquivo.
 
-Atualizado em 2026-09-02.
+Atualizado em 2026-10-02.
 
 **Plano de execução dos itens 1, 3 e 4:** `docs/superpowers/plans/2026-08-18-pendencias-balcao-financeiro-parceria.md`. O item 2 (portal) segue bloqueado pela decisão sobre os dados migrados da planilha.
 
@@ -16,39 +16,89 @@ Atualizado em 2026-09-02.
 
 ## Retomando o trabalho — leia isto primeiro
 
-**Última sessão: 29/09/2026.** Tudo commitado e sincronizado.
+**Última sessão: 02/10/2026.** Tudo commitado, no ar e sincronizado.
 
-O César pediu o mapa do que está em aberto, **deixando o Indique um Amigo de lado**.
-Ele tem spec e plano prontos (`plans/2026-09-08-indique-um-amigo.md`, 6 tasks) e está
-pausado por decisão dele.
+### O que entrou em 02/10
 
-### O que está em aberto, do maior para o menor
+Um dia de segurança e de arrumação. Nada de funcionalidade nova no fluxo de
+cupom — e muita coisa que estava torta ficou de pé.
 
-**1. Subsistema 2 — Fechamentos e pagamentos.** Spec escrita em 24/08, **sem plano e
-sem código**. É o maior buraco funcional: hoje marcar comissão como paga é cupom a
-cupom, o pagamento do fee fixo não tem onde ser registrado, e a restituição de fee que
-o contrato criou não tem tela. Três dívidas técnicas desta lista morrem junto com ele.
+**1. Alerta crítico do Supabase, resolvido.** `card_marcas` (do fc-digitalcard,
+que divide o mesmo projeto) estava com RLS desligada: qualquer um com a chave
+pública lia **e escrevia**. O risco não era o vazamento — é material de marca —
+era a escrita: a linha guarda o WhatsApp e o domínio de `cartao.foxcycles.com.br`,
+e trocar o número desvia os contatos sem deixar rastro. O César ligou a RLS.
 
-**2. Subsistema 3 — Funil de prospecção.** Não tem spec. O César escolheu "funil
-completo" em 18/08 e o assunto não voltou.
+**2. Dois buracos que a varredura seguinte achou**, e que a primeira não acharia:
+a view `card_metrics` é SECURITY DEFINER e **andava por fora** da trava da
+tabela (a tabela negava o anônimo, a view devolvia 17 linhas); e as funções do
+portal eram executáveis sem login — não exploráveis, porque as guardas internas
+seguraram, mas sem razão de existir. Migration 026.
 
-**3. O Financeiro pode reescrever o retrato de comissão do cupom que ele paga.**
-Segunda camada furada — ver "Dois buracos", item 2. O allowlist da rota já barra; o
-trigger é o backstop e tem o buraco. Conserto pequeno: somar quatro campos à lista.
+**3. A ficha do influenciador.** A pessoa vivia espalhada em cinco lugares que
+não se olhavam, e um deles — os dados que ela mesma preenche no portal — não
+aparecia em tela nenhuma. Agora há `/admin/influencers/[id]`.
 
-**4. Dívidas técnicas** — a lista própria mais abaixo.
+**4. A reorganização que o César pediu:** *"isso tá parecendo uma coberta cheia
+de remendos. Editar é editar. Edita tudo."* A lista virou lista, com **um** botão
+por linha. A ficha ganhou **um** Editar que abre tudo e um Salvar que grava as
+quatro tabelas. O cadastro parou de pedir os termos do cupom, que vêm da
+campanha — acabou a duplicação.
 
-**5. Subsistema 5 — Menus, páginas e papéis.** Difuso de propósito: cada entrega
-arruma a sua parte. Não é trabalho em si.
+**5. A senha do influenciador.** O risco real não eram os dados bancários (o
+portal não os mostra, decisão dele de 19/08, reconfirmada por teste). Era a
+**assinatura**: o César definia a senha e mandava por WhatsApp, então um aceite
+contestado teria como resposta à pergunta "quem mais sabia a senha?" o próprio
+contratante. Agora a senha inicial é gerada pelo sistema, o portal fica fechado
+até o influenciador criar a dele, e a troca acontece no servidor — é ele que
+carimba, e o carimbo é o que sustenta o aceite. Migration 028.
+
+**6. A mensagem de convite.** O endereço do portal não aparecia em lugar nenhum
+do admin. Agora a ficha mostra os dois links com nome — divulgação e portal — e
+gera a mensagem pronta para colar no WhatsApp, com a senha no único instante em
+que ela existe.
+
+### Feito pelo César no painel do Supabase, e verificado
+
+Senha mínima de **12** com exigência de letras, números e símbolos. Testado com
+contas descartáveis: 6, 10 e 12-só-letras são recusadas pelo próprio Supabase,
+não só pela nossa tela.
+
+**Proteção de senha vazada continua desligada** — é exclusiva do plano Pro, e a
+organização está no Free. Recomendei sem checar o plano; fica anotado para o dia
+em que houver Pro. Não vale assinar só por isso: o que protege a assinatura hoje
+é a troca obrigatória no primeiro acesso, que já está no ar.
+
+### O estado real do sistema
+
+| | |
+|---|---|
+| Parcerias ativas | **3** — @caiiuxo, @mariananavi e @mariannegimenes |
+| Contratos | 1, da @mariannegimenes, **aguardando aceite** |
+| Acessos ao portal | 3 |
+| Testes | 119 passando |
+
+**A @mariannegimenes é a primeira parceria nascida com contrato obrigatório.** O
+link dela está desligado e volta no instante em que ela aceitar. Falta ela entrar
+no portal, criar a senha dela, preencher os dados e aceitar.
+
+### O que continua em aberto
+
+1. **Fechamentos e pagamentos** (subsistema 2) — spec de 24/08, sem código. O
+   maior buraco funcional: pagar comissão é cupom a cupom, o fee fixo não tem
+   onde ser registrado, e a restituição que o contrato criou não tem tela.
+2. **Indique um Amigo** — spec e plano prontos, pausado por decisão dele.
+3. **Funil de prospecção** (subsistema 3) — sem spec.
+4. **O Financeiro pode reescrever o retrato de comissão** do cupom que ele paga.
+   Segunda camada furada; a rota já barra. Conserto: quatro campos no trigger.
+5. **Reorganizar o resto do admin** — Cupons, Contratos, Configurações. O César
+   quer, e pediu para fazer depois dos influenciadores. Merece spec antes.
 
 ### Do César, não técnico
 
-- **Revisar o texto do contrato** em Contratos → Editar modelo, e passar por um
-  advogado. O sistema garante o processo, não o mérito das cláusulas.
-- **Forma de pagamento e nota fiscal** do influenciador — PF e PJ têm tratamento
-  diferente. Conversa com o contador, e vale antes de rodar o Indique um Amigo, que
-  paga PIX a cliente comum.
-- **Testar o portal** de ponta a ponta com os acessos do @caiiuxo e da @mariananavi.
+- Revisar o texto do contrato com um advogado.
+- Nota fiscal e forma de pagamento do influenciador, com o contador.
+- A venda da @carolvilex (cupom `FOX-ZE679B`, de 22/05) nunca conferida.
 
 
 ---
