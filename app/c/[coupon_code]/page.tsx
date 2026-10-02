@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { FoxLogo } from '@/components/FoxLogo'
 import { CouponForm } from '@/components/forms/CouponForm'
 import { formatCurrency } from '@/lib/utils'
-import { linkAtivo } from '@/lib/influencer-status'
+import { linkAtivo, contratoEmDia } from '@/lib/influencer-status'
 import { parceriaAtiva, type Parceria } from '@/lib/partnership'
 import type { Metadata } from 'next'
 
@@ -54,17 +54,57 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-function LinkForaDoAr() {
+/**
+ * O link existe e não está no ar.
+ *
+ * Dois casos, e eles pedem frases diferentes. A primeira versão desta tela
+ * tinha uma só -- "a oferta pode ter terminado" -- e ela ficou ENGANOSA
+ * justamente no caso mais comum: parceria recém-criada, contrato ainda não
+ * aceito. Quem testa esse link primeiro é o próprio influenciador, e ele lia
+ * que a oferta acabou.
+ *
+ * Nenhuma das duas conta nada do negócio a um visitante estranho: uma diz que
+ * acabou, a outra diz que ainda não começou.
+ */
+function LinkForaDoAr({ aguardandoContrato }: { aguardandoContrato: boolean }) {
   return (
     <main className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center px-4">
       <FoxLogo size="lg" />
-      <h1 className="text-white font-bold text-xl mt-6 text-center">
-        Este link não está ativo no momento
-      </h1>
-      <p className="text-gray-500 text-sm mt-2 text-center max-w-sm leading-relaxed">
-        A oferta que ele apontava pode ter terminado. Dá uma olhada no perfil de
-        quem te indicou — se houver uma nova, o link estará por lá.
-      </p>
+
+      {aguardandoContrato ? (
+        <>
+          <h1 className="text-white font-bold text-xl mt-6 text-center">
+            Este link ainda não está ativo
+          </h1>
+          <p className="text-gray-500 text-sm mt-2 text-center max-w-sm leading-relaxed">
+            A parceria está sendo finalizada. Volte em instantes — ou dá uma
+            olhada no perfil de quem te indicou.
+          </p>
+          <div className="mt-8 border-t border-[#1e1e1e] pt-6 text-center max-w-sm">
+            <p className="text-gray-600 text-xs leading-relaxed">
+              É você o influenciador? Entre no portal para preencher seus dados e
+              aceitar o contrato — o link liga na hora.
+            </p>
+            <a
+              href="/portal/login"
+              className="inline-block mt-3 text-[#00ff87] hover:underline text-sm font-medium"
+            >
+              Entrar no portal
+            </a>
+          </div>
+        </>
+      ) : (
+        <>
+          <h1 className="text-white font-bold text-xl mt-6 text-center">
+            Este link não está ativo no momento
+          </h1>
+          <p className="text-gray-500 text-sm mt-2 text-center max-w-sm leading-relaxed">
+            A oferta que ele apontava pode ter terminado. Dá uma olhada no perfil
+            de quem te indicou — se houver uma nova, o link estará por lá.
+          </p>
+        </>
+      )}
+
       <a
         href="https://foxcycles.com.br"
         className="mt-6 text-[#00ff87] hover:underline text-sm"
@@ -97,7 +137,13 @@ export default async function CouponLandingPage({ params }: PageProps) {
   // achar que digitou errado e tentar de novo. A frase é neutra de propósito --
   // o visitante não tem por que saber se foi prazo, contrato ou cadastro.
   if (!influencer) notFound()
-  if (!linkAtivo(influencer, parceria)) return <LinkForaDoAr />
+  if (!linkAtivo(influencer, parceria)) {
+    // Parceria de pé, só faltando o aceite: é o caso de parceria recém-criada,
+    // e quem costuma abrir o link primeiro é o próprio influenciador.
+    const soFaltaOContrato =
+      !!parceria && parceria.status === 'ativa' && !contratoEmDia(parceria)
+    return <LinkForaDoAr aguardandoContrato={soFaltaOContrato} />
+  }
 
   const discountLabel = rotuloDesconto(parceria!.discount_type, parceria!.discount_value)
   const campanha = (influencer.campaigns as { name: string } | null)?.name ?? ''
