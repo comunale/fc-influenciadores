@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
@@ -203,7 +204,7 @@ export function UserManagement({
         <p className="text-gray-400 text-sm leading-relaxed">
           Procurando o acesso de um <span className="text-white">influenciador</span> ao
           portal dele? Ele se cria em{' '}
-          <a href="/admin/influencers" className="text-[#00ff87] hover:underline">Influencers</a>,
+          <Link href="/admin/influencers" className="text-[#00ff87] hover:underline">Influencers</Link>,
           no botão <span className="text-gray-200 font-medium">Portal</span> da linha
           de cada um — assim a conta já nasce ligada ao cadastro certo.
         </p>
