@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import type { ResumoComissao } from '@/lib/commission'
 import type { Parceria } from '@/lib/partnership'
+import { montarConvite, enderecoDoPortal } from '@/lib/portal/convite'
 
 /**
  * A ficha do influenciador: a pessoa inteira numa tela, com UM botão de editar.
@@ -303,7 +304,7 @@ export function FichaInfluencer({
       )}
 
       {/* O LINK */}
-      <Secao titulo="O link dele">
+      <Secao titulo="O link de divulgação" nota="É este que vai na bio e nos stories dele. Não é o do portal.">
         {editando ? (
           <Input label="Código do cupom" value={form.coupon_code} onChange={set('coupon_code')} disabled={loading} />
         ) : (
@@ -318,10 +319,35 @@ export function FichaInfluencer({
 
       {/* Acesso e contrato — leitura; mexer neles são ações, não edição */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <Secao titulo="Acesso ao portal">
-          {acesso?.email
-            ? <p className="text-gray-300 text-sm break-all">{acesso.email}</p>
-            : <p className="text-gray-500 text-sm">Sem acesso criado.</p>}
+        <Secao titulo="Acesso ao portal" nota="Onde ele entra para ver os números e o contrato.">
+          {acesso?.email ? (
+            <div className="flex flex-col gap-2">
+              <code className="text-white text-sm break-all">{enderecoDoPortal(site)}</code>
+              <div className="text-gray-400 text-sm break-all">{acesso.email}</div>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(montarConvite({
+                    nome: influencer.name,
+                    email: acesso.email ?? '',
+                    site,
+                    contratoPendente: contrato?.status === 'aguardando',
+                  }))
+                  toast.success('Mensagem copiada. É só colar no WhatsApp.')
+                }}
+                className="self-start text-xs border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#00ff87] px-3 py-1.5 rounded-lg transition-colors"
+              >
+                Copiar mensagem para ele
+              </button>
+              <p className="text-gray-600 text-xs leading-relaxed">
+                A senha não vai na mensagem — ela só existe no momento em que você
+                cria ou redefine, nas Ações.
+              </p>
+            </div>
+          ) : (
+            <p className="text-gray-500 text-sm">
+              Sem acesso criado. Crie em <span className="text-gray-400">Ações</span>, no fim da página.
+            </p>
+          )}
         </Secao>
 
         <Secao titulo="Contrato">
