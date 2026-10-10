@@ -4,6 +4,7 @@ import { CuponsTable } from '@/components/admin/cupons/CuponsTable'
 import { type CouponRow } from '@/components/admin/cupons/types'
 import { can, type Role } from '@/lib/auth/roles'
 import { telefonesSuspeitos } from '@/lib/coupons/telefone-repetido'
+import { janelaDeVencimento } from '@/lib/coupons/vencimento'
 
 interface SearchParams {
   status?: string
@@ -12,6 +13,7 @@ interface SearchParams {
   from?: string
   to?: string
   conferencia?: string
+  vence_em?: string
   [key: string]: string | undefined
 }
 
@@ -42,6 +44,13 @@ export default async function CuponsPage({
 
   if (params.status) query = query.eq('status', params.status)
   if (params.influencer_id) query = query.eq('influencer_id', params.influencer_id)
+  // Cupom pendente com a data chegando: a venda que ainda dá para salvar.
+  if (params.vence_em) {
+    const dias = Number(params.vence_em) || 15
+    const j = janelaDeVencimento(dias)
+    query = query.eq('status', 'pending').gte('expires_at', j.de).lte('expires_at', j.ate)
+  }
+
   if (params.from) query = query.gte('created_at', params.from)
   if (params.to) query = query.lte('created_at', params.to + 'T23:59:59')
 

@@ -25,6 +25,13 @@ export function CuponsFilters({
         className={`${INPUT} flex-1 min-w-52 px-4 placeholder:text-gray-500`}
       />
 
+      <select name="vence_em" defaultValue={filters.vence_em} className={INPUT}>
+        <option value="">Vencimento: todos</option>
+        <option value="7">Vence em 7 dias</option>
+        <option value="15">Vence em 15 dias</option>
+        <option value="30">Vence em 30 dias</option>
+      </select>
+
       <select name="status" defaultValue={filters.status} className={INPUT}>
         <option value="">Todos os status</option>
         <option value="pending">Pendente</option>

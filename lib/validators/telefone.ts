@@ -94,3 +94,40 @@ export function mascaraCelular(valor: string): string {
   if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
 }
+
+/** Onde fica cada DDD. Serve para priorizar atendimento: a loja é presencial. */
+const REGIOES: Record<number, string> = {
+  11: 'São Paulo capital', 12: 'São José dos Campos', 13: 'Santos', 14: 'Bauru',
+  15: 'Sorocaba', 16: 'Ribeirão Preto', 17: 'São José do Rio Preto',
+  18: 'Presidente Prudente', 19: 'Campinas',
+  21: 'Rio de Janeiro', 22: 'Campos (RJ)', 24: 'Volta Redonda',
+  27: 'Vitória', 28: 'Cachoeiro de Itapemirim',
+  31: 'Belo Horizonte', 32: 'Juiz de Fora', 33: 'Governador Valadares',
+  34: 'Uberlândia', 35: 'Poços de Caldas', 37: 'Divinópolis', 38: 'Montes Claros',
+  41: 'Curitiba', 42: 'Ponta Grossa', 43: 'Londrina', 44: 'Maringá',
+  45: 'Foz do Iguaçu', 46: 'Pato Branco', 47: 'Joinville', 48: 'Florianópolis',
+  49: 'Chapecó', 51: 'Porto Alegre', 53: 'Pelotas', 54: 'Caxias do Sul',
+  55: 'Santa Maria (RS)',
+  61: 'Brasília', 62: 'Goiânia', 63: 'Palmas', 64: 'Rio Verde', 65: 'Cuiabá',
+  66: 'Rondonópolis', 67: 'Campo Grande', 68: 'Rio Branco', 69: 'Porto Velho',
+  71: 'Salvador', 73: 'Itabuna', 74: 'Juazeiro (BA)', 75: 'Feira de Santana',
+  77: 'Barreiras', 79: 'Aracaju',
+  81: 'Recife', 82: 'Maceió', 83: 'João Pessoa', 84: 'Natal', 85: 'Fortaleza',
+  86: 'Teresina', 87: 'Petrolina', 88: 'Juazeiro do Norte', 89: 'Picos',
+  91: 'Belém', 92: 'Manaus', 93: 'Santarém', 94: 'Marabá', 95: 'Boa Vista',
+  96: 'Macapá', 97: 'Coari', 98: 'São Luís', 99: 'Imperatriz',
+}
+
+/**
+ * A cidade do DDD, para a lista de atendimento.
+ *
+ * NÃO é onde a pessoa mora: gente muda de cidade e mantém o número. É pista,
+ * não endereço -- e vale dizer isso a quem for usar a lista. Em 10/10/2026, dos
+ * 35 cupons de uma influenciadora, 19 DDDs diferentes e só 2 da cidade da loja:
+ * audiência nacional para uma oferta que exige ir à loja.
+ */
+export function regiaoDoDDD(telefone: string): string {
+  const d = (telefone ?? '').replace(/\D/g, '')
+  if (d.length < 2) return '—'
+  return REGIOES[Number(d.slice(0, 2))] ?? 'outra região'
+}
