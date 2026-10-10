@@ -223,6 +223,7 @@ export type Database = {
           discount_type: string | null
           discount_value: number | null
           commission_per_sale: number | null
+          accept_communications: boolean
         }
         Insert: {
           campaign_id: string
@@ -250,6 +251,7 @@ export type Database = {
           discount_type?: string | null
           discount_value?: number | null
           commission_per_sale?: number | null
+          accept_communications?: boolean
         }
         Update: {
           campaign_id?: string
@@ -277,6 +279,7 @@ export type Database = {
           discount_type?: string | null
           discount_value?: number | null
           commission_per_sale?: number | null
+          accept_communications?: boolean
         }
         Relationships: [
           {

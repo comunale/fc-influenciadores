@@ -1,3 +1,4 @@
+import { validarCelular } from '@/lib/validators/telefone'
 import { createAdminClient } from '@/lib/supabase/server'
 import { validateCPF } from '@/lib/validators/cpf'
 import { addDays } from '@/lib/utils'
@@ -19,7 +20,8 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { influencer_code, customer_name, customer_cpf, customer_phone, customer_email } = body
+    const { influencer_code, customer_name, customer_cpf, customer_phone, customer_email,
+            accept_communications } = body
 
     // Validações básicas
     if (!influencer_code || !customer_name || !customer_cpf || !customer_phone || !customer_email) {
@@ -36,10 +38,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'E-mail inválido.' }, { status: 400 })
     }
 
-    const phoneClean = customer_phone.replace(/\D/g, '')
-    if (phoneClean.length < 10) {
-      return NextResponse.json({ error: 'Telefone inválido. Informe com DDD.' }, { status: 400 })
+    // A tela nunca foi trava neste projeto. Em 08 e 09/10/2026 entraram três
+    // números quebrados porque aqui só se exigia 10 dígitos: quem digitava com
+    // o +55 tinha o número truncado pela máscara e passava direto.
+    const fone = validarCelular(customer_phone)
+    if (!fone.ok) {
+      return NextResponse.json({ error: fone.motivo }, { status: 400 })
     }
+    const phoneClean = fone.digitos
 
     // Rota pública: lê e grava pelo servidor. As tabelas deixaram de ser
     // públicas em 18/08/2026 — quem tivesse a chave anon lia a base inteira de
@@ -94,6 +100,10 @@ export async function POST(request: Request) {
       customer_name: customer_name.trim(),
       customer_cpf: cpfClean,
       customer_phone: phoneClean,
+      // Autorização para falar com a pessoa depois. Até 10/10/2026 a caixa
+      // existia no formulário e o valor se perdia no caminho -- ninguém
+      // gravava. Sem isso não há base legítima para disparo por API.
+      accept_communications: accept_communications === true,
       customer_email: customer_email.trim().toLowerCase(),
       status: 'pending',
       expires_at: expiresAt.toISOString(),

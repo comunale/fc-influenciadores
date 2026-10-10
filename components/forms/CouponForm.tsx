@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { formatCPF, formatPhone } from '@/lib/validators/cpf'
+import { formatCPF } from '@/lib/validators/cpf'
+import { validarCelular, mascaraCelular } from '@/lib/validators/telefone'
 
 interface CouponFormProps {
   influencerCode: string
@@ -30,7 +31,7 @@ export function CouponForm({ influencerCode }: CouponFormProps) {
       return
     }
     if (field === 'customer_phone' && typeof value === 'string') {
-      setForm((prev) => ({ ...prev, [field]: formatPhone(value) }))
+      setForm((prev) => ({ ...prev, [field]: mascaraCelular(value) }))
       return
     }
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -45,9 +46,10 @@ export function CouponForm({ influencerCode }: CouponFormProps) {
     if (!form.customer_cpf || form.customer_cpf.replace(/\D/g, '').length < 11) {
       newErrors.customer_cpf = 'CPF inválido.'
     }
-    if (!form.customer_phone || form.customer_phone.replace(/\D/g, '').length < 10) {
-      newErrors.customer_phone = 'Informe o telefone com DDD.'
-    }
+    // O cupom é combinado por WhatsApp: telefone que não recebe mensagem não
+    // serve. O erro diz o que fazer, não só que está errado.
+    const fone = validarCelular(form.customer_phone)
+    if (!fone.ok) newErrors.customer_phone = fone.motivo
     if (!form.customer_email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.customer_email)) {
       newErrors.customer_email = 'E-mail inválido.'
     }
@@ -69,7 +71,9 @@ export function CouponForm({ influencerCode }: CouponFormProps) {
           influencer_code: influencerCode,
           customer_name: form.customer_name,
           customer_cpf: form.customer_cpf,
-          customer_phone: form.customer_phone,
+          // Sempre os dígitos limpos: sem máscara e sem o +55.
+          customer_phone: validarCelular(form.customer_phone).digitos,
+          accept_communications: form.accept_communications,
           customer_email: form.customer_email,
         }),
       })
@@ -118,7 +122,7 @@ export function CouponForm({ influencerCode }: CouponFormProps) {
       />
 
       <Input
-        label="Telefone (com DDD)"
+        label="WhatsApp (com DDD)"
         placeholder="(11) 99999-9999"
         value={form.customer_phone}
         onChange={(e) => handleChange('customer_phone', e.target.value)}
@@ -127,6 +131,12 @@ export function CouponForm({ influencerCode }: CouponFormProps) {
         autoComplete="tel"
         disabled={loading}
       />
+      {!errors.customer_phone && (
+        <p className="text-xs text-gray-500 -mt-2 leading-relaxed">
+          Celular com DDD e o 9. É por aqui que a loja fala com você sobre o
+          cupom — não precisa do +55.
+        </p>
+      )}
 
       <Input
         label="E-mail"
