@@ -18,28 +18,49 @@ Atualizado em 2026-11-03.
 
 **Última sessão: 03/11/2026.**
 
-### ⚠️ PENDÊNCIA ABERTA DE 03/11 — rodar a migration 030 no banco
+### ✅ Migration 030 aplicada e verificada em 03/11
 
-`db/migrations/030_fecha_escalada_de_privilegio_no_perfil.sql` **está no repo mas
-pode não estar aplicada no banco.** A sessão de 03/11 teve a escrita no Supabase
-recusada pelo gate de permissão (duas vezes: `execute_sql` com DDL e
-`apply_migration`), então o SQL foi entregue ao César para colar no editor do
-Supabase. **Antes de qualquer coisa, conferir:**
+A brecha está **fechada**. O César aplicou a 030 no SQL Editor — a escrita pelo
+MCP foi recusada pelo gate de permissão três vezes nesta sessão (`execute_sql`
+com DDL e `apply_migration`), e não foi contornada por `psql`.
+
+Verificado de duas formas independentes: `scripts/verifica-030.sql` devolveu os
+três `OK` (escalada bloqueada com SQLSTATE **42501**, ramo do setup em `false`
+apesar de a conta ver 0 linhas, admin ativo ainda criando perfil), e o catálogo
+confirma `with_check = (sem_nenhum_perfil() OR is_admin())` com a função como
+`security definer`. Os 10 perfis seguem iguais aos de antes — o `rollback` dos
+testes não deixou resíduo.
+
+**Como reconferir, a qualquer momento:**
 
 ```sql
 select with_check from pg_policies
 where tablename='admin_profiles' and policyname='admin_profiles_insert';
 ```
 
-Se o texto ainda mencionar `auth.role()` ou tiver três ramos, **a brecha está
-aberta** — rodar a migration 030. Se mencionar `sem_nenhum_perfil()` e
-`is_admin()`, está fechada.
+Tem de dizer `(sem_nenhum_perfil() OR is_admin())`. Se algum dia voltar a
+mencionar `auth.role()` ou três ramos, **a brecha reabriu**.
 
-**Depois de aplicar, rodar `scripts/verifica-030.sql`** no SQL Editor. Ele não
-altera nada (tudo em `begin/rollback`) e devolve uma tabela com três veredictos:
-a escalada tem de ser bloqueada **com SQLSTATE 42501**, o ramo do setup tem de
-dar `false`, e o admin ativo tem de continuar criando perfil. Os três `OK` é o
-que fecha o assunto; qualquer outra coisa está escrito no que fazer.
+E `scripts/verifica-030.sql` no SQL Editor continua valendo como prova viva: não
+altera nada (tudo em `begin/rollback`) e devolve três veredictos — escalada
+bloqueada **com SQLSTATE 42501**, ramo do setup em `false`, admin ativo ainda
+criando perfil. Três `OK` fecha; qualquer outra coisa tem o que fazer escrito ao
+lado. O editor avisa "creates tables without enabling RLS": é falso positivo
+(são tabelas temporárias), escolher **"Run without RLS"** — "Run and enable RLS"
+liga RLS na tabela de resultados, que o teste escreve como `authenticated`, e o
+teste passa a medir a si mesmo.
+
+### Ainda aberto de 03/11 (não urgente, a escalada já está fechada)
+
+- **Cadastro aberto no Supabase** (`disable_signup: false`,
+  `mailer_autoconfirm: true`): qualquer um cria conta confirmada sozinho. Já não
+  é escalada, mas é porta para conta-lixo. Só o César desliga, no painel.
+  **Checado: não quebra o GC Estúdio** — ele cria usuário pela Edge Function
+  `gc-estudio-usuarios` com chave de serviço, não usa `signUp`.
+- **Funções do `gc_estudio`** (`mesclar_config`, `mesclar_sistema`, `tem_acesso`)
+  executáveis por `authenticated`. Não é da Fox, mas **um influenciador da Fox é
+  `authenticated` naquele schema também** — vale o César levar ao outro agente.
+- **`update_updated_at_column`** com `search_path` mutável: endurecimento menor.
 
 ### A brecha de 03/11 — escalada de privilégio no cadastro de perfil
 
