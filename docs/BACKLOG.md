@@ -8,7 +8,7 @@ pedidos do César quase se perderam assim.
 Regra: ao terminar qualquer entrega, atualizar este arquivo. Ao começar
 qualquer conversa, ler este arquivo.
 
-Atualizado em 2026-10-02.
+Atualizado em 2026-11-03.
 
 **Plano de execução dos itens 1, 3 e 4:** `docs/superpowers/plans/2026-08-18-pendencias-balcao-financeiro-parceria.md`. O item 2 (portal) segue bloqueado pela decisão sobre os dados migrados da planilha.
 
@@ -16,7 +16,71 @@ Atualizado em 2026-10-02.
 
 ## Retomando o trabalho — leia isto primeiro
 
-**Última sessão: 02/10/2026.** Tudo commitado, no ar e sincronizado.
+**Última sessão: 03/11/2026.**
+
+### ⚠️ PENDÊNCIA ABERTA DE 03/11 — rodar a migration 030 no banco
+
+`db/migrations/030_fecha_escalada_de_privilegio_no_perfil.sql` **está no repo mas
+pode não estar aplicada no banco.** A sessão de 03/11 teve a escrita no Supabase
+recusada pelo gate de permissão (duas vezes: `execute_sql` com DDL e
+`apply_migration`), então o SQL foi entregue ao César para colar no editor do
+Supabase. **Antes de qualquer coisa, conferir:**
+
+```sql
+select with_check from pg_policies
+where tablename='admin_profiles' and policyname='admin_profiles_insert';
+```
+
+Se o texto ainda mencionar `auth.role()` ou tiver três ramos, **a brecha está
+aberta** — rodar a migration 030. Se mencionar `sem_nenhum_perfil()` e
+`is_admin()`, está fechada.
+
+### A brecha de 03/11 — escalada de privilégio no cadastro de perfil
+
+Chegou por um relatório de outro agente, trabalhando no projeto do GC Estúdio,
+que divide o mesmo Supabase. Conferido no banco e **provado** com identidade
+simulada em `begin/rollback`: uma conta criada do zero virava `admin` da Fox e
+alcançava 248 cupons (CPF, telefone, e-mail) e a ficha bancária do influenciador.
+
+**De onde veio.** Commit `a0daab7`, de 22/05/2026, consertou "criar usuário admin
+sem erro de RLS" de duas formas no mesmo commit: a certa (`auth.admin.createUser`
+com a chave de serviço, que não troca a sessão) e um contorno (relaxar a RLS para
+quando a chave não estivesse configurada). A certa venceu em produção e está lá
+desde então. **O contorno ficou atrás, sem uso, e era a brecha.** Lição: contorno
+que nasce junto da solução certa não tem prazo de validade — alguém tem que
+apagá-lo no mesmo dia, ou ele vira dívida de segurança silenciosa.
+
+**O que o relatório não viu, e importa mais que o resto.** Ele mandava remover só
+o 3º ramo da política. Isso **não fecharia a brecha**: o 1º ramo (`not exists
+(select 1 from admin_profiles)`, para o setup inicial) faz um select que *também*
+passa pela RLS — e para quem não tem perfil a tabela parece vazia, então o ramo
+dá `true` sozinho, sem nenhuma restrição de cargo. Medido: conta nova vê 0 linhas.
+**Regra que fica: checagem de existência dentro de política de RLS precisa rodar
+em `security definer`, senão ela mede a visão filtrada e não a realidade.**
+
+**Armadilha no teste.** Com UID falso, os três casos dão "bloqueado" — mas pela
+chave estrangeira para `auth.users`, não pela RLS. Dá falso negativo e parece que
+não há brecha. É preciso criar a conta em `auth.users` dentro da transação para
+alcançar a política.
+
+**O que foi feito:** migration 030 (as duas checagens via `security definer`) e a
+remoção do caminho reserva do `signUp` em `app/api/admin/create-user/route.ts` —
+sem a chave de serviço a rota agora devolve 503 em vez de criar conta por fora.
+
+**O que não foi feito, e por quê:**
+
+- **Cadastro aberto no Supabase** (`disable_signup: false`, `mailer_autoconfirm:
+  true`): qualquer um cria conta confirmada sozinho. Só o César desliga, no painel
+  (Authentication › Sign In / Providers). **Checado: não quebra o GC Estúdio** —
+  ele cria usuário pela Edge Function `gc-estudio-usuarios` com
+  `auth.admin.createUser` e chave de serviço, não usa `signUp`. Quebra apenas
+  `/setup`, que não tem mais uso (o admin existe desde 20/05).
+- **`/setup`**: decisão dele, ainda aberta. Com a 030 aplicada ele é inofensivo
+  (só funciona com a tabela realmente vazia).
+- **View `card_metrics`**: o relatório disse "RLS desligada"; é **view**, e view
+  não tem RLS. Testado: `anon` recebe `permission denied`. Sobra que qualquer
+  usuário logado lê contagens de evento de cartão, sem PII. Real, menor, do
+  fc-digitalcard.
 
 ### O que entrou em 02/10
 

@@ -36,57 +36,48 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Nome da loja é obrigatório para moderadores.' }, { status: 400 })
     }
 
-    // Tenta usar service role key (solução correta: não troca sessão, bypassa RLS)
-    const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY
+    // A chave de serviço é obrigatória. `auth.admin.createUser` não troca a
+    // sessão e grava o perfil por fora da RLS -- é o caminho certo, e é o que
+    // roda em produção desde 22/05/2026.
+    //
+    // Existia aqui um caminho reserva com `signUp`, para quando a chave não
+    // estivesse configurada. Ele dependia de uma RLS frouxa que, em 03/11/2026,
+    // se revelou escalada de privilégio: qualquer conta logada sem perfil se
+    // inseria como admin e alcançava CPF de cliente e dados bancários. A
+    // migration 030 fechou a RLS, e o reserva sai junto -- sem a chave, a rota
+    // falha com erro claro em vez de criar conta por fora.
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('create-user: SUPABASE_SERVICE_ROLE_KEY não configurada')
+      return NextResponse.json(
+        { error: 'Criação de usuários indisponível: a chave de serviço não está configurada no servidor. Avise o administrador.' },
+        { status: 503 }
+      )
+    }
 
-    let newUserId: string
+    const adminClient = createAdminClient()
 
-    if (hasServiceKey) {
-      const adminClient = createAdminClient()
-      const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-      })
-      if (createError || !newUser.user) {
-        return NextResponse.json({ error: createError?.message || 'Erro ao criar usuário.' }, { status: 400 })
-      }
-      newUserId = newUser.user.id
+    const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    })
+    if (createError || !newUser.user) {
+      return NextResponse.json({ error: createError?.message || 'Erro ao criar usuário.' }, { status: 400 })
+    }
 
-      const { error: profileError } = await adminClient.from('admin_profiles').insert({
-        id: newUserId,
-        name: name.trim(),
-        email: email.toLowerCase().trim(),
-        role,
-        store_name: role === 'moderator' ? (store_name?.trim() || null) : null,
-        active: true,
-      })
-      if (profileError) {
-        // Limpa o auth user se o perfil falhou
-        await adminClient.auth.admin.deleteUser(newUserId)
-        return NextResponse.json({ error: 'Erro ao criar perfil: ' + profileError.message }, { status: 500 })
-      }
-    } else {
-      // Fallback: signUp (troca a sessão, mas a RLS foi ajustada para permitir auto-insert)
-      const { data: newUser, error: signUpError } = await supabase.auth.signUp({ email, password })
-      if (signUpError || !newUser.user) {
-        return NextResponse.json({ error: signUpError?.message || 'Erro ao criar usuário.' }, { status: 400 })
-      }
-      newUserId = newUser.user.id
-
-      // Cria um novo client após o signUp (sessão pode ter mudado)
-      const supabaseAfter = await createClient()
-      const { error: profileError } = await supabaseAfter.from('admin_profiles').insert({
-        id: newUserId,
-        name: name.trim(),
-        email: email.toLowerCase().trim(),
-        role,
-        store_name: role === 'moderator' ? (store_name?.trim() || null) : null,
-        active: true,
-      })
-      if (profileError) {
-        return NextResponse.json({ error: 'Usuário criado mas erro no perfil: ' + profileError.message }, { status: 500 })
-      }
+    const { error: profileError } = await adminClient.from('admin_profiles').insert({
+      id: newUser.user.id,
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      role,
+      store_name: role === 'moderator' ? (store_name?.trim() || null) : null,
+      active: true,
+    })
+    if (profileError) {
+      // Limpa o auth user se o perfil falhou: conta no Auth sem perfil é
+      // exatamente o estado que a brecha de 03/11/2026 soube explorar.
+      await adminClient.auth.admin.deleteUser(newUser.user.id)
+      return NextResponse.json({ error: 'Erro ao criar perfil: ' + profileError.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, user: { email, name, role } }, { status: 201 })
