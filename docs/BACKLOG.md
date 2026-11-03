@@ -48,6 +48,14 @@ que divide o mesmo Supabase. Conferido no banco e **provado** com identidade
 simulada em `begin/rollback`: uma conta criada do zero virava `admin` da Fox e
 alcançava 248 cupons (CPF, telefone, e-mail) e a ficha bancária do influenciador.
 
+**O alcance era maior do que vazamento de leitura, e isso só ficou claro depois,
+na varredura de advisors.** Virando admin, o invasor também escrevia:
+`admin_can_update_profiles` é um UPDATE sem `with_check`, então ele podia
+**desativar o perfil do admin de verdade e trancar o César fora do sistema**; e
+`registrar_descumprimento()` — protegida por dentro com `is_admin()`, o que não
+serve de nada contra quem acabou de virar admin — encerra parceria, desliga link
+e marca fee a restituir. Ou seja: era tomada de conta, não só cópia de dados.
+
 **De onde veio.** Commit `a0daab7`, de 22/05/2026, consertou "criar usuário admin
 sem erro de RLS" de duas formas no mesmo commit: a certa (`auth.admin.createUser`
 com a chave de serviço, que não troca a sessão) e um contorno (relaxar a RLS para
@@ -86,7 +94,30 @@ sem a chave de serviço a rota agora devolve 503 em vez de criar conta por fora.
 - **View `card_metrics`**: o relatório disse "RLS desligada"; é **view**, e view
   não tem RLS. Testado: `anon` recebe `permission denied`. Sobra que qualquer
   usuário logado lê contagens de evento de cartão, sem PII. Real, menor, do
-  fc-digitalcard.
+  fc-digitalcard. Não mexi: trocar para `security_invoker` pode quebrar a tela
+  daquele projeto, e a decisão é de lá.
+- **`/setup`**: mantido de propósito. Com a 030 aplicada ele é provadamente
+  inerte (só funciona com `admin_profiles` realmente vazia), então apagá-lo não
+  acrescenta segurança nenhuma — e mudança a mais num dia de segurança é risco a
+  mais. Se o cadastro aberto for desligado, ele vira código morto; aí sai.
+
+### Varredura de advisors de 03/11 — o que é ruído e por quê
+
+Rodei a varredura de segurança da plataforma enquanto o contexto estava fresco.
+Fica registrado para a próxima pessoa não reinvestigar:
+
+| Aviso | Veredito |
+|---|---|
+| `card_*` e `rate_limits` com RLS sem política | **Correto assim** — sem política = nega tudo pela API; só o service role entra |
+| `anon` executa `coupons_guard_insert`, `coupons_guard_non_admin_update`, `sync_store_rename` | **Ruído, testado** — são funções de trigger, nem aparecem no schema cache do PostgREST (`PGRST202`) |
+| `anon` executa `is_admin`, `eh_interno`, `is_finance`, `meu_influencer_id`, `caller_store_name`, `seller_ok_for_caller` | **Ruído** — são predicados sobre quem chama; para o anônimo devolvem falso/nulo |
+| `authenticated` executa `registrar_descumprimento` | **Protegida por dentro** (`if not is_admin() then raise`) — mas ver acima: a guarda não vale contra quem virou admin pela brecha |
+| `mesclar_config` / `mesclar_sistema` / `tem_acesso` do `gc_estudio` abertas a `authenticated` | **Não é da Fox** — mas vale ele checar se guardam por `eh_membro()`, porque hoje um influenciador da Fox é `authenticated` ali também |
+| `update_updated_at_column` com `search_path` mutável | Endurecimento menor, pendente |
+| Proteção de senha vazada desligada | **Exige plano Pro**, a org é Free. Já sabido desde 02/10 |
+
+As funções `portal_*` aparecem só na lista de `authenticated`, não na de `anon` —
+a migration 026 fez o que prometeu.
 
 ### O que entrou em 02/10
 
