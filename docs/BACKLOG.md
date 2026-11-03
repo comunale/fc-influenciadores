@@ -35,6 +35,12 @@ Se o texto ainda mencionar `auth.role()` ou tiver três ramos, **a brecha está
 aberta** — rodar a migration 030. Se mencionar `sem_nenhum_perfil()` e
 `is_admin()`, está fechada.
 
+**Depois de aplicar, rodar `scripts/verifica-030.sql`** no SQL Editor. Ele não
+altera nada (tudo em `begin/rollback`) e devolve uma tabela com três veredictos:
+a escalada tem de ser bloqueada **com SQLSTATE 42501**, o ramo do setup tem de
+dar `false`, e o admin ativo tem de continuar criando perfil. Os três `OK` é o
+que fecha o assunto; qualquer outra coisa está escrito no que fazer.
+
 ### A brecha de 03/11 — escalada de privilégio no cadastro de perfil
 
 Chegou por um relatório de outro agente, trabalhando no projeto do GC Estúdio,
