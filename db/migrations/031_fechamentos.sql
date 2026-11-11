@@ -21,6 +21,16 @@
 --     inerte (auth.uid() é nulo para a chave de serviço). Regra sobre QUEM
 --     chama vai para política, nunca para o trigger.
 --   * status 'pago' exige paid_at E forma (constraint).
+--   * Lançamento PAGO é imutável: nenhum campo muda, não sai de 'pago' e não
+--     é apagado; seus itens não mudam nem somem. Correção se faz com
+--     lançamento novo -- apagar prova é o oposto do que este módulo existe
+--     para fazer. Regra em duas camadas: a rota barra, e estes triggers são
+--     o backstop (o mesmo buraco que o BACKLOG registra em
+--     coupons_guard_non_admin_update, que aqui não se repete). Itens de
+--     lançamento 'aberto' continuam editáveis/apagáveis: é o que o
+--     cancelamento usa.
+--   * `valor` é magnitude (>= 0); o sinal do dinheiro mora em `tipo`.
+--     Aceitar negativo abriria dupla negação (restituição de -500 que soma).
 --   * Parceria com lançamento não pode ser apagada (on delete restrict): o
 --     livro-razão não pode perder a referência de a quem se pagou.
 --   * Só admin e financeiro enxergam e escrevem. `moderator` (o Lojista na
@@ -42,6 +52,12 @@
 -- PARA DESFAZER (apaga o livro inteiro, inclusive os lançamentos gravados):
 --
 --   drop trigger if exists settlement_items_valida on public.settlement_items;
+--   drop trigger if exists settlement_items_congela on public.settlement_items;
+--   drop trigger if exists settlements_congela_pago on public.settlements;
+--   drop trigger if exists settlements_protege_pago on public.settlements;
+--   drop function if exists public.settlement_items_congela();
+--   drop function if exists public.settlements_congela_pago();
+--   drop function if exists public.settlements_protege_pago();
 --   drop function if exists public.settlement_items_valida();
 --   drop function if exists public.settlement_pode_incluir(uuid, uuid);
 --   drop function if exists public.settlement_motivo_recusa(uuid, uuid);
@@ -66,6 +82,8 @@ create table if not exists public.settlements (
     foreign key (partnership_id) references public.partnerships(id) on delete restrict,
   constraint settlements_tipo_check
     check (tipo in ('comissao','fixo','restituicao')),
+  constraint settlements_valor_nao_negativo
+    check (valor >= 0),
   constraint settlements_status_check
     check (status in ('aberto','pago','cancelado')),
   constraint settlements_pago_exige_dados
@@ -85,6 +103,8 @@ create table if not exists public.settlement_items (
   coupon_id     uuid not null,
   valor         numeric not null,
 
+  constraint settlement_items_valor_nao_negativo
+    check (valor >= 0),
   constraint settlement_items_settlement_id_fkey
     foreign key (settlement_id) references public.settlements(id) on delete cascade,
   constraint settlement_items_coupon_id_fkey
@@ -190,6 +210,82 @@ drop trigger if exists settlement_items_valida on public.settlement_items;
 create trigger settlement_items_valida
   before insert or update of settlement_id, coupon_id on public.settlement_items
   for each row execute function public.settlement_items_valida();
+
+-- ---------------------------------------------------------------------------
+-- Imutabilidade do lançamento pago. Valida ESTADO e DADOS, nunca identidade:
+-- vale também para service_role.
+-- ---------------------------------------------------------------------------
+create or replace function public.settlements_congela_pago()
+returns trigger
+language plpgsql
+as $fn$
+begin
+  if old.status = 'pago' and (
+       new.status         is distinct from 'pago'
+    or new.valor          is distinct from old.valor
+    or new.tipo           is distinct from old.tipo
+    or new.partnership_id is distinct from old.partnership_id
+    or new.periodo_de     is distinct from old.periodo_de
+    or new.periodo_ate    is distinct from old.periodo_ate
+    or new.paid_at        is distinct from old.paid_at
+    or new.forma          is distinct from old.forma
+    or new.identificador  is distinct from old.identificador
+  ) then
+    raise exception 'Lancamento pago e imutavel: correcao se faz com lancamento novo';
+  end if;
+  return new;
+end;
+$fn$;
+
+drop trigger if exists settlements_congela_pago on public.settlements;
+create trigger settlements_congela_pago
+  before update on public.settlements
+  for each row execute function public.settlements_congela_pago();
+
+create or replace function public.settlements_protege_pago()
+returns trigger
+language plpgsql
+as $fn$
+begin
+  if old.status = 'pago' then
+    raise exception 'Lancamento pago e imutavel: nao se apaga, correcao se faz com lancamento novo';
+  end if;
+  return old;
+end;
+$fn$;
+
+drop trigger if exists settlements_protege_pago on public.settlements;
+create trigger settlements_protege_pago
+  before delete on public.settlements
+  for each row execute function public.settlements_protege_pago();
+
+-- Itens: só mudam ou somem enquanto o lançamento pai está 'aberto'. Se o pai
+-- não existe mais (apagado em cascata), deixa passar. security definer: a
+-- leitura do pai não pode depender do que a RLS mostra ao chamador.
+create or replace function public.settlement_items_congela()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public'
+as $fn$
+declare
+  st text;
+begin
+  select status into st from public.settlements where id = old.settlement_id;
+  if found and st <> 'aberto' then
+    raise exception 'Lancamento % e imutavel: itens so mudam em lancamento aberto', st;
+  end if;
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$fn$;
+
+drop trigger if exists settlement_items_congela on public.settlement_items;
+create trigger settlement_items_congela
+  before update or delete on public.settlement_items
+  for each row execute function public.settlement_items_congela();
 
 -- ---------------------------------------------------------------------------
 -- RLS: admin e financeiro tudo. Lojista e influenciador: nenhuma política.

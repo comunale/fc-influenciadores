@@ -11,37 +11,34 @@
 --
 -- As duas lições de 03/11/2026 (ver verifica-030.sql) valem aqui:
 --
---   1. Cada caso confere o SQLSTATE, e quando há mais de uma causa possível
---      para o mesmo código, confere também QUAL constraint ou QUAL motivo
---      barrou. `exception when others` genérico esconde a causa. Exemplo: um
---      DELETE de parceria dá 23503 tanto pelo livro quanto por qualquer outra
---      tabela que aponte para ela; só o nome da constraint prova que foi o
---      livro.
+--   1. Cada caso confere o SQLSTATE e QUAL constraint ou QUAL motivo barrou
+--      (pg_temp.tenta). `exception when others` genérico esconde a causa:
+--      um DELETE de parceria dá 23503 por qualquer FK; só o nome da constraint
+--      prova que foi o livro.
 --   2. Cada caso usa os seus PRÓPRIOS dados (parceria, lançamento, cupom).
 --      Nenhum caso depende do resultado de outro.
 --
 -- Os registros de teste são clonados de linhas reais (parceria e cupom) por
--- jsonb_populate_record, só trocando o que importa; assim o script não precisa
--- conhecer todas as colunas obrigatórias das tabelas. Exige existir pelo menos
--- uma parceria e um cupom no banco (existem). Se o INSERT dos clones falhar,
--- o script inteiro para: o problema está no fixture, não na migration.
---
--- Se a 031 NÃO estiver aplicada, os casos acusam "migration 031 nao aplicada".
+-- jsonb_populate_record, trocando só o que importa. Exige ao menos uma
+-- parceria e um cupom no banco. Se o INSERT dos clones falhar, o script para:
+-- o problema está no fixture, não na migration. Se a 031 NÃO estiver
+-- aplicada, também para no setup com "relation ... does not exist" (é o
+-- controle negativo). Cupons e parcerias são inseridos ANTES de qualquer
+-- `set local role`, porque o trigger de insert de `coupons` só passa direto
+-- quando auth.uid() é nulo.
 
 begin;
 
 create temp table r(ordem numeric, teste text, esperado text, obtido text, veredito text);
 grant select, insert on r to authenticated, anon;
 
--- O admin de verdade, lido do banco para não gravar uuid neste arquivo.
 create temp table adm as
   select id from public.admin_profiles where role = 'admin' and active = true limit 1;
 grant select on adm to authenticated;
 
--- ---------- fábricas de fixture (só existem durante a transação) ----------
+-- ---------- fábricas e auxiliares (só existem durante a transação) ----------
 
--- Parceria clonada de uma real, 'encerrada' para não colidir com o índice de
--- "uma ativa por influenciador".
+-- Parceria clonada, 'encerrada' para não colidir com "uma ativa por influenciador".
 create function pg_temp.mkp(p_id uuid) returns void language sql as $f$
   insert into public.partnerships
   select (jsonb_populate_record(null::public.partnerships,
@@ -49,34 +46,46 @@ create function pg_temp.mkp(p_id uuid) returns void language sql as $f$
   from (select * from public.partnerships limit 1) b;
 $f$;
 
--- Cupom clonado de um real. Id, número, CPF e NF únicos por n.
+-- Cupom clonado. Id, número, CPF e NF únicos por n (NF só se conferido).
 create function pg_temp.mkc(n int, p_part uuid, p_status text, p_verified boolean,
-                            p_used_at timestamptz) returns uuid language plpgsql as $f$
-declare cid uuid := ('00000000-0000-0000-0031-0000000001' || lpad(n::text, 2, '0'))::uuid;
-begin
+                            p_used_at timestamptz) returns void language sql as $f$
   insert into public.coupons
   select (jsonb_populate_record(null::public.coupons,
            to_jsonb(b) || jsonb_build_object(
-             'id', cid,
+             'id', ('00000000-0000-0000-0031-0000000001' || lpad(n::text, 2, '0'))::uuid,
              'coupon_number', 'T031-' || n,
              'customer_cpf', '9990031' || lpad(n::text, 4, '0'),
              'invoice_number', case when p_verified then 'T031-NF-' || n end,
-             'status', p_status,
-             'verified', p_verified,
-             'paid', false,
-             'used_at', p_used_at,
-             'partnership_id', p_part))).*
+             'status', p_status, 'verified', p_verified, 'paid', false,
+             'used_at', p_used_at, 'partnership_id', p_part))).*
   from (select * from public.coupons limit 1) b;
-  return cid;
+$f$;
+
+-- Executa q e confere SQLSTATE (cod) e, se informado, a constraint OU um
+-- trecho da mensagem (quem). Se q não falhar, o caso FALHOU.
+create function pg_temp.tenta(o numeric, t text, esperado text, q text, cod text, quem text)
+returns void language plpgsql as $f$
+declare cn text; ms text; sq text;
+begin
+  begin
+    execute q;
+    insert into r values (o, t, esperado, 'EXECUTOU', 'FALHOU -- a trava nao barrou');
+    return;
+  exception when others then
+    get stacked diagnostics cn = constraint_name;
+    sq := sqlstate; ms := sqlerrm;
+  end;
+  insert into r values (o, t, esperado, sq || ' ' || coalesce(cn, left(ms, 70)),
+    case when sq = cod and (quem is null or quem = cn or ms like '%' || quem || '%')
+         then 'OK' else 'CONFERIR -- barrou por outro motivo' end);
 end $f$;
 
--- ---------- fixtures (como superusuário, antes de trocar de papel) ----------
+-- ---------- fixtures (como superusuário) ----------
 
 select pg_temp.mkp('00000000-0000-0000-0031-000000000a01');  -- PA
 select pg_temp.mkp('00000000-0000-0000-0031-000000000a02');  -- PB
 select pg_temp.mkp('00000000-0000-0000-0031-000000000a03');  -- P6 (só do caso 6)
 
--- Contas por papel. O influenciador precisa de influencer_id (constraint da 014).
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password,
                         email_confirmed_at, created_at, updated_at)
 values
@@ -93,179 +102,127 @@ insert into public.admin_profiles(id, name, email, role, active, influencer_id) 
     (select influencer_id from public.partnerships where id = '00000000-0000-0000-0031-000000000a01')),
  ('00000000-0000-0000-0031-0000000000e3','teste financeiro','teste-031-financeiro@exemplo.invalido','finance',true,null);
 
--- Cupons: um conjunto por caso.
-select pg_temp.mkc(1,  '00000000-0000-0000-0031-000000000a01', 'used', true,  now());  -- caso 1
-select pg_temp.mkc(2,  '00000000-0000-0000-0031-000000000a01', 'used', true,  null);   -- caso 2: used_at nulo
-select pg_temp.mkc(3,  '00000000-0000-0000-0031-000000000a02', 'used', true,  now());  -- caso 3: outra parceria
-select pg_temp.mkc(4,  '00000000-0000-0000-0031-000000000a01', 'used', false, now());  -- caso 4: nao conferido
-select pg_temp.mkc(71, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());  -- caso 7
-select pg_temp.mkc(72, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());  -- caso 7
-select pg_temp.mkc(10, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());  -- caso 10
-select pg_temp.mkc(11, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());  -- caso 11
+-- Cupons, um conjunto por caso (n = número do caso; 71/72 = caso 7).
+select pg_temp.mkc(1,  '00000000-0000-0000-0031-000000000a01', 'used', true,  now());
+select pg_temp.mkc(2,  '00000000-0000-0000-0031-000000000a01', 'used', true,  null);   -- used_at nulo
+select pg_temp.mkc(3,  '00000000-0000-0000-0031-000000000a02', 'used', true,  now());  -- outra parceria
+select pg_temp.mkc(4,  '00000000-0000-0000-0031-000000000a01', 'used', false, now());  -- nao conferido
+select pg_temp.mkc(71, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());
+select pg_temp.mkc(72, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());
+select pg_temp.mkc(10, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());
+select pg_temp.mkc(11, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());
+select pg_temp.mkc(14, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());
+select pg_temp.mkc(15, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());
+select pg_temp.mkc(16, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());
+select pg_temp.mkc(17, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());
+select pg_temp.mkc(18, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());
 
--- Lançamentos de fixture (o que os casos de leitura precisam encontrar).
--- Um lançamento por caso; só entram aqui os que o caso não cria sozinho.
-insert into public.settlements(id, partnership_id, tipo, valor, periodo_de, periodo_ate) values
- ('00000000-0000-0000-0031-000000000b01','00000000-0000-0000-0031-000000000a01','comissao',100,'2026-10-01','2026-10-31'),
- ('00000000-0000-0000-0031-000000000b02','00000000-0000-0000-0031-000000000a01','comissao',100,'2026-10-01','2026-10-31'),
- ('00000000-0000-0000-0031-000000000b03','00000000-0000-0000-0031-000000000a01','comissao',100,'2026-10-01','2026-10-31'),
- ('00000000-0000-0000-0031-000000000b04','00000000-0000-0000-0031-000000000a01','comissao',100,'2026-10-01','2026-10-31'),
- ('00000000-0000-0000-0031-000000000b06','00000000-0000-0000-0031-000000000a03','fixo',500,null,null),
- ('00000000-0000-0000-0031-000000000b08','00000000-0000-0000-0031-000000000a01','fixo',500,null,null),
- ('00000000-0000-0000-0031-000000000b09','00000000-0000-0000-0031-000000000a01','fixo',500,null,null),
- ('00000000-0000-0000-0031-000000000b10','00000000-0000-0000-0031-000000000a01','fixo',500,null,null);
+-- Lançamentos de fixture: um por caso (b12/b13 já nascem pagos).
+insert into public.settlements(id, partnership_id, tipo, status, valor, periodo_de, periodo_ate, paid_at, forma) values
+ ('00000000-0000-0000-0031-000000000b01','00000000-0000-0000-0031-000000000a01','comissao','aberto',100,'2026-10-01','2026-10-31',null,null),
+ ('00000000-0000-0000-0031-000000000b02','00000000-0000-0000-0031-000000000a01','comissao','aberto',100,'2026-10-01','2026-10-31',null,null),
+ ('00000000-0000-0000-0031-000000000b03','00000000-0000-0000-0031-000000000a01','comissao','aberto',100,'2026-10-01','2026-10-31',null,null),
+ ('00000000-0000-0000-0031-000000000b04','00000000-0000-0000-0031-000000000a01','comissao','aberto',100,'2026-10-01','2026-10-31',null,null),
+ ('00000000-0000-0000-0031-000000000b06','00000000-0000-0000-0031-000000000a03','fixo','aberto',500,null,null,null,null),
+ ('00000000-0000-0000-0031-000000000b08','00000000-0000-0000-0031-000000000a01','fixo','aberto',500,null,null,null,null),
+ ('00000000-0000-0000-0031-000000000b09','00000000-0000-0000-0031-000000000a01','fixo','aberto',500,null,null,null,null),
+ ('00000000-0000-0000-0031-000000000b10','00000000-0000-0000-0031-000000000a01','fixo','aberto',500,null,null,null,null),
+ ('00000000-0000-0000-0031-000000000b12','00000000-0000-0000-0031-000000000a01','fixo','pago',100,null,null,now(),'pix'),
+ ('00000000-0000-0000-0031-000000000b13','00000000-0000-0000-0031-000000000a01','fixo','pago',100,null,null,now(),'pix'),
+ ('00000000-0000-0000-0031-000000000b14','00000000-0000-0000-0031-000000000a01','fixo','aberto',100,null,null,null,null),
+ ('00000000-0000-0000-0031-000000000b15','00000000-0000-0000-0031-000000000a01','fixo','aberto',100,null,null,null,null),
+ ('00000000-0000-0000-0031-000000000b16','00000000-0000-0000-0031-000000000a01','fixo','aberto',100,null,null,null,null),
+ ('00000000-0000-0000-0031-000000000b17','00000000-0000-0000-0031-000000000a01','fixo','aberto',100,null,null,null,null),
+ ('00000000-0000-0000-0031-000000000b18','00000000-0000-0000-0031-000000000a01','fixo','aberto',100,null,null,null,null);
 
--- ===== 1: o mesmo cupom duas vezes => índice único =====
-do $$
-declare cn text;
-begin
-  insert into public.settlement_items(settlement_id, coupon_id, valor)
-  values ('00000000-0000-0000-0031-000000000b01','00000000-0000-0000-0031-000000000101',10);
-  begin
-    insert into public.settlement_items(settlement_id, coupon_id, valor)
-    values ('00000000-0000-0000-0031-000000000b01','00000000-0000-0000-0031-000000000101',10);
-    insert into r values (1,'mesmo cupom duas vezes','23505 settlement_items_coupon_unico',
-                          'INSERIU','FALHOU -- cupom pode ser pago duas vezes');
-  exception when unique_violation then
-    get stacked diagnostics cn = constraint_name;
-    insert into r values (1,'mesmo cupom duas vezes','23505 settlement_items_coupon_unico',
-      '23505 '||coalesce(cn,'?'),
-      case when cn = 'settlement_items_coupon_unico' then 'OK' else 'CONFERIR -- barrou por outro indice' end);
-  end;
-exception
-  when undefined_table then
-    insert into r values (1,'mesmo cupom duas vezes','23505','tabela nao existe','FALHOU -- migration 031 nao aplicada');
-  when others then
-    insert into r values (1,'mesmo cupom duas vezes','23505',
-      sqlstate||' '||left(sqlerrm,60),'CONFERIR -- falhou antes de chegar no teste');
-end $$;
+-- Itens de fixture (os de b14/b15 entram com o lançamento aberto e só depois ele vira pago).
+insert into public.settlement_items(id, settlement_id, coupon_id, valor) values
+ ('00000000-0000-0000-0031-0000000000d1','00000000-0000-0000-0031-000000000b01','00000000-0000-0000-0031-000000000101',10),
+ ('00000000-0000-0000-0031-0000000000d4','00000000-0000-0000-0031-000000000b14','00000000-0000-0000-0031-000000000114',10),
+ ('00000000-0000-0000-0031-0000000000d5','00000000-0000-0000-0031-000000000b15','00000000-0000-0000-0031-000000000115',10),
+ ('00000000-0000-0000-0031-0000000000d6','00000000-0000-0000-0031-000000000b16','00000000-0000-0000-0031-000000000116',10),
+ ('00000000-0000-0000-0031-0000000000d8','00000000-0000-0000-0031-000000000b18','00000000-0000-0000-0031-000000000118',10);
 
--- ===== 2: cupom 'used' com used_at nulo => trigger =====
-do $$
-begin
-  insert into public.settlement_items(settlement_id, coupon_id, valor)
-  values ('00000000-0000-0000-0031-000000000b02','00000000-0000-0000-0031-000000000102',10);
-  insert into r values (2,'cupom used com used_at nulo','recusa pelo trigger (sem data de uso)',
-                        'INSERIU','FALHOU -- trigger ausente ou frouxo');
-exception
-  when raise_exception then
-    insert into r values (2,'cupom used com used_at nulo','recusa pelo trigger (sem data de uso)',
-      sqlstate||' '||left(sqlerrm,70),
-      case when sqlerrm like '%sem data de uso%' then 'OK' else 'CONFERIR -- trigger recusou por outro motivo' end);
-  when undefined_table then
-    insert into r values (2,'cupom used com used_at nulo','recusa pelo trigger','tabela nao existe','FALHOU -- migration 031 nao aplicada');
-  when others then
-    insert into r values (2,'cupom used com used_at nulo','recusa pelo trigger (sem data de uso)',
-      sqlstate||' '||left(sqlerrm,60),'CONFERIR -- barrou por outro motivo');
-end $$;
+update public.settlements set status = 'pago', paid_at = now(), forma = 'pix'
+ where id in ('00000000-0000-0000-0031-000000000b14','00000000-0000-0000-0031-000000000b15');
 
--- ===== 3: cupom de outra parceria => trigger =====
-do $$
-begin
-  insert into public.settlement_items(settlement_id, coupon_id, valor)
-  values ('00000000-0000-0000-0031-000000000b03','00000000-0000-0000-0031-000000000103',10);
-  insert into r values (3,'cupom de outra parceria','recusa pelo trigger (outra parceria)',
-                        'INSERIU','FALHOU -- trigger ausente ou frouxo');
-exception
-  when raise_exception then
-    insert into r values (3,'cupom de outra parceria','recusa pelo trigger (outra parceria)',
-      sqlstate||' '||left(sqlerrm,70),
-      case when sqlerrm like '%outra parceria%' then 'OK' else 'CONFERIR -- trigger recusou por outro motivo' end);
-  when undefined_table then
-    insert into r values (3,'cupom de outra parceria','recusa pelo trigger','tabela nao existe','FALHOU -- migration 031 nao aplicada');
-  when others then
-    insert into r values (3,'cupom de outra parceria','recusa pelo trigger (outra parceria)',
-      sqlstate||' '||left(sqlerrm,60),'CONFERIR -- barrou por outro motivo');
-end $$;
+-- ===== Casos de constraint e de trigger (como superusuário) =====
+-- Prefixos: S = lançamento, C = cupom, em uuids '...0031-000000000bNN' / '...01NN'.
 
--- ===== 4: cupom verified = false => trigger =====
-do $$
-begin
-  insert into public.settlement_items(settlement_id, coupon_id, valor)
-  values ('00000000-0000-0000-0031-000000000b04','00000000-0000-0000-0031-000000000104',10);
-  insert into r values (4,'cupom nao conferido (verified=false)','recusa pelo trigger (nao conferido)',
-                        'INSERIU','FALHOU -- trigger ausente ou frouxo');
-exception
-  when raise_exception then
-    insert into r values (4,'cupom nao conferido (verified=false)','recusa pelo trigger (nao conferido)',
-      sqlstate||' '||left(sqlerrm,70),
-      case when sqlerrm like '%nao conferido%' then 'OK' else 'CONFERIR -- trigger recusou por outro motivo' end);
-  when undefined_table then
-    insert into r values (4,'cupom nao conferido (verified=false)','recusa pelo trigger','tabela nao existe','FALHOU -- migration 031 nao aplicada');
-  when others then
-    insert into r values (4,'cupom nao conferido (verified=false)','recusa pelo trigger (nao conferido)',
-      sqlstate||' '||left(sqlerrm,60),'CONFERIR -- barrou por outro motivo');
-end $$;
+select pg_temp.tenta(1,   'mesmo cupom duas vezes', '23505 settlement_items_coupon_unico',
+  $q$insert into public.settlement_items(settlement_id, coupon_id, valor)
+     values ('00000000-0000-0000-0031-000000000b01','00000000-0000-0000-0031-000000000101',10)$q$,
+  '23505', 'settlement_items_coupon_unico');
+select pg_temp.tenta(2,   'cupom used com used_at nulo', 'trigger: sem data de uso',
+  $q$insert into public.settlement_items(settlement_id, coupon_id, valor)
+     values ('00000000-0000-0000-0031-000000000b02','00000000-0000-0000-0031-000000000102',10)$q$,
+  'P0001', 'sem data de uso');
+select pg_temp.tenta(3,   'cupom de outra parceria', 'trigger: outra parceria',
+  $q$insert into public.settlement_items(settlement_id, coupon_id, valor)
+     values ('00000000-0000-0000-0031-000000000b03','00000000-0000-0000-0031-000000000103',10)$q$,
+  'P0001', 'outra parceria');
+select pg_temp.tenta(4,   'cupom verified=false', 'trigger: nao conferido',
+  $q$insert into public.settlement_items(settlement_id, coupon_id, valor)
+     values ('00000000-0000-0000-0031-000000000b04','00000000-0000-0000-0031-000000000104',10)$q$,
+  'P0001', 'nao conferido');
 
--- ===== 5: status 'pago' sem paid_at / sem forma / forma em branco => check =====
--- tipo 'fixo' de propósito: assim a regra do período da comissão não interfere.
-do $$
-declare cn text;
-begin
-  begin
-    insert into public.settlements(partnership_id, tipo, status, valor, forma)
-    values ('00000000-0000-0000-0031-000000000a01','fixo','pago',10,'pix');
-    insert into r values (5,'pago sem paid_at','23514 settlements_pago_exige_dados','INSERIU','FALHOU -- check ausente');
-  exception when check_violation then
-    get stacked diagnostics cn = constraint_name;
-    insert into r values (5,'pago sem paid_at','23514 settlements_pago_exige_dados','23514 '||coalesce(cn,'?'),
-      case when cn = 'settlements_pago_exige_dados' then 'OK' else 'CONFERIR -- outra constraint barrou' end);
-  end;
-  begin
-    insert into public.settlements(partnership_id, tipo, status, valor, paid_at)
-    values ('00000000-0000-0000-0031-000000000a01','fixo','pago',10,now());
-    insert into r values (5.1,'pago sem forma','23514 settlements_pago_exige_dados','INSERIU','FALHOU -- check ausente');
-  exception when check_violation then
-    get stacked diagnostics cn = constraint_name;
-    insert into r values (5.1,'pago sem forma','23514 settlements_pago_exige_dados','23514 '||coalesce(cn,'?'),
-      case when cn = 'settlements_pago_exige_dados' then 'OK' else 'CONFERIR -- outra constraint barrou' end);
-  end;
-  begin
-    insert into public.settlements(partnership_id, tipo, status, valor, paid_at, forma)
-    values ('00000000-0000-0000-0031-000000000a01','fixo','pago',10,now(),'   ');
-    insert into r values (5.2,'pago com forma em branco','23514 settlements_pago_exige_dados','INSERIU','FALHOU -- check ausente');
-  exception when check_violation then
-    get stacked diagnostics cn = constraint_name;
-    insert into r values (5.2,'pago com forma em branco','23514 settlements_pago_exige_dados','23514 '||coalesce(cn,'?'),
-      case when cn = 'settlements_pago_exige_dados' then 'OK' else 'CONFERIR -- outra constraint barrou' end);
-  end;
-  begin
-    insert into public.settlements(partnership_id, tipo, valor)
-    values ('00000000-0000-0000-0031-000000000a01','comissao',10);
-    insert into r values (5.3,'comissao sem periodo','23514 settlements_comissao_exige_periodo','INSERIU','FALHOU -- check ausente');
-  exception when check_violation then
-    get stacked diagnostics cn = constraint_name;
-    insert into r values (5.3,'comissao sem periodo','23514 settlements_comissao_exige_periodo','23514 '||coalesce(cn,'?'),
-      case when cn = 'settlements_comissao_exige_periodo' then 'OK' else 'CONFERIR -- outra constraint barrou' end);
-  end;
-exception
-  when undefined_table then
-    insert into r values (5,'checks de settlements','23514','tabela nao existe','FALHOU -- migration 031 nao aplicada');
-  when others then
-    insert into r values (5,'checks de settlements','23514',
-      sqlstate||' '||left(sqlerrm,60),'CONFERIR -- falhou por outro motivo');
-end $$;
+-- 5: tipo 'fixo' nos três primeiros, para a regra do período não interferir.
+select pg_temp.tenta(5,   'pago sem paid_at', '23514 settlements_pago_exige_dados',
+  $q$insert into public.settlements(partnership_id,tipo,status,valor,forma)
+     values ('00000000-0000-0000-0031-000000000a01','fixo','pago',10,'pix')$q$,
+  '23514', 'settlements_pago_exige_dados');
+select pg_temp.tenta(5.1, 'pago sem forma', '23514 settlements_pago_exige_dados',
+  $q$insert into public.settlements(partnership_id,tipo,status,valor,paid_at)
+     values ('00000000-0000-0000-0031-000000000a01','fixo','pago',10,now())$q$,
+  '23514', 'settlements_pago_exige_dados');
+select pg_temp.tenta(5.2, 'pago com forma em branco', '23514 settlements_pago_exige_dados',
+  $q$insert into public.settlements(partnership_id,tipo,status,valor,paid_at,forma)
+     values ('00000000-0000-0000-0031-000000000a01','fixo','pago',10,now(),'   ')$q$,
+  '23514', 'settlements_pago_exige_dados');
+select pg_temp.tenta(5.3, 'comissao sem periodo', '23514 settlements_comissao_exige_periodo',
+  $q$insert into public.settlements(partnership_id,tipo,valor)
+     values ('00000000-0000-0000-0031-000000000a01','comissao',10)$q$,
+  '23514', 'settlements_comissao_exige_periodo');
 
--- ===== 6: apagar parceria que tem lançamento => restrict =====
--- P6 só tem um lançamento e nenhum cupom: o 23503 só pode vir do livro.
-do $$
-declare cn text;
-begin
-  delete from public.partnerships where id = '00000000-0000-0000-0031-000000000a03';
-  insert into r values (6,'apagar parceria com lancamento','23503 settlements_partnership_id_fkey',
-                        'APAGOU','FALHOU -- livro perde a referencia de quem foi pago');
-exception
-  when foreign_key_violation then
-    get stacked diagnostics cn = constraint_name;
-    insert into r values (6,'apagar parceria com lancamento','23503 settlements_partnership_id_fkey',
-      '23503 '||coalesce(cn,'?'),
-      case when cn = 'settlements_partnership_id_fkey' then 'OK' else 'CONFERIR -- outra FK barrou' end);
-  when undefined_table then
-    insert into r values (6,'apagar parceria com lancamento','23503','tabela nao existe','FALHOU -- migration 031 nao aplicada');
-  when others then
-    insert into r values (6,'apagar parceria com lancamento','23503',
-      sqlstate||' '||left(sqlerrm,60),'CONFERIR -- falhou por outro motivo');
-end $$;
+-- 6: P6 só tem lançamento e nenhum cupom: o 23503 só pode vir do livro.
+select pg_temp.tenta(6,   'apagar parceria com lancamento', '23503 settlements_partnership_id_fkey',
+  $q$delete from public.partnerships where id = '00000000-0000-0000-0031-000000000a03'$q$,
+  '23503', 'settlements_partnership_id_fkey');
+
+-- 12: pago não muda campo nenhum nem sai de 'pago'; 13: não se apaga.
+select pg_temp.tenta(12,   'editar valor de lancamento pago', 'trigger: pago e imutavel',
+  $q$update public.settlements set valor = 999 where id = '00000000-0000-0000-0031-000000000b12'$q$,
+  'P0001', 'pago e imutavel');
+select pg_temp.tenta(12.1, 'editar forma de lancamento pago', 'trigger: pago e imutavel',
+  $q$update public.settlements set forma = 'dinheiro' where id = '00000000-0000-0000-0031-000000000b12'$q$,
+  'P0001', 'pago e imutavel');
+select pg_temp.tenta(12.2, 'reabrir lancamento pago', 'trigger: pago e imutavel',
+  $q$update public.settlements set status = 'aberto' where id = '00000000-0000-0000-0031-000000000b12'$q$,
+  'P0001', 'pago e imutavel');
+select pg_temp.tenta(12.3, 'cancelar lancamento pago', 'trigger: pago e imutavel',
+  $q$update public.settlements set status = 'cancelado' where id = '00000000-0000-0000-0031-000000000b12'$q$,
+  'P0001', 'pago e imutavel');
+select pg_temp.tenta(13,   'apagar lancamento pago', 'trigger: pago e imutavel',
+  $q$delete from public.settlements where id = '00000000-0000-0000-0031-000000000b13'$q$,
+  'P0001', 'pago e imutavel');
+
+-- 14: itens de lançamento pago não mudam nem somem.
+select pg_temp.tenta(14,   'editar item de lancamento pago', 'trigger: itens so mudam em aberto',
+  $q$update public.settlement_items set valor = 999 where id = '00000000-0000-0000-0031-0000000000d4'$q$,
+  'P0001', 'itens so mudam em lancamento aberto');
+select pg_temp.tenta(14.1, 'apagar item de lancamento pago', 'trigger: itens so mudam em aberto',
+  $q$delete from public.settlement_items where id = '00000000-0000-0000-0031-0000000000d5'$q$,
+  'P0001', 'itens so mudam em lancamento aberto');
+
+-- 16: valor é magnitude; o sinal mora em `tipo`.
+select pg_temp.tenta(16,   'lancamento com valor negativo', '23514 settlements_valor_nao_negativo',
+  $q$insert into public.settlements(partnership_id,tipo,valor)
+     values ('00000000-0000-0000-0031-000000000a01','restituicao',-500)$q$,
+  '23514', 'settlements_valor_nao_negativo');
+select pg_temp.tenta(16.1, 'item com valor negativo', '23514 settlement_items_valor_nao_negativo',
+  $q$insert into public.settlement_items(settlement_id, coupon_id, valor)
+     values ('00000000-0000-0000-0031-000000000b17','00000000-0000-0000-0031-000000000117',-10)$q$,
+  '23514', 'settlement_items_valor_nao_negativo');
 
 -- ===== 7: controle POSITIVO — fechar, incluir 2 cupons válidos, pagar =====
 do $$
@@ -284,13 +241,44 @@ begin
   select status into st from public.settlements where id = '00000000-0000-0000-0031-000000000b07';
   insert into r values (7,'fechar, incluir 2 cupons validos, pagar (controle positivo)','2 itens, pago',
     n||' itens, '||st, case when n = 2 and st = 'pago' then 'OK' else 'FALHOU' end);
-exception
-  when undefined_table then
-    insert into r values (7,'fechar, incluir 2 cupons validos, pagar (controle positivo)','funciona',
-      'tabela nao existe','FALHOU -- migration 031 nao aplicada');
-  when others then
-    insert into r values (7,'fechar, incluir 2 cupons validos, pagar (controle positivo)','funciona',
-      sqlstate||' '||left(sqlerrm,70),'FALHOU -- a 031 barrou o caminho legitimo');
+exception when others then
+  insert into r values (7,'fechar, incluir 2 cupons validos, pagar (controle positivo)','funciona',
+    sqlstate||' '||left(sqlerrm,70),'FALHOU -- a 031 barrou o caminho legitimo');
+end $$;
+
+-- ===== 15: controle POSITIVO — em lançamento ABERTO as travas de 12-14 deixam passar =====
+-- Sem este caso, uma trava que recusa tudo passaria como aprovada.
+do $$
+declare v numeric; n int;
+begin
+  update public.settlement_items set valor = 55 where id = '00000000-0000-0000-0031-0000000000d6';
+  select valor into v from public.settlement_items where id = '00000000-0000-0000-0031-0000000000d6';
+  insert into r values (15,'editar item de lancamento aberto','valor 55','valor '||v,
+    case when v = 55 then 'OK' else 'FALHOU' end);
+
+  delete from public.settlement_items where id = '00000000-0000-0000-0031-0000000000d6';
+  select count(*) into n from public.settlement_items where id = '00000000-0000-0000-0031-0000000000d6';
+  insert into r values (15.1,'apagar item de lancamento aberto','0 linhas',n||' linhas',
+    case when n = 0 then 'OK' else 'FALHOU' end);
+
+  update public.settlements set valor = 20 where id = '00000000-0000-0000-0031-000000000b16';
+  select valor into v from public.settlements where id = '00000000-0000-0000-0031-000000000b16';
+  insert into r values (15.2,'editar valor de lancamento aberto','valor 20','valor '||v,
+    case when v = 20 then 'OK' else 'FALHOU' end);
+
+  -- o fluxo do cancelamento: apagar os itens e depois marcar cancelado
+  delete from public.settlement_items where settlement_id = '00000000-0000-0000-0031-000000000b18';
+  update public.settlements set status = 'cancelado' where id = '00000000-0000-0000-0031-000000000b18';
+  select count(*) into n from public.settlement_items
+   where settlement_id = '00000000-0000-0000-0031-000000000b18';
+  insert into r values (15.3,'cancelar lancamento aberto apagando itens','0 itens',n||' itens',
+    case when n = 0 then 'OK' else 'FALHOU' end);
+
+  delete from public.settlements where id = '00000000-0000-0000-0031-000000000b16';
+  insert into r values (15.4,'apagar lancamento aberto','apagou','APAGOU','OK');
+exception when others then
+  insert into r values (15,'lancamento aberto continua editavel','funciona',
+    sqlstate||' '||left(sqlerrm,70),'FALHOU -- a trava recusa tudo, ate o legitimo');
 end $$;
 
 -- ===== 8: lojista (moderator) lendo e escrevendo: nada =====
@@ -302,27 +290,24 @@ select set_config('request.jwt.claims',
 do $$
 declare n int;
 begin
-  select count(*) into n from public.settlements
-   where id = '00000000-0000-0000-0031-000000000b08';
-  insert into r values (8,'lojista lendo settlements (existe 1 linha para admin)','0 linhas',
-    n||' linhas', case when n = 0 then 'OK' else 'FALHOU -- lojista enxerga o livro' end);
-exception
-  when insufficient_privilege then
-    insert into r values (8,'lojista lendo settlements','0 linhas','42501 sem grant','CONFERIR -- esperava 0 linhas por RLS');
-  when undefined_table then
-    insert into r values (8,'lojista lendo settlements','0 linhas','tabela nao existe','FALHOU -- migration 031 nao aplicada');
+  select count(*) into n from public.settlements where id = '00000000-0000-0000-0031-000000000b08';
+  insert into r values (8,'lojista lendo settlements (existe 1 linha para admin)','0 linhas',n||' linhas',
+    case when n = 0 then 'OK' else 'FALHOU -- lojista enxerga o livro' end);
+exception when others then
+  insert into r values (8,'lojista lendo settlements','0 linhas',sqlstate||' '||left(sqlerrm,60),
+    'CONFERIR -- esperava 0 linhas por RLS');
 end $$;
 
 do $$
 begin
   insert into public.settlements(partnership_id, tipo, valor)
   values ('00000000-0000-0000-0031-000000000a01','fixo',1);
-  insert into r values (8.1,'lojista inserindo em settlements','42501 violacao de RLS','INSERIU','FALHOU -- lojista escreve no livro');
+  insert into r values (8.1,'lojista inserindo em settlements','42501','INSERIU','FALHOU -- lojista escreve no livro');
 exception
   when insufficient_privilege then
-    insert into r values (8.1,'lojista inserindo em settlements','42501 violacao de RLS','42501','OK');
+    insert into r values (8.1,'lojista inserindo em settlements','42501','42501','OK');
   when others then
-    insert into r values (8.1,'lojista inserindo em settlements','42501 violacao de RLS',
+    insert into r values (8.1,'lojista inserindo em settlements','42501',
       sqlstate||' '||left(sqlerrm,60),'CONFERIR -- barrou por outro motivo');
 end $$;
 
@@ -335,27 +320,24 @@ select set_config('request.jwt.claims',
 do $$
 declare n int;
 begin
-  select count(*) into n from public.settlements
-   where id = '00000000-0000-0000-0031-000000000b09';
-  insert into r values (9,'influenciador lendo settlements (existe 1 linha para admin)','0 linhas',
-    n||' linhas', case when n = 0 then 'OK' else 'FALHOU -- influenciador enxerga o livro' end);
-exception
-  when insufficient_privilege then
-    insert into r values (9,'influenciador lendo settlements','0 linhas','42501 sem grant','CONFERIR -- esperava 0 linhas por RLS');
-  when undefined_table then
-    insert into r values (9,'influenciador lendo settlements','0 linhas','tabela nao existe','FALHOU -- migration 031 nao aplicada');
+  select count(*) into n from public.settlements where id = '00000000-0000-0000-0031-000000000b09';
+  insert into r values (9,'influenciador lendo settlements (existe 1 linha para admin)','0 linhas',n||' linhas',
+    case when n = 0 then 'OK' else 'FALHOU -- influenciador enxerga o livro' end);
+exception when others then
+  insert into r values (9,'influenciador lendo settlements','0 linhas',sqlstate||' '||left(sqlerrm,60),
+    'CONFERIR -- esperava 0 linhas por RLS');
 end $$;
 
 do $$
 begin
   insert into public.settlements(partnership_id, tipo, valor)
   values ('00000000-0000-0000-0031-000000000a01','fixo',1);
-  insert into r values (9.1,'influenciador inserindo em settlements','42501 violacao de RLS','INSERIU','FALHOU -- influenciador escreve no livro');
+  insert into r values (9.1,'influenciador inserindo em settlements','42501','INSERIU','FALHOU -- influenciador escreve no livro');
 exception
   when insufficient_privilege then
-    insert into r values (9.1,'influenciador inserindo em settlements','42501 violacao de RLS','42501','OK');
+    insert into r values (9.1,'influenciador inserindo em settlements','42501','42501','OK');
   when others then
-    insert into r values (9.1,'influenciador inserindo em settlements','42501 violacao de RLS',
+    insert into r values (9.1,'influenciador inserindo em settlements','42501',
       sqlstate||' '||left(sqlerrm,60),'CONFERIR -- barrou por outro motivo');
 end $$;
 
@@ -368,13 +350,11 @@ select set_config('request.jwt.claims',
 do $$
 declare n int;
 begin
-  select count(*) into n from public.settlements
-   where id = '00000000-0000-0000-0031-000000000b10';
-  insert into r values (10,'financeiro lendo settlements','1 linha',
-    n||' linhas', case when n = 1 then 'OK' else 'FALHOU -- financeiro nao enxerga o livro' end);
+  select count(*) into n from public.settlements where id = '00000000-0000-0000-0031-000000000b10';
+  insert into r values (10,'financeiro lendo settlements','1 linha',n||' linhas',
+    case when n = 1 then 'OK' else 'FALHOU -- financeiro nao enxerga o livro' end);
 exception when others then
-  insert into r values (10,'financeiro lendo settlements','1 linha',
-    sqlstate||' '||left(sqlerrm,60),'FALHOU');
+  insert into r values (10,'financeiro lendo settlements','1 linha',sqlstate||' '||left(sqlerrm,60),'FALHOU');
 end $$;
 
 do $$
