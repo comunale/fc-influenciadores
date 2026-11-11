@@ -29,6 +29,15 @@
 --     coupons_guard_non_admin_update, que aqui não se repete). Itens de
 --     lançamento 'aberto' continuam editáveis/apagáveis: é o que o
 --     cancelamento usa.
+--     EXCEÇÃO DELIBERADA (11/11/2026): admin e chamadas sem identidade
+--     (service_role, SQL Editor: auth.uid() nulo) passam pelas três travas.
+--     Razão do dono do projeto: "A ferramenta é para controle nosso. Mas o
+--     Admin PODE e DEVE poder editar. Erros acontecem, e se o admin não puder
+--     ajustar, não tenho a necessidade de ter." Correção de erro sem poder de
+--     edição não é controle. A guarda é a mesma de coupons_guard_insert
+--     (auth.uid() is null or is_admin()); o `auth.uid() is null` NÃO é
+--     opcional, senão service_role e as migrations seguintes ficam barrados.
+--     Finance e os demais papéis continuam barrados.
 --   * `valor` é magnitude (>= 0); o sinal do dinheiro mora em `tipo`.
 --     Aceitar negativo abriria dupla negação (restituição de -500 que soma).
 --   * Parceria com lançamento não pode ser apagada (on delete restrict): o
@@ -212,14 +221,17 @@ create trigger settlement_items_valida
   for each row execute function public.settlement_items_valida();
 
 -- ---------------------------------------------------------------------------
--- Imutabilidade do lançamento pago. Valida ESTADO e DADOS, nunca identidade:
--- vale também para service_role.
+-- Imutabilidade do lançamento pago. Valida ESTADO e DADOS; a única checagem de
+-- quem chama é a porta do admin / sem identidade (ver cabeçalho, 11/11/2026).
 -- ---------------------------------------------------------------------------
 create or replace function public.settlements_congela_pago()
 returns trigger
 language plpgsql
 as $fn$
 begin
+  if auth.uid() is null or public.is_admin() then
+    return new;
+  end if;
   if old.status = 'pago' and (
        new.status         is distinct from 'pago'
     or new.valor          is distinct from old.valor
@@ -247,6 +259,9 @@ returns trigger
 language plpgsql
 as $fn$
 begin
+  if auth.uid() is null or public.is_admin() then
+    return old;
+  end if;
   if old.status = 'pago' then
     raise exception 'Lancamento pago e imutavel: nao se apaga, correcao se faz com lancamento novo';
   end if;
@@ -271,6 +286,10 @@ as $fn$
 declare
   st text;
 begin
+  if auth.uid() is null or public.is_admin() then
+    if tg_op = 'DELETE' then return old; end if;
+    return new;
+  end if;
   select status into st from public.settlements where id = old.settlement_id;
   if found and st <> 'aberto' then
     raise exception 'Lancamento % e imutavel: itens so mudam em lancamento aberto', st;

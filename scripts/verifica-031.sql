@@ -80,6 +80,16 @@ begin
          then 'OK' else 'CONFERIR -- barrou por outro motivo' end);
 end $f$;
 
+-- Executa q e espera que FUNCIONE (controle positivo / porta do admin).
+create function pg_temp.funciona(o numeric, t text, q text) returns void language plpgsql as $f$
+begin
+  execute q;
+  insert into r values (o, t, 'funciona', 'EXECUTOU', 'OK');
+exception when others then
+  insert into r values (o, t, 'funciona', sqlstate || ' ' || left(sqlerrm, 70),
+    'FALHOU -- a trava barrou quem deveria passar');
+end $f$;
+
 -- ---------- fixtures (como superusuário) ----------
 
 select pg_temp.mkp('00000000-0000-0000-0031-000000000a01');  -- PA
@@ -116,6 +126,8 @@ select pg_temp.mkc(15, '00000000-0000-0000-0031-000000000a01', 'used', true,  no
 select pg_temp.mkc(16, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());
 select pg_temp.mkc(17, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());
 select pg_temp.mkc(18, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());
+select pg_temp.mkc(21, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());
+select pg_temp.mkc(22, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());
 
 -- Lançamentos de fixture: um por caso (b12/b13 já nascem pagos).
 insert into public.settlements(id, partnership_id, tipo, status, valor, periodo_de, periodo_ate, paid_at, forma) values
@@ -133,7 +145,12 @@ insert into public.settlements(id, partnership_id, tipo, status, valor, periodo_
  ('00000000-0000-0000-0031-000000000b15','00000000-0000-0000-0031-000000000a01','fixo','aberto',100,null,null,null,null),
  ('00000000-0000-0000-0031-000000000b16','00000000-0000-0000-0031-000000000a01','fixo','aberto',100,null,null,null,null),
  ('00000000-0000-0000-0031-000000000b17','00000000-0000-0000-0031-000000000a01','fixo','aberto',100,null,null,null,null),
- ('00000000-0000-0000-0031-000000000b18','00000000-0000-0000-0031-000000000a01','fixo','aberto',100,null,null,null,null);
+ ('00000000-0000-0000-0031-000000000b18','00000000-0000-0000-0031-000000000a01','fixo','aberto',100,null,null,null,null),
+ ('00000000-0000-0000-0031-000000000b19','00000000-0000-0000-0031-000000000a01','fixo','pago',100,null,null,now(),'pix'),
+ ('00000000-0000-0000-0031-000000000b20','00000000-0000-0000-0031-000000000a01','fixo','pago',100,null,null,now(),'pix'),
+ ('00000000-0000-0000-0031-000000000b21','00000000-0000-0000-0031-000000000a01','fixo','aberto',100,null,null,null,null),
+ ('00000000-0000-0000-0031-000000000b22','00000000-0000-0000-0031-000000000a01','fixo','aberto',100,null,null,null,null),
+ ('00000000-0000-0000-0031-000000000b23','00000000-0000-0000-0031-000000000a01','fixo','pago',100,null,null,now(),'pix');
 
 -- Itens de fixture (os de b14/b15 entram com o lançamento aberto e só depois ele vira pago).
 insert into public.settlement_items(id, settlement_id, coupon_id, valor) values
@@ -141,10 +158,13 @@ insert into public.settlement_items(id, settlement_id, coupon_id, valor) values
  ('00000000-0000-0000-0031-0000000000d4','00000000-0000-0000-0031-000000000b14','00000000-0000-0000-0031-000000000114',10),
  ('00000000-0000-0000-0031-0000000000d5','00000000-0000-0000-0031-000000000b15','00000000-0000-0000-0031-000000000115',10),
  ('00000000-0000-0000-0031-0000000000d6','00000000-0000-0000-0031-000000000b16','00000000-0000-0000-0031-000000000116',10),
- ('00000000-0000-0000-0031-0000000000d8','00000000-0000-0000-0031-000000000b18','00000000-0000-0000-0031-000000000118',10);
+ ('00000000-0000-0000-0031-0000000000d8','00000000-0000-0000-0031-000000000b18','00000000-0000-0000-0031-000000000118',10),
+ ('00000000-0000-0000-0031-0000000000d9','00000000-0000-0000-0031-000000000b21','00000000-0000-0000-0031-000000000121',10),
+ ('00000000-0000-0000-0031-0000000000da','00000000-0000-0000-0031-000000000b22','00000000-0000-0000-0031-000000000122',10);
 
 update public.settlements set status = 'pago', paid_at = now(), forma = 'pix'
- where id in ('00000000-0000-0000-0031-000000000b14','00000000-0000-0000-0031-000000000b15');
+ where id in ('00000000-0000-0000-0031-000000000b14','00000000-0000-0000-0031-000000000b15',
+                '00000000-0000-0000-0031-000000000b21','00000000-0000-0000-0031-000000000b22');
 
 -- ===== Casos de constraint e de trigger (como superusuário) =====
 -- Prefixos: S = lançamento, C = cupom, em uuids '...0031-000000000bNN' / '...01NN'.
@@ -188,31 +208,6 @@ select pg_temp.tenta(5.3, 'comissao sem periodo', '23514 settlements_comissao_ex
 select pg_temp.tenta(6,   'apagar parceria com lancamento', '23503 settlements_partnership_id_fkey',
   $q$delete from public.partnerships where id = '00000000-0000-0000-0031-000000000a03'$q$,
   '23503', 'settlements_partnership_id_fkey');
-
--- 12: pago não muda campo nenhum nem sai de 'pago'; 13: não se apaga.
-select pg_temp.tenta(12,   'editar valor de lancamento pago', 'trigger: pago e imutavel',
-  $q$update public.settlements set valor = 999 where id = '00000000-0000-0000-0031-000000000b12'$q$,
-  'P0001', 'pago e imutavel');
-select pg_temp.tenta(12.1, 'editar forma de lancamento pago', 'trigger: pago e imutavel',
-  $q$update public.settlements set forma = 'dinheiro' where id = '00000000-0000-0000-0031-000000000b12'$q$,
-  'P0001', 'pago e imutavel');
-select pg_temp.tenta(12.2, 'reabrir lancamento pago', 'trigger: pago e imutavel',
-  $q$update public.settlements set status = 'aberto' where id = '00000000-0000-0000-0031-000000000b12'$q$,
-  'P0001', 'pago e imutavel');
-select pg_temp.tenta(12.3, 'cancelar lancamento pago', 'trigger: pago e imutavel',
-  $q$update public.settlements set status = 'cancelado' where id = '00000000-0000-0000-0031-000000000b12'$q$,
-  'P0001', 'pago e imutavel');
-select pg_temp.tenta(13,   'apagar lancamento pago', 'trigger: pago e imutavel',
-  $q$delete from public.settlements where id = '00000000-0000-0000-0031-000000000b13'$q$,
-  'P0001', 'pago e imutavel');
-
--- 14: itens de lançamento pago não mudam nem somem.
-select pg_temp.tenta(14,   'editar item de lancamento pago', 'trigger: itens so mudam em aberto',
-  $q$update public.settlement_items set valor = 999 where id = '00000000-0000-0000-0031-0000000000d4'$q$,
-  'P0001', 'itens so mudam em lancamento aberto');
-select pg_temp.tenta(14.1, 'apagar item de lancamento pago', 'trigger: itens so mudam em aberto',
-  $q$delete from public.settlement_items where id = '00000000-0000-0000-0031-0000000000d5'$q$,
-  'P0001', 'itens so mudam em lancamento aberto');
 
 -- 16: valor é magnitude; o sinal mora em `tipo`.
 select pg_temp.tenta(16,   'lancamento com valor negativo', '23514 settlements_valor_nao_negativo',
@@ -280,6 +275,12 @@ exception when others then
   insert into r values (15,'lancamento aberto continua editavel','funciona',
     sqlstate||' '||left(sqlerrm,70),'FALHOU -- a trava recusa tudo, ate o legitimo');
 end $$;
+
+-- ===== 17: sem identidade (auth.uid nulo = service_role / SQL Editor) passa =====
+-- Sem esta porta, a migration da tarefa seguinte, que insere lançamento já
+-- pago, ficaria barrada. Aqui ainda somos superusuário, sem claims.
+select pg_temp.funciona(17, 'sem identidade edita lancamento pago',
+  $q$update public.settlements set valor = 150 where id = '00000000-0000-0000-0031-000000000b23'$q$);
 
 -- ===== 8: lojista (moderator) lendo e escrevendo: nada =====
 reset role;
@@ -370,6 +371,34 @@ exception when others then
     sqlstate||' '||left(sqlerrm,70),'FALHOU -- a 031 barrou o financeiro');
 end $$;
 
+-- Financeiro NÃO mexe em lançamento pago nem em itens dele (as travas de
+-- 12-14 distinguem papel: o par admin está no caso 11, logo abaixo).
+-- 12: pago não muda campo nenhum nem sai de 'pago'; 13: não se apaga.
+select pg_temp.tenta(12,   'editar valor de lancamento pago', 'trigger: pago e imutavel',
+  $q$update public.settlements set valor = 999 where id = '00000000-0000-0000-0031-000000000b12'$q$,
+  'P0001', 'pago e imutavel');
+select pg_temp.tenta(12.1, 'editar forma de lancamento pago', 'trigger: pago e imutavel',
+  $q$update public.settlements set forma = 'dinheiro' where id = '00000000-0000-0000-0031-000000000b12'$q$,
+  'P0001', 'pago e imutavel');
+select pg_temp.tenta(12.2, 'reabrir lancamento pago', 'trigger: pago e imutavel',
+  $q$update public.settlements set status = 'aberto' where id = '00000000-0000-0000-0031-000000000b12'$q$,
+  'P0001', 'pago e imutavel');
+select pg_temp.tenta(12.3, 'cancelar lancamento pago', 'trigger: pago e imutavel',
+  $q$update public.settlements set status = 'cancelado' where id = '00000000-0000-0000-0031-000000000b12'$q$,
+  'P0001', 'pago e imutavel');
+select pg_temp.tenta(13,   'apagar lancamento pago', 'trigger: pago e imutavel',
+  $q$delete from public.settlements where id = '00000000-0000-0000-0031-000000000b13'$q$,
+  'P0001', 'pago e imutavel');
+
+-- 14: itens de lançamento pago não mudam nem somem.
+select pg_temp.tenta(14,   'editar item de lancamento pago', 'trigger: itens so mudam em aberto',
+  $q$update public.settlement_items set valor = 999 where id = '00000000-0000-0000-0031-0000000000d4'$q$,
+  'P0001', 'itens so mudam em lancamento aberto');
+select pg_temp.tenta(14.1, 'apagar item de lancamento pago', 'trigger: itens so mudam em aberto',
+  $q$delete from public.settlement_items where id = '00000000-0000-0000-0031-0000000000d5'$q$,
+  'P0001', 'itens so mudam em lancamento aberto');
+
+
 -- ===== 11: admin inserindo lançamento e item =====
 reset role;
 set local role authenticated;
@@ -388,6 +417,17 @@ exception when others then
   insert into r values (11,'admin inserindo lancamento e item','funciona',
     sqlstate||' '||left(sqlerrm,70),'FALHOU -- a 031 barrou o admin');
 end $$;
+
+-- Par dos casos 12-14: o MESMO tipo de operação que o financeiro não pode,
+-- o admin pode (cada um com o seu próprio lançamento pago).
+select pg_temp.funciona(12.4, 'admin edita lancamento pago',
+  $q$update public.settlements set valor = 150 where id = '00000000-0000-0000-0031-000000000b19'$q$);
+select pg_temp.funciona(13.1, 'admin apaga lancamento pago',
+  $q$delete from public.settlements where id = '00000000-0000-0000-0031-000000000b20'$q$);
+select pg_temp.funciona(14.2, 'admin edita item de lancamento pago',
+  $q$update public.settlement_items set valor = 15 where id = '00000000-0000-0000-0031-0000000000d9'$q$);
+select pg_temp.funciona(14.3, 'admin apaga item de lancamento pago',
+  $q$delete from public.settlement_items where id = '00000000-0000-0000-0031-0000000000da'$q$);
 
 reset role;
 select * from r order by ordem;
