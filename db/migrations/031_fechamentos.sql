@@ -58,6 +58,11 @@
 -- confere QUAL constraint barrou, para um erro de chave estrangeira em outra
 -- coisa não passar por prova.
 --
+-- SE A COLAGEM FALHAR NO MEIO: rode o bloco "PARA DESFAZER" abaixo e cole de
+-- novo do zero. NUNCA recole por cima: `create table if not exists` pularia a
+-- tabela já criada pela metade (sem as constraints que faltaram), e o script
+-- de verificação passaria a medir uma tabela sem travas.
+--
 -- PARA DESFAZER (apaga o livro inteiro, inclusive os lançamentos gravados):
 --
 --   drop trigger if exists settlement_items_valida on public.settlement_items;
@@ -191,10 +196,16 @@ $fn$;
 comment on function public.settlement_pode_incluir(uuid, uuid) is
   'True se o cupom pode entrar no lancamento. Mesma regra do trigger.';
 
-revoke all on function public.settlement_motivo_recusa(uuid, uuid) from public, anon;
-revoke all on function public.settlement_pode_incluir(uuid, uuid) from public, anon;
-grant execute on function public.settlement_motivo_recusa(uuid, uuid) to authenticated, service_role;
-grant execute on function public.settlement_pode_incluir(uuid, uuid) to authenticated, service_role;
+-- Só service_role chama (a rota de fechamento consome settlement_pode_incluir).
+-- Nenhum usuário logado: as funções leem settlements e coupons POR FORA da RLS,
+-- e com grant para authenticated seriam um oráculo de leitura para lojista e
+-- influenciador (mesma família da brecha de 03/11, migration 030). O trigger
+-- settlement_items_valida é security definer e roda como dono, então não
+-- depende do grant do chamador.
+revoke all on function public.settlement_motivo_recusa(uuid, uuid) from public, anon, authenticated;
+revoke all on function public.settlement_pode_incluir(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.settlement_motivo_recusa(uuid, uuid) to service_role;
+grant execute on function public.settlement_pode_incluir(uuid, uuid) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- O trigger: valida DADOS, não identidade. Dispara para qualquer papel,
@@ -203,6 +214,8 @@ grant execute on function public.settlement_pode_incluir(uuid, uuid) to authenti
 create or replace function public.settlement_items_valida()
 returns trigger
 language plpgsql
+security definer
+set search_path to 'public'
 as $fn$
 declare
   motivo text;
@@ -232,17 +245,9 @@ begin
   if auth.uid() is null or public.is_admin() then
     return new;
   end if;
-  if old.status = 'pago' and (
-       new.status         is distinct from 'pago'
-    or new.valor          is distinct from old.valor
-    or new.tipo           is distinct from old.tipo
-    or new.partnership_id is distinct from old.partnership_id
-    or new.periodo_de     is distinct from old.periodo_de
-    or new.periodo_ate    is distinct from old.periodo_ate
-    or new.paid_at        is distinct from old.paid_at
-    or new.forma          is distinct from old.forma
-    or new.identificador  is distinct from old.identificador
-  ) then
+  -- Linha inteira, não lista de colunas: created_at/created_by/id também não
+  -- mudam, e coluna que alguém acrescentar um dia já nasce congelada.
+  if old.status = 'pago' and to_jsonb(new) is distinct from to_jsonb(old) then
     raise exception 'Lancamento pago e imutavel: correcao se faz com lancamento novo';
   end if;
   return new;

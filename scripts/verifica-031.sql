@@ -36,6 +36,14 @@ create temp table adm as
   select id from public.admin_profiles where role = 'admin' and active = true limit 1;
 grant select on adm to authenticated;
 
+-- Sem admin ativo os claims do caso 11 virariam nulos, a RLS esconderia tudo e
+-- os controles positivos da porta do admin imprimiriam resultado vazio.
+do $$ begin
+  if not exists (select 1 from adm) then
+    raise exception 'fixture adm vazio: nao ha admin ativo no banco';
+  end if;
+end $$;
+
 -- ---------- fábricas e auxiliares (só existem durante a transação) ----------
 
 -- Parceria clonada, 'encerrada' para não colidir com "uma ativa por influenciador".
@@ -75,19 +83,35 @@ begin
     get stacked diagnostics cn = constraint_name;
     sq := sqlstate; ms := sqlerrm;
   end;
-  insert into r values (o, t, esperado, sq || ' ' || coalesce(cn, left(ms, 70)),
+  insert into r values (o, t, esperado, sq || ' ' || coalesce(nullif(cn, ''), left(ms, 70)),
     case when sq = cod and (quem is null or quem = cn or ms like '%' || quem || '%')
          then 'OK' else 'CONFERIR -- barrou por outro motivo' end);
 end $f$;
 
 -- Executa q e espera que FUNCIONE (controle positivo / porta do admin).
+-- Confere linhas afetadas: sob RLS, UPDATE/DELETE de linha invisível afeta 0
+-- linhas SEM erro, e um "OK" sem ter tocado em nada seria mentira.
 create function pg_temp.funciona(o numeric, t text, q text) returns void language plpgsql as $f$
+declare n int;
 begin
   execute q;
-  insert into r values (o, t, 'funciona', 'EXECUTOU', 'OK');
+  get diagnostics n = row_count;
+  insert into r values (o, t, '1 linha afetada', n || ' linhas',
+    case when n > 0 then 'OK' else 'FALHOU -- 0 linhas: RLS escondeu a linha' end);
 exception when others then
-  insert into r values (o, t, 'funciona', sqlstate || ' ' || left(sqlerrm, 70),
+  insert into r values (o, t, '1 linha afetada', sqlstate || ' ' || left(sqlerrm, 70),
     'FALHOU -- a trava barrou quem deveria passar');
+end $f$;
+
+-- Executa q (select que devolve um valor) e compara o texto com o esperado.
+create function pg_temp.confere(o numeric, t text, q text, esperado text) returns void language plpgsql as $f$
+declare v text;
+begin
+  execute q into v;
+  insert into r values (o, t, esperado, coalesce(v, 'null'),
+    case when v = esperado then 'OK' else 'FALHOU' end);
+exception when others then
+  insert into r values (o, t, esperado, sqlstate || ' ' || left(sqlerrm, 70), 'FALHOU -- erro ao consultar');
 end $f$;
 
 -- ---------- fixtures (como superusuário) ----------
@@ -128,6 +152,8 @@ select pg_temp.mkc(17, '00000000-0000-0000-0031-000000000a01', 'used', true,  no
 select pg_temp.mkc(18, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());
 select pg_temp.mkc(21, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());
 select pg_temp.mkc(22, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());
+select pg_temp.mkc(23, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());
+select pg_temp.mkc(24, '00000000-0000-0000-0031-000000000a01', 'used', true,  now());
 
 -- Lançamentos de fixture: um por caso (b12/b13 já nascem pagos).
 insert into public.settlements(id, partnership_id, tipo, status, valor, periodo_de, periodo_ate, paid_at, forma) values
@@ -270,11 +296,17 @@ begin
     case when n = 0 then 'OK' else 'FALHOU' end);
 
   delete from public.settlements where id = '00000000-0000-0000-0031-000000000b16';
-  insert into r values (15.4,'apagar lancamento aberto','apagou','APAGOU','OK');
+  get diagnostics n = row_count;
+  insert into r values (15.4,'apagar lancamento aberto','1 linha',n||' linhas',
+    case when n = 1 then 'OK' else 'FALHOU -- 0 linhas' end);
 exception when others then
   insert into r values (15,'lancamento aberto continua editavel','funciona',
     sqlstate||' '||left(sqlerrm,70),'FALHOU -- a trava recusa tudo, ate o legitimo');
 end $$;
+
+-- ===== 18: settlement_pode_incluir (interface que a T5 consome) =====
+select pg_temp.confere(18,   'pode_incluir: cupom valido', $q$select public.settlement_pode_incluir('00000000-0000-0000-0031-000000000b10','00000000-0000-0000-0031-000000000110')::text$q$, 'true');
+select pg_temp.confere(18.1, 'pode_incluir: cupom sem data de uso', $q$select public.settlement_pode_incluir('00000000-0000-0000-0031-000000000b02','00000000-0000-0000-0031-000000000102')::text$q$, 'false');
 
 -- ===== 17: sem identidade (auth.uid nulo = service_role / SQL Editor) passa =====
 -- Sem esta porta, a migration da tarefa seguinte, que insere lançamento já
@@ -312,6 +344,12 @@ exception
       sqlstate||' '||left(sqlerrm,60),'CONFERIR -- barrou por outro motivo');
 end $$;
 
+select pg_temp.confere(8.2, 'lojista lendo settlement_items', $q$select count(*)::text from public.settlement_items where id = '00000000-0000-0000-0031-0000000000d1'$q$, '0');
+select pg_temp.tenta(8.3, 'lojista inserindo em settlement_items', '42501 violacao de RLS',
+  $q$insert into public.settlement_items(settlement_id, coupon_id, valor) values ('00000000-0000-0000-0031-000000000b08','00000000-0000-0000-0031-000000000123',1)$q$, '42501', null);
+select pg_temp.tenta(8.4, 'lojista chamando settlement_pode_incluir', '42501 sem EXECUTE',
+  $q$select public.settlement_pode_incluir('00000000-0000-0000-0031-000000000b08','00000000-0000-0000-0031-000000000110')$q$, '42501', null);
+
 -- ===== 9: influenciador lendo e escrevendo: nada =====
 reset role;
 set local role authenticated;
@@ -341,6 +379,12 @@ exception
     insert into r values (9.1,'influenciador inserindo em settlements','42501',
       sqlstate||' '||left(sqlerrm,60),'CONFERIR -- barrou por outro motivo');
 end $$;
+
+select pg_temp.confere(9.2, 'influenciador lendo settlement_items', $q$select count(*)::text from public.settlement_items where id = '00000000-0000-0000-0031-0000000000d1'$q$, '0');
+select pg_temp.tenta(9.3, 'influenciador inserindo em settlement_items', '42501 violacao de RLS',
+  $q$insert into public.settlement_items(settlement_id, coupon_id, valor) values ('00000000-0000-0000-0031-000000000b09','00000000-0000-0000-0031-000000000124',1)$q$, '42501', null);
+select pg_temp.tenta(9.4, 'influenciador chamando settlement_pode_incluir', '42501 sem EXECUTE',
+  $q$select public.settlement_pode_incluir('00000000-0000-0000-0031-000000000b09','00000000-0000-0000-0031-000000000110')$q$, '42501', null);
 
 -- ===== 10: financeiro lendo e inserindo (lançamento e item) =====
 reset role;
@@ -428,6 +472,16 @@ select pg_temp.funciona(14.2, 'admin edita item de lancamento pago',
   $q$update public.settlement_items set valor = 15 where id = '00000000-0000-0000-0031-0000000000d9'$q$);
 select pg_temp.funciona(14.3, 'admin apaga item de lancamento pago',
   $q$delete from public.settlement_items where id = '00000000-0000-0000-0031-0000000000da'$q$);
+
+-- Resumo. Um bloco `do` que estoura no meio desfaz o que ele já gravou em `r`
+-- (se o 15.3 falhar, 15 a 15.2 somem). Por isso o total é conferido contra o
+-- número esperado de linhas de resultado: 44 (recontar se casos mudarem).
+insert into r
+select 999, 'RESUMO', 'total 44, nenhum nao-OK',
+       count(*) || ' linhas, ' || count(*) filter (where veredito not like 'OK%') || ' nao-OK',
+       case when count(*) = 44 and count(*) filter (where veredito not like 'OK%') = 0
+            then 'OK' else 'FALHOU -- linhas faltando ou casos nao-OK' end
+  from r;
 
 reset role;
 select * from r order by ordem;
