@@ -43,18 +43,65 @@ describe('cuponsElegiveis', () => {
     expect(cuponsElegiveis(cupons, contrato, junho)).toEqual([{ coupon_id: 'c1', valor: 500 }])
   })
 
-  test('exclui nao conferido, ja pago e used_at nulo', () => {
-    const cupons = [
-      cupom('c1', '2026-06-05', { verified: false }),
-      cupom('c2', '2026-06-06', { paid: true }),
-      cupom('c3', null),
-    ]
-    expect(cuponsElegiveis(cupons, contrato, junho)).toEqual([])
+  // Cada motivo de exclusao sozinho, com um cupom valido ao lado como controle
+  // positivo: o resultado esperado e exatamente ele, nunca uma lista vazia.
+  const valido = cupom('ok', '2026-06-15')
+  const soOValido = [{ coupon_id: 'ok', valor: 500 }]
+
+  test('exclui cupom nao conferido', () => {
+    const r = cuponsElegiveis([cupom('x', '2026-06-05', { verified: false }), valido], contrato, junho)
+    expect(r).toEqual(soOValido)
+  })
+
+  test('exclui cupom ja pago', () => {
+    const r = cuponsElegiveis([cupom('x', '2026-06-05', { paid: true }), valido], contrato, junho)
+    expect(r).toEqual(soOValido)
+  })
+
+  test('exclui cupom com used_at nulo', () => {
+    const r = cuponsElegiveis([cupom('x', null), valido], contrato, junho)
+    expect(r).toEqual(soOValido)
+  })
+
+  test('venda do balcao em 30/06 as 21h30 de Brasilia fecha em junho, nao em julho', () => {
+    // 2026-07-01T00:30Z == 30/06 21h30 em Sao Paulo (UTC-3)
+    const noite = cupom('noite', '2026-07-01T00:30:00.000Z')
+    const julho = { de: '2026-07-01', ate: '2026-07-31' }
+    expect(cuponsElegiveis([noite], contrato, junho)).toEqual([{ coupon_id: 'noite', valor: 500 }])
+    expect(cuponsElegiveis([noite], contrato, julho)).toEqual([])
+  })
+
+  test('retrato do cupom vale mais que o contrato de hoje', () => {
+    const r = cuponsElegiveis([cupom('c1', '2026-06-05', { commission_per_sale: 300 })], contrato, junho)
+    expect(r).toEqual([{ coupon_id: 'c1', valor: 300 }])
   })
 
   test('cupom sem retrato usa o valor do contrato no instante de fechar', () => {
-    const cupons = [cupom('c1', '2026-06-05', { commission_per_sale: null })]
-    expect(cuponsElegiveis(cupons, contrato, junho)).toEqual([{ coupon_id: 'c1', valor: 500 }])
+    const c750 = { ...contrato, commission_per_sale: 750 }
+    const r = cuponsElegiveis([cupom('c1', '2026-06-05', { commission_per_sale: null })], c750, junho)
+    expect(r).toEqual([{ coupon_id: 'c1', valor: 750 }])
+  })
+
+  test('venda ja paga ou de fora do periodo continua ocupando posicao', () => {
+    // starts_at 2: a venda de junho (paga) e a numero 1; a de julho e a numero 2 e entra.
+    // Se a posicao reiniciasse por periodo, a de julho viraria a 1 e ficaria de fora.
+    const c2 = { ...contrato, commission_starts_at: 2 }
+    const cupons = [cupom('jun', '2026-06-10', { paid: true }), cupom('jul', '2026-07-10')]
+    const r = cuponsElegiveis(cupons, c2, { de: '2026-07-01', ate: '2026-07-31' })
+    expect(r).toEqual([{ coupon_id: 'jul', valor: 500 }])
+  })
+
+  test("modo 'parceria' ignora cupom de outra parceria", () => {
+    const cupons = [cupom('outra', '2026-06-05', { partnership_id: 'P2' }), valido]
+    expect(cuponsElegiveis(cupons, contrato, junho)).toEqual(soOValido)
+  })
+
+  test("modo 'historico' conta cupom de outra parceria", () => {
+    const hist = { ...contrato, commission_counts_from: 'historico' as const }
+    const cupons = [cupom('outra', '2026-06-05', { partnership_id: 'P2' }), valido]
+    expect(cuponsElegiveis(cupons, hist, junho)).toEqual([
+      { coupon_id: 'outra', valor: 500 }, { coupon_id: 'ok', valor: 500 },
+    ])
   })
 
   test('respeita commission_starts_at contando a posicao da venda por created_at', () => {

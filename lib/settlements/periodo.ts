@@ -19,6 +19,20 @@ type ParceriaParaPeriodo = {
 const iso = (d: Date) => d.toISOString().slice(0, 10)
 
 /**
+ * Dia civil do balcao em que o cupom foi usado.
+ *
+ * `used_at` e gravado com toISOString(), sempre em UTC. Uma venda no balcao em
+ * 30/06 as 21h30 de Brasilia vira `2026-07-01T00:30Z`; fatiar os 10 primeiros
+ * caracteres jogaria essa venda no fechamento do mes errado (decisao de
+ * 11/11/2026). A loja e presencial, em Campinas: vale a data de Sao Paulo.
+ * Data pura (`YYYY-MM-DD`) ja e dia civil e passa direto.
+ */
+function diaDoBalcao(usedAt: string): string {
+  if (usedAt.length === 10) return usedAt
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(usedAt))
+}
+
+/**
  * O periodo que o Financeiro deveria fechar agora, ou null se ainda nao ha.
  *
  * 'mensal': o mes civil anterior a `hoje`. Mes corrente nunca e proposto, pois
@@ -77,7 +91,7 @@ export function cuponsElegiveis(
     const atual = calcularComissao(contrato, conferidas.slice(0, i + 1))
     const c = conferidas[i]
     const entra = atual.vendasQueContam > anterior.vendasQueContam
-    const dia = c.used_at?.slice(0, 10)
+    const dia = c.used_at ? diaDoBalcao(c.used_at) : null
 
     if (entra && !c.paid && dia && dia >= periodo.de && dia <= periodo.ate) {
       resultado.push({ coupon_id: c.id, valor: atual.comissaoGerada - anterior.comissaoGerada })
