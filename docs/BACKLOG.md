@@ -206,9 +206,19 @@ no portal, criar a senha dela, preencher os dados e aceitar.
 
 ### O que continua em aberto
 
-1. **Fechamentos e pagamentos** (subsistema 2) — spec de 24/08, sem código. O
-   maior buraco funcional: pagar comissão é cupom a cupom, o fee fixo não tem
-   onde ser registrado, e a restituição que o contrato criou não tem tela.
+1. **Fechamentos e pagamentos** (subsistema 2) — **spec aprovada em 11/11 e plano
+   escrito**, ainda sem código. Plano: `docs/superpowers/plans/2026-11-11-fechamentos-e-pagamentos.md`,
+   8 tarefas, execução por subagente. O maior buraco funcional: pagar comissão é
+   cupom a cupom, o fee fixo não tem onde ser registrado, e a restituição que o
+   contrato criou não tem tela.
+
+   Três coisas decididas em 11/11 que não estão na spec de agosto: o período
+   recorta por **`used_at`** e nunca por `verified_at` (as 5 vendas de junho do
+   @caiiuxo foram conferidas todas em 18/08, num lote — fechar junho por data de
+   conferência devolveria junho vazio); o critério de aceitação da spec **venceu**,
+   porque os R$ 3.000 do @caiiuxo foram pagos em 01/10; e esse pagamento vira
+   **lançamento retroativo** (forma `PIX`), para a promessa "nenhum cupom pago
+   fora de um fechamento" valer desde a origem em vez de nascer com exceção.
 2. **Indique um Amigo** — spec e plano prontos, pausado por decisão dele.
 3. **Funil de prospecção** (subsistema 3) — sem spec.
 4. **O Financeiro pode reescrever o retrato de comissão** do cupom que ele paga.
