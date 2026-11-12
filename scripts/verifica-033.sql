@@ -7,12 +7,16 @@
 -- Mesmas lições do verifica-031: cada caso confere SQLSTATE e o MOTIVO
 -- (pg_temp.tenta), e cada caso usa a sua PRÓPRIA parceria e o seu PRÓPRIO
 -- contrato. Parcerias de teste são clones de uma parceria real, com fee_amount
--- trocado. Se a 031 não estiver aplicada, o script para no setup.
+-- trocado. O setup só confere o fixture (`adm` e `base`); sem a 031 aplicada o
+-- script não para ali, os casos que leem `settlements` é que caem em
+-- "FALHOU -- erro ao consultar". Falha alta, não silenciosa.
 --
 -- RODAR ANTES de aplicar a 033 e DEPOIS dela. Antes, os casos 1, 1.1, 3.1, 5.2,
 -- 8.1 e 8.2 têm que ficar VERMELHOS (nada cria fixo nem restituição ainda):
--- é isso que prova que o script mede alguma coisa. Os demais ficam verdes nas
--- duas rodadas, inclusive o 3 e o 4 (a função antiga já funciona para admin).
+-- é isso que prova que o script mede alguma coisa. O RESUMO também fica
+-- vermelho nessa primeira rodada, acusando 6 não-OK — são 7 linhas vermelhas no
+-- total, e é o esperado. Os demais ficam verdes nas duas rodadas, inclusive o 3
+-- e o 4 (a função antiga já funciona para admin).
 --
 -- registrar_descumprimento exige admin: os casos que a chamam assumem a
 -- identidade de um admin ativo (claims), como o caso 11 do verifica-031.
