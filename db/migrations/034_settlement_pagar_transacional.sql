@@ -18,6 +18,11 @@
 --
 --   settlement_pagar(p_id, p_paid_at, p_forma, p_identificador, p_quem)
 --     1. exige admin ou financeiro;
+--     1b. recusa, com nome, pagamento sem data ou sem forma. A constraint
+--        settlements_pago_exige_dados barraria de qualquer jeito, mas com
+--        23514 e sem diagnóstico; e ninguém deve "ajudar" com
+--        coalesce(p_forma, 'manual'), que gravaria um pagamento com forma
+--        inventada;
 --     2. reivindica o lançamento: UPDATE condicionado a status = 'aberto'
 --        (zero linhas = não existe ou já foi pago/cancelado: recusa);
 --     3. recusa comissão sem itens (zero itens só é legítimo em fixo e
@@ -40,13 +45,25 @@
 --     settlements com o mesmo resultado para admin e financeiro; a regra de
 --     QUEM pode é a guarda acima.
 --
+-- POR QUE SÓ `verified` É CONFERIDO DE NOVO (e não o resto de
+-- settlement_motivo_recusa): o item JÁ congelou o valor e entrou no lançamento
+-- pelo trigger da 031. O que pode mudar depois, por mão do Financeiro, é a
+-- conferência, e `verified` é a única condição amparada por uma constraint
+-- (coupons_paid_requires_verified) que abortaria a escrita de qualquer jeito.
+-- Conferir aqui só troca o erro cru por um que nomeia os cupons. Não
+-- "complete" a checagem com as demais condições.
+--
 -- p_quem é o nome de quem pagou (vai para coupons.paid_by, como a rota antiga
 -- de cupons gravava). O instante, p_paid_at, vale para o lançamento e para os
 -- cupons.
 --
 -- Verificação: scripts/verifica-034.sql (tudo em begin/rollback).
 --
--- PARA DESFAZER (a rota de pagar precisa voltar à versão anterior do código):
+-- PARA DESFAZER. ATENÇÃO: a rota de pagar chama esta função; antes do drop, ela
+-- precisa voltar ao commit 5d6ab15 (a versão de duas escritas). Entre o drop e
+-- o redeploy TODA tentativa de pagar falha com PGRST202 (função não
+-- encontrada), que a rota devolve como 500 genérico: pagar fica 100% fora do
+-- ar, não degradado.
 --
 --   drop function if exists public.settlement_pagar(uuid, timestamptz, text, text, text);
 
@@ -70,6 +87,10 @@ declare
 begin
   if not (public.is_admin() or public.is_finance()) then
     raise exception 'apenas admin ou financeiro';
+  end if;
+
+  if p_paid_at is null or length(btrim(coalesce(p_forma, ''))) = 0 then
+    raise exception 'pagamento sem data ou forma';
   end if;
 
   update public.settlements

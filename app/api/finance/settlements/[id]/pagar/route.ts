@@ -12,7 +12,13 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
  * Paga um lancamento: 'aberto' -> 'pago' e marca os cupons dele como pagos.
- * E o unico lugar do sistema que escreve coupons.paid / paid_at / paid_by.
+ * E o unico lugar que DEVERIA escrever coupons.paid / paid_at / paid_by. Hoje
+ * nao e o unico que PODE: a rota legada app/api/admin/coupons/route.ts ainda
+ * deixa admin e financeiro marcar/desmarcar "Pago" cupom a cupom, sem olhar se
+ * o cupom pertence a um lancamento. Desmarcar assim um cupom de lancamento
+ * pago recria a divergencia que a migration 034 evita, e o Financeiro nao
+ * conserta (lancamento pago e imutavel para ele). Fechar esse buraco e a Task 6
+ * (aposentar a rota legada).
  *
  * As duas escritas acontecem DENTRO da funcao SQL settlement_pagar (migration
  * 034), numa transacao so: ou o lancamento e os cupons ficam pagos, ou nada

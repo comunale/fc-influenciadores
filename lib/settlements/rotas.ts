@@ -190,6 +190,9 @@ export function traduzErroDoLivro(err: { code?: string; message: string }): Recu
   if (/apenas admin ou financeiro/i.test(msg)) {
     return { status: 403, error: 'Sem permissão para esta ação.' }
   }
+  if (/pagamento sem data ou forma/i.test(msg)) {
+    return { status: 400, error: 'Informe a data e a forma do pagamento.' }
+  }
   if (/lancamento inexistente ou nao esta aberto/i.test(msg)) {
     return { status: 409, error: 'Este lançamento já foi pago ou cancelado.' }
   }

@@ -14,23 +14,43 @@
 -- exist"). Falha alta, não silenciosa.
 --
 -- RODAR ANTES de aplicar a 034 e DEPOIS dela. Antes, os casos 1, 1.1, 1.2, 2,
--- 3, 3.1, 3.2, 4, 5, 6, 7, 7.1 e 8 (13 casos, todos os que chamam a função)
--- têm que ficar VERMELHOS: a função não existe (42883). O RESUMO também fica
--- vermelho, acusando 13 não-OK — são 14 linhas vermelhas no total, e é o
--- esperado. Ficam verdes nas duas rodadas os casos de "nada foi gravado":
--- 2.1, 2.2, 4.1, 5.1 e 6.1. Depois da 034, tudo OK.
+-- 3, 3.1, 3.2, 4, 5, 6, 7, 7.1, 8, 9, 9.1, 10 e 10.1 (17 casos, todos os que
+-- chamam a função) têm que ficar VERMELHOS: a função não existe (42883). O
+-- RESUMO também fica vermelho, acusando 17 não-OK — são 18 linhas vermelhas no
+-- total, e é o esperado. Ficam verdes nas duas rodadas os casos de "nada foi
+-- gravado": 2.1, 2.2, 4.1, 5.1, 6.1 e 10.2. Depois da 034, tudo OK.
 --
--- Casos: 1 caminho feliz (lançamento e todos os cupons); 2 cupom desmarcado
--- de "Conferido" depois de entrar no lançamento (o cenário que motivou a
--- migration: a chamada INTEIRA falha e nada fica gravado); 3 segunda chamada
--- no mesmo lançamento; 4 lojista (nem admin nem financeiro); 5 sem identidade
--- (service_role / SQL Editor), recusado de propósito; 6 comissão sem itens;
--- 7 fixo sem itens (legítimo); 8 lançamento inexistente.
+-- Casos: 1 caminho feliz do financeiro (lançamento e todos os cupons); 2 cupom
+-- desmarcado de "Conferido" depois de entrar no lançamento (o cenário que
+-- motivou a migration: a chamada INTEIRA falha e nada fica gravado); 3 segunda
+-- chamada no mesmo lançamento; 4 lojista (nem admin nem financeiro); 5 sem
+-- identidade (service_role / SQL Editor), recusado de propósito; 6 comissão
+-- sem itens; 7 fixo sem itens (legítimo); 8 lançamento inexistente; 9 caminho
+-- feliz do ADMIN (o papel que pula congela_pago e a guarda de coupons: o
+-- caminho que mais difere do financeiro); 10 pagamento sem forma ou sem data.
 
 begin;
 
 create temp table r(ordem numeric, teste text, esperado text, obtido text, veredito text);
 grant select, insert on r to authenticated, anon;
+
+create temp table adm as
+  select id from public.admin_profiles where role = 'admin' and active = true limit 1;
+grant select on adm to authenticated;
+
+-- mkp/mkc clonam a primeira linha de partnerships/coupons; se a origem fosse
+-- vazia inseririam zero linhas em silêncio e o sintoma seria um 23503 adiante.
+do $$ begin
+  if not exists (select 1 from adm) then
+    raise exception 'fixture adm vazio: nao ha admin ativo no banco';
+  end if;
+  if not exists (select 1 from public.partnerships) then
+    raise exception 'fixture partnerships vazio: nao ha parceria para clonar';
+  end if;
+  if not exists (select 1 from public.coupons) then
+    raise exception 'fixture coupons vazio: nao ha cupom para clonar';
+  end if;
+end $$;
 
 -- ---------- auxiliares (só existem durante a transação) ----------
 
@@ -106,7 +126,7 @@ end $f$;
 
 -- ---------- fixtures (como superusuário, auth.uid() nulo) ----------
 
-select pg_temp.mkp(('00000000-0000-0000-0034-000000000a0' || g)::uuid) from generate_series(1, 7) g;
+select pg_temp.mkp(('00000000-0000-0000-0034-000000000a0' || g)::uuid) from generate_series(1, 9) g;
 
 -- 1: dois cupons conferidos | 2: dois, um será desmarcado | 3, 4, 5: um cada
 select pg_temp.mkc(11, '00000000-0000-0000-0034-000000000a01');
@@ -116,6 +136,8 @@ select pg_temp.mkc(22, '00000000-0000-0000-0034-000000000a02');
 select pg_temp.mkc(31, '00000000-0000-0000-0034-000000000a03');
 select pg_temp.mkc(41, '00000000-0000-0000-0034-000000000a04');
 select pg_temp.mkc(51, '00000000-0000-0000-0034-000000000a05');
+select pg_temp.mkc(61, '00000000-0000-0000-0034-000000000a08');
+select pg_temp.mkc(71, '00000000-0000-0000-0034-000000000a09');
 
 select pg_temp.mks('00000000-0000-0000-0034-000000000b01', '00000000-0000-0000-0034-000000000a01', 'comissao', 20);
 select pg_temp.mks('00000000-0000-0000-0034-000000000b02', '00000000-0000-0000-0034-000000000a02', 'comissao', 20);
@@ -125,6 +147,11 @@ select pg_temp.mks('00000000-0000-0000-0034-000000000b05', '00000000-0000-0000-0
 select pg_temp.mks('00000000-0000-0000-0034-000000000b06', '00000000-0000-0000-0034-000000000a06', 'comissao', 0);
 select pg_temp.mks('00000000-0000-0000-0034-000000000b07', '00000000-0000-0000-0034-000000000a07', 'fixo', 500);
 
+select pg_temp.mks('00000000-0000-0000-0034-000000000b08', '00000000-0000-0000-0034-000000000a08', 'comissao', 10);
+select pg_temp.mks('00000000-0000-0000-0034-000000000b09', '00000000-0000-0000-0034-000000000a09', 'comissao', 10);
+
+select pg_temp.mki('00000000-0000-0000-0034-000000000b08', 61, 10);
+select pg_temp.mki('00000000-0000-0000-0034-000000000b09', 71, 10);
 select pg_temp.mki('00000000-0000-0000-0034-000000000b01', 11, 10);
 select pg_temp.mki('00000000-0000-0000-0034-000000000b01', 12, 10);
 select pg_temp.mki('00000000-0000-0000-0034-000000000b02', 21, 10);
@@ -239,13 +266,44 @@ select pg_temp.tenta(8, 'lancamento inexistente', 'P0001 inexistente ou nao esta
   $q$select public.settlement_pagar('00000000-0000-0000-0034-00000000dead', now(), 'PIX', null, 'x')$q$,
   'P0001', 'inexistente ou nao esta aberto');
 
--- Resumo. 18 casos: 1, 1.1, 1.2 (3); 2, 2.1, 2.2 (3); 3, 3.1, 3.2 (3);
--- 4, 4.1 (2); 5, 5.1 (2); 6, 6.1 (2); 7, 7.1 (2); 8 (1) = 18.
+-- 10: pagamento sem forma ou sem data. Recusa nomeada, antes de qualquer
+-- escrita; sem ela só a constraint settlements_pago_exige_dados barraria (23514).
+select pg_temp.tenta(10, 'forma em branco', 'P0001 pagamento sem data ou forma',
+  $q$select public.settlement_pagar('00000000-0000-0000-0034-000000000b09', now(), '   ', null, 'x')$q$,
+  'P0001', 'pagamento sem data ou forma');
+select pg_temp.tenta(10.1, 'data nula', 'P0001 pagamento sem data ou forma',
+  $q$select public.settlement_pagar('00000000-0000-0000-0034-000000000b09', null, 'PIX', null, 'x')$q$,
+  'P0001', 'pagamento sem data ou forma');
+select pg_temp.confere(10.2, 'recusas nao gravaram nada (aberto, cupom nao pago)',
+  $q$select (select status from public.settlements where id = '00000000-0000-0000-0034-000000000b09')
+          || '|' || (select paid::text from public.coupons where id = '00000000-0000-0000-0034-000000000171')$q$,
+  'aberto|false');
+
+-- 9: caminho feliz do ADMIN. Admin passa direto por settlements_congela_pago e
+-- por coupons_guard_non_admin_update, entao o caminho dele difere do financeiro.
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims',
+  json_build_object('sub',(select id from adm),'role','authenticated')::text, true);
+
+select pg_temp.confere(9, 'admin paga: devolve 1 cupom marcado',
+  $q$select public.settlement_pagar('00000000-0000-0000-0034-000000000b08',
+       '2026-11-10T12:00:00Z', 'TED', null, 'Admin Quem')::text$q$, '1');
+select pg_temp.confere(9.1, 'lancamento pago e cupom pago pelo admin',
+  $q$select s.status || '|' || s.forma || '|' || c.paid::text || '|' || c.paid_by
+       from public.settlements s, public.coupons c
+      where s.id = '00000000-0000-0000-0034-000000000b08'
+        and c.id = '00000000-0000-0000-0034-000000000161'$q$,
+  'pago|TED|true|Admin Quem');
+
+-- Resumo. 23 casos: 1, 1.1, 1.2 (3); 2, 2.1, 2.2 (3); 3, 3.1, 3.2 (3);
+-- 4, 4.1 (2); 5, 5.1 (2); 6, 6.1 (2); 7, 7.1 (2); 8 (1); 9, 9.1 (2);
+-- 10, 10.1, 10.2 (3) = 23.
 -- (recontar se casos mudarem)
 insert into r
-select 999, 'RESUMO', 'total 18, nenhum nao-OK',
+select 999, 'RESUMO', 'total 23, nenhum nao-OK',
        count(*) || ' linhas, ' || count(*) filter (where veredito not like 'OK%') || ' nao-OK',
-       case when count(*) = 18 and count(*) filter (where veredito not like 'OK%') = 0
+       case when count(*) = 23 and count(*) filter (where veredito not like 'OK%') = 0
             then 'OK' else 'FALHOU -- linhas faltando ou casos nao-OK' end
   from r;
 

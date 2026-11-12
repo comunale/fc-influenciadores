@@ -171,6 +171,7 @@ describe('erros da funcao settlement_pagar', () => {
     expect(traduzErroDoLivro({ message: 'apenas admin ou financeiro' }).status).toBe(403)
     expect(traduzErroDoLivro({ message: 'lancamento inexistente ou nao esta aberto' }).status).toBe(409)
     expect(traduzErroDoLivro({ message: 'lancamento de comissao sem itens' }).status).toBe(409)
+    expect(traduzErroDoLivro({ message: 'pagamento sem data ou forma' }).status).toBe(400)
     const r = traduzErroDoLivro({ message: 'cupom nao conferido: FOX123, FOX456' })
     expect(r.status).toBe(422)
     expect(r.error).toContain('FOX123, FOX456')
