@@ -38,9 +38,9 @@ describe('admin e superusuario', () => {
 })
 
 describe('financeiro', () => {
-  it('confere, paga e preenche NF', () => {
+  it('confere e preenche NF, mas nao paga cupom a cupom (paga por lancamento)', () => {
     expect(can('finance', 'coupons.verify')).toBe(true)
-    expect(can('finance', 'coupons.pay')).toBe(true)
+    expect(can('finance', 'coupons.pay')).toBe(false)
     expect(can('finance', 'coupons.invoice')).toBe(true)
   })
 

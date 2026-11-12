@@ -30,7 +30,10 @@ function traduzErroDoBanco(msg: string): string {
 const FIELDS_BY_ROLE: Record<Role, string[]> = {
   admin: ['status', 'customer_name', 'customer_phone', 'customer_email', 'customer_cpf',
           'verified', 'paid', 'invoice_number'],
-  finance: ['verified', 'paid', 'invoice_number'],
+  // Sem 'paid': o Financeiro paga por lancamento (app/api/finance/settlements).
+  // Pagar cupom a cupom aqui deixava desmarcar um cupom de lancamento pago.
+  // O admin MANTEM 'paid' por decisao do dono.
+  finance: ['verified', 'invoice_number'],
   moderator: [],
   // O influenciador nao edita cupom nenhum: o portal dele e so leitura.
   influencer: [],

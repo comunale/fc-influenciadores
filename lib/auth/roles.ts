@@ -47,7 +47,9 @@ const MATRIX: Record<Action, Role[]> = {
   'coupons.edit':     ['admin'],
   'coupons.delete':   ['admin'],
   'coupons.verify':   ['admin', 'finance'],
-  'coupons.pay':      ['admin', 'finance'],
+  // So admin marca "Pago" cupom a cupom. O Financeiro paga pela tela do
+  // Financeiro (lancamento), que e atomica e respeita o livro.
+  'coupons.pay':      ['admin'],
   'coupons.invoice':  ['admin', 'finance'],
   'validate':         ['admin', 'moderator'],
   // Cadastro express no balcao: so admin, como saida de emergencia. O Lojista
