@@ -425,7 +425,7 @@ git commit -m "feat(fechamentos): tela do Financeiro"
 ### Task 7: O que o influenciador vê
 
 **Files:**
-- Create: `db/migrations/034_portal_fechamentos.sql`
+- Create: `db/migrations/035_portal_fechamentos.sql`
 - Create: `components/portal/MeusPagamentos.tsx`
 - Modify: `lib/portal/dados.ts`
 
@@ -454,7 +454,7 @@ Lista simples: tipo, período, valor, data de pagamento. Nada de prova.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add db/migrations/034_portal_fechamentos.sql components/portal lib/portal
+git add db/migrations/035_portal_fechamentos.sql components/portal lib/portal
 git commit -m "feat(fechamentos): o influenciador ve o que recebeu"
 ```
 
