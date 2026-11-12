@@ -588,6 +588,48 @@ passar, então o trigger é a única camada, e ela tem o buraco.
 
 Sem indício de uso. É lacuna, não incidente. O conserto é somar os quatro campos à lista.
 
+### 3. O Financeiro consegue "despagar" um cupom que já está num lançamento pago
+
+Achado pela revisão da Task 5 em 12/11. A migration 034 garante que pagar marque o
+lançamento e os cupons **juntos ou nada**. Mas a tela antiga de cupons entra por trás:
+`app/api/admin/coupons/route.ts` libera `paid` para admin **e Financeiro**, e grava
+`paid_at`/`paid_by` sem checar se o cupom pertence a algum lançamento.
+
+O cenário: o Financeiro paga o lançamento S; uma semana depois desmarca "Pago" num
+cupom de S pela tela de cupons. Nada barra — o trigger `coupons_guard_non_admin_update`
+permite `paid` para o Financeiro, a constraint `coupons_paid_requires_verified` não
+morde no sentido `paid = false`, e nenhum trigger da 031 dispara porque `settlements` não
+foi tocada. Resultado: lançamento `pago` e cupom dizendo que ainda deve — **a divergência
+que a 034 existe para impedir, alcançada pelo outro lado** — e o Financeiro não consegue
+desfazer, porque lançamento pago é imutável para ele.
+
+**Fecha na Task 6**, que aposenta essa tela. Até lá, a regra prática é não mexer em
+"Pago" na tela de cupons. Conserto definitivo: tirar `paid` do que o Financeiro edita
+ali, e avaliar um trigger que recuse mudar `paid` de cupom que esteja em lançamento
+não-`aberto` — o padrão de três camadas do projeto.
+
+Detecção, se houver suspeita:
+
+```sql
+select s.id, c.coupon_number from settlements s
+  join settlement_items i on i.settlement_id = s.id
+  join coupons c on c.id = i.coupon_id
+ where s.status = 'pago' and c.paid = false;
+```
+
+### 4. Duas coisas que a tela de fechamento não explica ao operador
+
+Também da revisão da Task 5. Nenhuma das duas corrompe nada; as duas fazem o total
+aparecer menor do que o operador espera, sem dizer por quê.
+
+- **Cupom pago no regime antigo** (`paid = true` sem `settlement_item`) é pulado por
+  `cuponsElegiveis` e **não** entra no `excluidos` que a rota devolve. Hoje são zero no
+  banco — a 032 cuidou dos 6 que existiam —, mas volta a acontecer se alguém usar a tela
+  antiga (ver buraco 3).
+- **Cupom cujo `partnership_id` mudou depois de entrar no lançamento** continua pagável:
+  a 034 só reconfere `verified`. É defensável (o item já congelou o valor), e o
+  `partnership_id` editável pelo Financeiro é o buraco 2 desta mesma lista.
+
 ### E uma coisa que não é buraco, mas todo mundo vai supor errado
 
 **Os dois triggers de `coupons` não valem no caminho real de criação.** Os dois começam
