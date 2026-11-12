@@ -1,7 +1,9 @@
 /** Tipos e formatadores da tela do Financeiro. Sem React. */
+import type { PreviaDaTela } from '@/lib/settlements/previa'
 
 export type ItemDoLancamento = {
   id: string
+  coupon_id: string
   valor: number
   coupons: { coupon_number: string; customer_name: string | null; used_at: string | null } | null
 }
@@ -35,7 +37,7 @@ export type GrupoDoInfluenciador = {
   pagosForaDeLancamento: number
   influencer: { id: string; name: string; instagram_handle: string | null }
   parcerias: (ParceriaDoFinanceiro & {
-    sugerido: { de: string; ate: string } | null
+    previa: PreviaDaTela
     lancamentos: Lancamento[]
   })[]
 }

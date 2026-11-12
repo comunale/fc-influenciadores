@@ -15,12 +15,14 @@
 -- exist" / função inexistente). Falha alta, não silenciosa.
 --
 -- RODAR ANTES de aplicar a 035 e DEPOIS dela. Antes, ficam VERMELHOS os casos
--- 1 (o financeiro consegue limpar "Pago": EXECUTOU) e 1.1 (o cupom ficou
--- não-pago), e o RESUMO, que acusa 2 não-OK: 3 linhas vermelhas no total, e é
--- o esperado. Todos os outros casos são o comportamento que NÃO pode mudar e
+-- 1 (o financeiro consegue limpar "Pago": EXECUTOU), 1.1 (o cupom ficou
+-- não-pago), 1.2 (consegue apagar paid_at/paid_by: EXECUTOU) e 1.3 (a prova do
+-- pagamento sumiu), e o RESUMO, que acusa 4 não-OK: 5 linhas vermelhas no
+-- total, e é o esperado. Todos os outros casos são o comportamento que NÃO pode mudar e
 -- ficam verdes nas duas rodadas. Depois da 035, tudo OK.
 --
--- Casos: 1 financeiro NÃO limpa "Pago" de cupom em lançamento pago; 2 financeiro
+-- Casos: 1 financeiro NÃO limpa "Pago" nem apaga paid_at/paid_by de cupom em
+-- lançamento pago; 2 financeiro
 -- AINDA limpa "Pago" de cupom fora de qualquer lançamento; 3 financeiro AINDA
 -- marca e desmarca "Pago" de cupom em lançamento aberto; 4 financeiro AINDA
 -- confere e preenche NF, AINDA muda NF de cupom de lançamento pago, e AINDA é
@@ -211,12 +213,22 @@ select set_config('request.jwt.claims',
 
 -- 1: a trava nova.
 select pg_temp.tenta(1, 'financeiro limpa Pago de cupom em lancamento pago',
-  'P0001 nao pode ser desmarcado',
+  'P0001 nao pode ter o pagamento desfeito',
   $q$update public.coupons set paid = false, paid_at = null, paid_by = null
       where id = '00000000-0000-0000-0035-000000000111'$q$,
-  'P0001', 'nao pode ser desmarcado');
+  'P0001', 'nao pode ter o pagamento desfeito');
 select pg_temp.confere(1.1, 'o cupom segue pago',
   $q$select paid::text from public.coupons where id = '00000000-0000-0000-0035-000000000111'$q$, 'true');
+
+-- 1.2/1.3: apagar so a prova do pagamento (paid segue true) tambem e barrado.
+select pg_temp.tenta(1.2, 'financeiro apaga paid_at/paid_by de cupom em lancamento pago',
+  'P0001 nao pode ter o pagamento desfeito',
+  $q$update public.coupons set paid_at = null, paid_by = null
+      where id = '00000000-0000-0000-0035-000000000141'$q$,
+  'P0001', 'nao pode ter o pagamento desfeito');
+select pg_temp.confere(1.3, 'a prova do pagamento segue la (paid_by fixture, paid_at preenchido)',
+  $q$select paid_by || '|' || (paid_at is not null)::text from public.coupons
+      where id = '00000000-0000-0000-0035-000000000141'$q$, 'fixture|true');
 
 -- 2: fora de qualquer lançamento, o comportamento de antes.
 select pg_temp.nao_levanta(2, 'financeiro limpa Pago de cupom fora de lancamento',
@@ -229,9 +241,13 @@ select pg_temp.confere(2.1, 'o cupom ficou nao pago',
 select pg_temp.nao_levanta(3, 'financeiro marca Pago em cupom de lancamento aberto',
   $q$update public.coupons set paid = true, paid_at = now(), paid_by = 'Financeiro'
       where id = '00000000-0000-0000-0035-000000000131'$q$);
-select pg_temp.nao_levanta(3.1, 'financeiro desmarca Pago em cupom de lancamento aberto',
+select pg_temp.confere(3.1, 'o cupom ficou pago',
+  $q$select paid::text from public.coupons where id = '00000000-0000-0000-0035-000000000131'$q$, 'true');
+select pg_temp.nao_levanta(3.2, 'financeiro desmarca Pago em cupom de lancamento aberto',
   $q$update public.coupons set paid = false, paid_at = null, paid_by = null
       where id = '00000000-0000-0000-0035-000000000131'$q$);
+select pg_temp.confere(3.3, 'o cupom ficou nao pago',
+  $q$select paid::text from public.coupons where id = '00000000-0000-0000-0035-000000000131'$q$, 'false');
 
 -- 4: conferência e NF como antes; dado do cliente segue barrado com a mensagem da 003.
 select pg_temp.nao_levanta(4, 'financeiro confere e preenche NF',
@@ -245,11 +261,15 @@ select pg_temp.tenta(4.2, 'financeiro mexe em dado do cliente', 'P0001 Financeir
   'P0001', 'Financeiro so pode');
 select pg_temp.nao_levanta(4.3, 'financeiro muda a NF de cupom de lancamento pago',
   $q$update public.coupons set invoice_number = 'NF-corrigida' where id = '00000000-0000-0000-0035-000000000141'$q$);
+select pg_temp.confere(4.4, 'a NF corrigida foi gravada',
+  $q$select invoice_number from public.coupons where id = '00000000-0000-0000-0035-000000000141'$q$, 'NF-corrigida');
 
 -- 7: false -> true em cupom de lançamento 'pago' (o meio de settlement_pagar).
 select pg_temp.nao_levanta(7, 'financeiro marca Pago (false -> true) em cupom de lancamento pago',
   $q$update public.coupons set paid = true, paid_at = now(), paid_by = 'Financeiro'
       where id = '00000000-0000-0000-0035-000000000181'$q$);
+select pg_temp.confere(7.1, 'o cupom ficou pago',
+  $q$select paid::text from public.coupons where id = '00000000-0000-0000-0035-000000000181'$q$, 'true');
 
 -- 8: settlement_pagar de ponta a ponta, com a identidade do financeiro.
 select pg_temp.confere(8, 'financeiro paga lancamento: devolve 1 cupom marcado',
@@ -273,13 +293,13 @@ select pg_temp.nao_levanta(5, 'admin limpa Pago de cupom em lancamento pago',
 select pg_temp.confere(5.1, 'o cupom ficou nao pago',
   $q$select paid::text from public.coupons where id = '00000000-0000-0000-0035-000000000161'$q$, 'false');
 
--- Resumo. 17 casos: 1, 1.1 (2); 2, 2.1 (2); 3, 3.1 (2); 4, 4.1, 4.2, 4.3 (4);
--- 5, 5.1 (2); 6, 6.1 (2); 7 (1); 8, 8.1 (2) = 17.
+-- Resumo. 23 casos: 1, 1.1, 1.2, 1.3 (4); 2, 2.1 (2); 3, 3.1, 3.2, 3.3 (4);
+-- 4, 4.1, 4.2, 4.3, 4.4 (5); 5, 5.1 (2); 6, 6.1 (2); 7, 7.1 (2); 8, 8.1 (2) = 23.
 -- (recontar se casos mudarem)
 insert into r
-select 999, 'RESUMO', 'total 17, nenhum nao-OK',
+select 999, 'RESUMO', 'total 23, nenhum nao-OK',
        count(*) || ' linhas, ' || count(*) filter (where veredito not like 'OK%') || ' nao-OK',
-       case when count(*) = 17 and count(*) filter (where veredito not like 'OK%') = 0
+       case when count(*) = 23 and count(*) filter (where veredito not like 'OK%') = 0
             then 'OK' else 'FALHOU -- linhas faltando ou casos nao-OK' end
   from r;
 

@@ -1,16 +1,22 @@
 import { createClient, getUserRole } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import type { ContratoInfluencer } from '@/lib/commission'
 import { periodoSugerido, hojeNoBalcao } from '@/lib/settlements/periodo'
+import { previaDoFechamento, previaParaTela, type CupomDeExibicao } from '@/lib/settlements/previa'
 import { ListaDeLancamentos } from '@/components/admin/financeiro/ListaDeLancamentos'
 import type { GrupoDoInfluenciador, Lancamento } from '@/components/admin/financeiro/tipos'
 
 type ParceriaLinha = {
   id: string
+  influencer_id: string
   status: string
   starts_at: string
   ends_at: string | null
   payment_schedule: string
   commission_per_sale: number
+  commission_starts_at: number
+  fee_amount: number
+  commission_counts_from: string
   influencers: { id: string; name: string; instagram_handle: string | null } | null
   settlements: Lancamento[]
 }
@@ -25,34 +31,77 @@ export default async function FinanceiroPage() {
   const { data, error } = await supabase
     .from('partnerships')
     .select(
-      `id, status, starts_at, ends_at, payment_schedule, commission_per_sale,
+      `id, influencer_id, status, starts_at, ends_at, payment_schedule, commission_per_sale,
+       commission_starts_at, fee_amount, commission_counts_from,
        influencers(id, name, instagram_handle),
        settlements(id, tipo, status, periodo_de, periodo_ate, valor, paid_at, forma, identificador, created_at, created_by,
-         settlement_items(id, valor, coupons(coupon_number, customer_name, used_at)))`
+         settlement_items(id, coupon_id, valor, coupons(coupon_number, customer_name, used_at)))`
     )
     .order('starts_at', { ascending: false })
 
-  // Cupons pagos fora de lancamento, por influenciador: o portal os soma em
-  // "Ja pago" e a soma dos lancamentos nao, entao a tela diz que existem.
-  const { data: pagos } = await supabase
-    .from('coupons')
-    .select('influencer_id, settlement_items(id)')
-    .eq('paid', true)
-  const foraDeLancamento = new Map<string, number>()
-  for (const c of (pagos ?? []) as unknown as { influencer_id: string; settlement_items: unknown }[]) {
-    const emLancamento = Array.isArray(c.settlement_items) ? c.settlement_items.length > 0 : Boolean(c.settlement_items)
-    if (!emLancamento) foraDeLancamento.set(c.influencer_id, (foraDeLancamento.get(c.influencer_id) ?? 0) + 1)
+  const parcerias = (data ?? []) as unknown as ParceriaLinha[]
+
+  // Os cupons de cada influenciador, para a previa do fechamento calculada AQUI
+  // com as mesmas funcoes puras da rota (o navegador nao recalcula dinheiro).
+  const idsDosInfluenciadores = [...new Set(parcerias.map((p) => p.influencer_id))]
+  const respostas = await Promise.all(
+    idsDosInfluenciadores.map((id) =>
+      supabase
+        .from('coupons')
+        .select('id, status, verified, paid, created_at, commission_per_sale, partnership_id, used_at, coupon_number, customer_name')
+        .eq('influencer_id', id)
+    )
+  )
+  const erroNosCupons = respostas.some((r) => r.error)
+  const cuponsDe = new Map<string, CupomDeExibicao[]>()
+  respostas.forEach((r, i) => cuponsDe.set(idsDosInfluenciadores[i], (r.data ?? []) as unknown as CupomDeExibicao[]))
+
+  // Cupons que ja estao em algum item de lancamento, por influenciador.
+  const emLancamentoDe = new Map<string, Set<string>>()
+  for (const p of parcerias) {
+    const s = emLancamentoDe.get(p.influencer_id) ?? new Set<string>()
+    for (const l of p.settlements ?? []) for (const i of l.settlement_items) s.add(i.coupon_id)
+    emLancamentoDe.set(p.influencer_id, s)
   }
 
   const hoje = hojeNoBalcao(new Date())
   const porInfluenciador = new Map<string, GrupoDoInfluenciador>()
-  for (const p of (data ?? []) as unknown as ParceriaLinha[]) {
+  for (const p of parcerias) {
     if (!p.influencers) continue
+    const cupons = cuponsDe.get(p.influencer_id) ?? []
+    const emLancamento = emLancamentoDe.get(p.influencer_id) ?? new Set<string>()
+
     const grupo = porInfluenciador.get(p.influencers.id) ?? {
       influencer: p.influencers,
-      pagosForaDeLancamento: foraDeLancamento.get(p.influencers.id) ?? 0,
+      // Pagos (paid = true) sem item de lancamento: o portal os soma em "Ja pago".
+      pagosForaDeLancamento: cupons.filter((c) => c.paid && !emLancamento.has(c.id)).length,
       parcerias: [],
     }
+
+    // Parceria encerrada fecha a vida inteira dela (como 'fim'), qualquer que
+    // seja o calendario: oferecer "o mes passado" de quem acabou em marco e
+    // sempre um fechamento vazio.
+    const encerrada = p.status === 'encerrada'
+    const periodo = periodoSugerido(
+      encerrada || p.payment_schedule === 'fim' ? 'fim' : 'mensal',
+      { starts_at: p.starts_at, ends_at: p.ends_at, status: encerrada ? 'encerrada' : 'ativa' },
+      hoje
+    )
+    const contrato: ContratoInfluencer = {
+      commission_per_sale: p.commission_per_sale,
+      commission_starts_at: p.commission_starts_at,
+      fee_amount: p.fee_amount,
+      commission_counts_from: p.commission_counts_from === 'historico' ? 'historico' : 'parceria',
+      partnership_id: p.id,
+    }
+    const previa = previaDoFechamento({
+      cupons,
+      contrato,
+      periodo,
+      fimDaParceria: p.ends_at,
+      emLancamento,
+    })
+
     grupo.parcerias.push({
       id: p.id,
       status: p.status,
@@ -60,11 +109,7 @@ export default async function FinanceiroPage() {
       ends_at: p.ends_at,
       payment_schedule: p.payment_schedule,
       commission_per_sale: p.commission_per_sale,
-      sugerido: periodoSugerido(
-        p.payment_schedule === 'fim' ? 'fim' : 'mensal',
-        { starts_at: p.starts_at, ends_at: p.ends_at, status: p.status === 'encerrada' ? 'encerrada' : 'ativa' },
-        hoje
-      ),
+      previa: previaParaTela(previa, cupons, periodo, p.ends_at),
       lancamentos: [...(p.settlements ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at)),
     })
     porInfluenciador.set(p.influencers.id, grupo)
@@ -82,6 +127,11 @@ export default async function FinanceiroPage() {
       {error && (
         <p role="alert" className="text-sm text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
           Não foi possível carregar os lançamentos. Atualize a página.
+        </p>
+      )}
+      {erroNosCupons && (
+        <p role="alert" className="text-sm text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
+          Não foi possível ler os cupons de algum influenciador: as prévias e os totais de &quot;pago fora de lançamento&quot; podem estar incompletos. Atualize a página antes de fechar.
         </p>
       )}
       <ListaDeLancamentos grupos={grupos} />

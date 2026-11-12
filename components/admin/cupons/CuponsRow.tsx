@@ -204,7 +204,7 @@ export function CuponsRowItem({
             // tela do Financeiro: o texto diz para onde a acao foi.
             <>
               <div className="text-xs text-gray-400">
-                {paid && c.paid_at ? formatDate(c.paid_at) : '—'}
+                {paid ? (c.paid_at ? formatDate(c.paid_at) : 'pago') : '—'}
               </div>
               <Link href="/admin/financeiro" className="text-[10px] text-gray-600 hover:text-[#00ff87]">
                 pago pelo Financeiro

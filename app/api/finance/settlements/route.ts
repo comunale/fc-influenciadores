@@ -1,17 +1,15 @@
 import { requireRole, createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { ContratoInfluencer } from '@/lib/commission'
-import { cuponsElegiveis, cuponsJaPagos } from '@/lib/settlements/periodo'
+import { intersecar, previaDoFechamento } from '@/lib/settlements/previa'
 import {
   PAPEIS_DO_LIVRO,
   camposDeFechamento,
   centavos,
-  filtrarInclusao,
   recusaDeFechar,
   resumoDeExcluidos,
   somaDoLancamento,
   traduzErroDoLivro,
-  type CupomExcluido,
 } from '@/lib/settlements/rotas'
 
 /**
@@ -34,13 +32,13 @@ export async function POST(request: Request) {
 
     const campos = camposDeFechamento(await request.json().catch(() => null))
     if (!campos.ok) return NextResponse.json({ error: campos.error }, { status: 400 })
-    const { partnership_id, periodo } = campos
+    const { partnership_id, periodo, cupom_ids } = campos
 
     const supabase = await createClient()
 
     const { data: parceria, error: erroParceria } = await supabase
       .from('partnerships')
-      .select('id, influencer_id, commission_per_sale, commission_starts_at, fee_amount, commission_counts_from')
+      .select('id, influencer_id, ends_at, commission_per_sale, commission_starts_at, fee_amount, commission_counts_from')
       .eq('id', partnership_id)
       .maybeSingle()
     if (erroParceria) {
@@ -67,62 +65,34 @@ export async function POST(request: Request) {
       commission_counts_from: parceria.commission_counts_from === 'historico' ? 'historico' : 'parceria',
       partnership_id: parceria.id,
     }
-    const todos = cuponsElegiveis(cupons ?? [], contratoDaParceria, periodo)
 
-    // A POSICAO da venda foi contada no historico todo (certo e deliberado);
-    // a INCLUSAO e so da parceria do lancamento e so de cupom que o trigger
-    // aceitaria. Cupom fora da regra e PULADO e CONTADO: o trigger nao diz qual
-    // cupom o barrou, e status e campo so do admin, entao deixar o trigger
-    // recusar mandaria uma tarefa do Financeiro para o admin toda vez.
-    const { incluidos, excluidos: foraDaRegra } = filtrarInclusao(todos, cupons ?? [], partnership_id)
+    // Cupons que ja constam em algum lancamento (qualquer status). Junta por
+    // cupom do influenciador para nao montar uma URL com centenas de ids.
+    const { data: itensDoInfluenciador, error: erroItens } = await supabase
+      .from('settlement_items')
+      .select('coupon_id, coupons!inner(influencer_id)')
+      .eq('coupons.influencer_id', parceria.influencer_id)
+    if (erroItens) {
+      console.error('settlements fechar: itens existentes', erroItens)
+      return NextResponse.json({ error: 'Não foi possível conferir os lançamentos existentes.' }, { status: 500 })
+    }
+    const emLancamento = new Set((itensDoInfluenciador ?? []).map((i) => i.coupon_id))
 
-    // Cupom que ja esta em outro lancamento (aberto) tambem nao entra de novo.
-    // O indice unico barraria de qualquer jeito.
-    const excluidos: CupomExcluido[] = [...foraDaRegra]
-    let elegiveis = incluidos
-    if (incluidos.length > 0) {
-      const { data: jaLancados, error: erroItens } = await supabase
-        .from('settlement_items')
-        .select('coupon_id')
-        .in('coupon_id', incluidos.map((c) => c.coupon_id))
-      if (erroItens) {
-        console.error('settlements fechar: itens existentes', erroItens)
-        return NextResponse.json({ error: 'Não foi possível conferir os lançamentos existentes.' }, { status: 500 })
-      }
-      const ocupados = new Set((jaLancados ?? []).map((i) => i.coupon_id))
-      elegiveis = incluidos.filter((c) => !ocupados.has(c.coupon_id))
-      for (const c of incluidos) {
-        if (ocupados.has(c.coupon_id)) {
-          excluidos.push({ coupon_id: c.coupon_id, valor: c.valor, motivo: 'cupom ja esta em outro lancamento' })
-        }
-      }
-    }
-    // Cupom ja pago (paid = true) do periodo que NAO esta em lancamento: pago
-    // antes desta funcionalidade. cuponsElegiveis o descarta, e sem contar aqui o
-    // total sairia completo na aparencia. Os que estao em lancamento sao
-    // pagamentos normais e nao sao exclusao.
-    const jaPagos = cuponsJaPagos(cupons ?? [], contratoDaParceria, periodo)
-    if (jaPagos.length > 0) {
-      const { data: pagosEmLancamento, error: erroPagos } = await supabase
-        .from('settlement_items')
-        .select('coupon_id')
-        .in('coupon_id', jaPagos.map((c) => c.coupon_id))
-      if (erroPagos) {
-        console.error('settlements fechar: pagos', erroPagos)
-        return NextResponse.json({ error: 'Não foi possível conferir os cupons já pagos.' }, { status: 500 })
-      }
-      const emLancamento = new Set((pagosEmLancamento ?? []).map((i) => i.coupon_id))
-      for (const c of jaPagos) {
-        if (!emLancamento.has(c.coupon_id)) {
-          excluidos.push({ coupon_id: c.coupon_id, valor: c.valor, motivo: 'ja consta como pago fora de um lancamento' })
-        }
-      }
-    }
-    const resumoExcluidos = resumoDeExcluidos(excluidos)
+    // O conjunto elegivel e SEMPRE calculado aqui, igual ao da previa da tela.
+    // A lista de ids do cliente (se vier) so escolhe DENTRO dele.
+    const previa = previaDoFechamento({
+      cupons: cupons ?? [],
+      contrato: contratoDaParceria,
+      periodo,
+      fimDaParceria: parceria.ends_at,
+      emLancamento,
+    })
+    const { escolhidos: elegiveis, ignorados } = intersecar(previa, cupom_ids)
+    const resumoExcluidos = resumoDeExcluidos(previa.excluidos)
 
     const recusa = recusaDeFechar(elegiveis)
     if (recusa) {
-      return NextResponse.json({ error: recusa.error, excluidos: resumoExcluidos }, { status: recusa.status })
+      return NextResponse.json({ error: recusa.error, excluidos: resumoExcluidos, ignorados }, { status: recusa.status })
     }
 
     // Cada item arredondado a centavos e o total e a soma dos itens ja
@@ -170,6 +140,8 @@ export async function POST(request: Request) {
       // O que ficou de fora e por que, para a tela nao mostrar um total menor
       // sem explicar.
       excluidos: resumoExcluidos,
+      // Ids da lista que nao pertencem ao conjunto do servidor (ignorados, nunca inseridos).
+      ignorados,
     })
   } catch (err) {
     console.error('settlements fechar error:', err)

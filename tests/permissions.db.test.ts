@@ -116,8 +116,8 @@ d('permissoes no banco', () => {
   describe('financeiro', () => {
     it('preenche NF e confere; marcar pago cupom a cupom fica por conta da tela do Financeiro, nao do banco', async () => {
       // O banco AINDA aceita o financeiro marcar "Pago" num cupom fora de
-      // lancamento (so o admin tem o campo na API; ver FIELDS_BY_ROLE). O que o
-      // banco recusa e DESMARCAR cupom de lancamento pago (migration 035).
+      // lancamento (so o admin tem o campo na API; ver CAMPOS_POR_PAPEL). O que o
+      // banco recusa e DESFAZER o pagamento de cupom de lancamento fechado (migration 035).
       const cupom = await criarCupom(client, { status: 'used' })
       await virar(client, finance)
 
@@ -133,14 +133,19 @@ d('permissoes no banco', () => {
 
     it('nao desmarca pago de cupom que esta em lancamento pago (035)', async () => {
       const cupom = await criarCupom(client, { status: 'used', verified: true, invoiceNumber: 'NF-1' })
+      // Setup em chamadas SEQUENCIAIS: o trigger de itens le settlements e
+      // coupons, e CTEs com escrita de uma mesma instrucao nao se enxergam.
+      const { rows: parc } = await client.query('select id from public.partnerships limit 1')
+      const parceria = parc[0].id
+      await client.query('update public.coupons set partnership_id=$2 where id=$1', [cupom, parceria])
+      const { rows: lanc } = await client.query(
+        `insert into public.settlements(partnership_id, tipo, status, periodo_de, periodo_ate, valor)
+         values ($1, 'comissao', 'aberto', date '2026-10-01', date '2026-10-31', 10) returning id`,
+        [parceria]
+      )
       await client.query(
-        `with p as (select id from public.partnerships limit 1),
-              c as (update public.coupons set partnership_id = (select id from p) where id = $1 returning id),
-              s as (insert into public.settlements(partnership_id, tipo, status, periodo_de, periodo_ate, valor)
-                    select id, 'comissao', 'aberto', date '2026-10-01', date '2026-10-31', 10 from p returning id)
-         insert into public.settlement_items(settlement_id, coupon_id, valor)
-         select s.id, c.id, 10 from s, c`,
-        [cupom]
+        'insert into public.settlement_items(settlement_id, coupon_id, valor) values ($1, $2, 10)',
+        [lanc[0].id, cupom]
       )
       await client.query(`update public.coupons set paid=true, paid_at=now(), paid_by='x' where id=$1`, [cupom])
       await client.query(
@@ -152,7 +157,13 @@ d('permissoes no banco', () => {
 
       await deveFalhar(
         () => client.query(`update public.coupons set paid=false, paid_at=null, paid_by=null where id=$1`, [cupom]),
-        /lancamento pago nao pode ser desmarcado/i
+        /nao pode ter o pagamento desfeito/i
+      )
+
+      // Apagar so a prova do pagamento (paid_at/paid_by) tambem e barrado.
+      await deveFalhar(
+        () => client.query('update public.coupons set paid_at=null, paid_by=null where id=$1', [cupom]),
+        /nao pode ter o pagamento desfeito/i
       )
 
       // O admin mantem o poder (decisao do dono).

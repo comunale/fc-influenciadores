@@ -37,7 +37,7 @@ function dataValida(s: string): boolean {
 // --- fechar -----------------------------------------------------------------
 
 export type CamposDeFechamento =
-  | { ok: true; partnership_id: string; periodo: Periodo }
+  | { ok: true; partnership_id: string; periodo: Periodo; cupom_ids?: string[] }
   | { ok: false; error: string }
 
 /** Allowlist fechada: o valor, o tipo e o status NUNCA vem do corpo. */
@@ -55,7 +55,18 @@ export function camposDeFechamento(body: unknown): CamposDeFechamento {
     return { ok: false, error: 'Período inválido: informe as datas no formato AAAA-MM-DD.' }
   }
   if (de > ate) return { ok: false, error: 'Período inválido: a data inicial vem depois da final.' }
-  return { ok: true, partnership_id, periodo: { de, ate } }
+  // Lista explicita de cupons: OPCIONAL. Ausente = so o periodo, como sempre.
+  // Presente (mesmo vazia) = exatamente a interseccao dela com o que o servidor
+  // calcula (ver intersecar em previa.ts). Nunca e confiada como esta.
+  let cupom_ids: string[] | undefined
+  if (b.cupom_ids !== undefined) {
+    if (!Array.isArray(b.cupom_ids) || b.cupom_ids.length > 5000 ||
+        !b.cupom_ids.every((x) => typeof x === 'string' && UUID.test(x))) {
+      return { ok: false, error: 'Lista de cupons inválida.' }
+    }
+    cupom_ids = [...new Set(b.cupom_ids as string[])]
+  }
+  return { ok: true, partnership_id, periodo: { de, ate }, ...(cupom_ids ? { cupom_ids } : {}) }
 }
 
 /** Arredonda para centavos. 0.1 + 0.2 nao pode virar 0.30000000000000004 no livro. */

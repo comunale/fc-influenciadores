@@ -5,9 +5,6 @@ import type { Database } from '@/lib/supabase/types'
 
 type CouponUpdate = Database['public']['Tables']['coupons']['Update']
 
-// Quais colunas cada papel pode escrever. O banco repete essa regra no trigger:
-// se as duas discordarem, o banco vence e a API devolve 500 — o que é o certo.
-
 // O Postgres devolve o nome da constraint, que nao diz nada para quem usa o
 // sistema. Aqui vira portugues. Se aparecer uma constraint nova sem traducao,
 // cai no texto generico em vez de vazar SQL na tela.
@@ -24,9 +21,11 @@ function traduzErroDoBanco(msg: string): string {
   if (msg.includes('coupons_coupon_number_key')) {
     return 'Já existe um cupom com este código.'
   }
+  if (msg.includes('nao pode ter o pagamento desfeito')) {
+    return 'Este cupom está num lançamento fechado: o pagamento dele não pode ser desfeito nem alterado.'
+  }
   return 'Não foi possível salvar a alteração.'
 }
-
 
 // DELETE — exclui um ou mais cupons
 export async function DELETE(request: Request) {

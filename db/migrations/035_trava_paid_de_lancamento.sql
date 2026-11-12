@@ -16,19 +16,24 @@
 -- O QUE MUDA
 --
 --   No ramo do financeiro, DEPOIS da conferência das colunas proibidas e antes
---   do `return new`: recusa a mudança de `paid` de true para false quando o
---   cupom tem item num lançamento que NÃO está 'aberto' (ou seja, 'pago').
+--   do `return new`: recusa desfazer ou alterar o pagamento (paid de true para
+--   false, ou mudar paid_at / paid_by de um cupom pago) quando o cupom tem item
+--   num lançamento que NÃO está 'aberto'. A condição é `<> 'aberto'`, e não
+--   `= 'pago'`, de propósito: falha fechada. Apagar paid_at/paid_by não recria
+--   a divergência de dinheiro, mas apaga a prova do pagamento de um lançamento
+--   congelado (e a tela do Cupons lê o pagamento de paid_at).
 --   Todo o resto do corpo é o da 003, byte a byte: o curto-circuito de
 --   `auth.uid() is null or is_admin()` no topo (decisão do dono: o admin PODE
 --   e DEVE poder editar) e o ramo do lojista seguem iguais.
 --
--- POR QUE SÓ true -> false
+-- POR QUE SÓ QUANDO O CUPOM JÁ ESTAVA PAGO (old.paid)
 --
 --   settlement_pagar (034) primeiro marca o lançamento 'pago' e SÓ DEPOIS
 --   marca coupons.paid = true, dentro da mesma função e com a identidade do
---   financeiro (security definer não zera auth.uid()). Recusar também a
---   mudança false -> true derrubaria o próprio pagamento. A divergência que
---   esta migration fecha é a de LIMPAR a marca; marcar não a cria.
+--   financeiro (security definer não zera auth.uid()). Nessa escrita o cupom
+--   ainda tem old.paid = false, então ela passa; recusar também a mudança
+--   false -> true derrubaria o próprio pagamento. A divergência que esta
+--   migration fecha é a de LIMPAR ou ALTERAR a marca já gravada.
 --
 -- Aplicar DEPOIS da 031 (settlement_items) e da 034.
 --
@@ -120,10 +125,14 @@ begin
       raise exception 'Financeiro so pode alterar conferencia, pagamento e NF.';
     end if;
 
-    -- Cupom de lancamento pago nao volta a "nao pago" pela mao do financeiro.
-    -- So true -> false: settlement_pagar marca o lancamento 'pago' ANTES de
-    -- marcar os cupons, e essa escrita (false -> true) precisa passar.
-    if old.paid and not new.paid
+    -- Cupom de lancamento fechado nao tem o pagamento desfeito nem apagado
+    -- pela mao do financeiro (paid, paid_at, paid_by). So quando o cupom JA
+    -- ESTAVA pago: settlement_pagar marca o lancamento 'pago' ANTES de marcar
+    -- os cupons, e essa escrita (old.paid = false) precisa passar.
+    if old.paid
+       and (new.paid is distinct from old.paid
+            or new.paid_at is distinct from old.paid_at
+            or new.paid_by is distinct from old.paid_by)
        and exists (
          select 1
            from public.settlement_items i
@@ -132,7 +141,7 @@ begin
             and s.status <> 'aberto'
        )
     then
-      raise exception 'Cupom de lancamento pago nao pode ser desmarcado como pago.';
+      raise exception 'Cupom de lancamento fechado (pago ou cancelado) nao pode ter o pagamento desfeito ou alterado.';
     end if;
 
     return new;

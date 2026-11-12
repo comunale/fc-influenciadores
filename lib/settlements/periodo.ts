@@ -108,17 +108,20 @@ export function cuponsJaPagos(
   return percorrer(cupons, contrato, periodo, true)
 }
 
-function percorrer(
-  cupons: VendaComUso[],
-  contrato: ContratoInfluencer,
-  periodo: Periodo,
-  pagos: boolean
-): CupomElegivel[] {
+/** Uma venda que conta para comissao, com o valor que acrescenta e o dia do balcao. */
+export type VendaQueConta = { coupon_id: string; valor: number; dia: string; paid: boolean }
+
+/**
+ * Todas as vendas conferidas que CONTAM para comissao (a posicao decidida por
+ * calcularComissao), pagas ou nao, sem recorte de periodo. Base comum de
+ * cuponsElegiveis, cuponsJaPagos e da previa do fechamento.
+ */
+export function vendasQueContam(cupons: VendaComUso[], contrato: ContratoInfluencer): VendaQueConta[] {
   const conferidas = cupons
     .filter((c) => c.verified)
     .sort((a, b) => a.created_at.localeCompare(b.created_at))
 
-  const resultado: CupomElegivel[] = []
+  const resultado: VendaQueConta[] = []
   let anterior = calcularComissao(contrato, [])
 
   for (let i = 0; i < conferidas.length; i++) {
@@ -127,10 +130,26 @@ function percorrer(
     const entra = atual.vendasQueContam > anterior.vendasQueContam
     const dia = c.used_at ? diaDoBalcao(c.used_at) : null
 
-    if (entra && Boolean(c.paid) === pagos && dia && dia >= periodo.de && dia <= periodo.ate) {
-      resultado.push({ coupon_id: c.id, valor: atual.comissaoGerada - anterior.comissaoGerada })
+    if (entra && dia) {
+      resultado.push({
+        coupon_id: c.id,
+        valor: atual.comissaoGerada - anterior.comissaoGerada,
+        dia,
+        paid: Boolean(c.paid),
+      })
     }
     anterior = atual
   }
   return resultado
+}
+
+function percorrer(
+  cupons: VendaComUso[],
+  contrato: ContratoInfluencer,
+  periodo: Periodo,
+  pagos: boolean
+): CupomElegivel[] {
+  return vendasQueContam(cupons, contrato)
+    .filter((v) => v.paid === pagos && v.dia >= periodo.de && v.dia <= periodo.ate)
+    .map((v) => ({ coupon_id: v.coupon_id, valor: v.valor }))
 }
