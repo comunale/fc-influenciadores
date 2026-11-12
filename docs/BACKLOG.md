@@ -206,9 +206,14 @@ no portal, criar a senha dela, preencher os dados e aceitar.
 
 ### O que continua em aberto
 
-1. **Fechamentos e pagamentos** (subsistema 2) — **spec aprovada em 11/11 e plano
-   escrito**, ainda sem código. Plano: `docs/superpowers/plans/2026-11-11-fechamentos-e-pagamentos.md`,
-   8 tarefas, execução por subagente. O maior buraco funcional: pagar comissão é
+1. **Fechamentos e pagamentos** (subsistema 2) — **em execução desde 11/11**.
+   Plano: `docs/superpowers/plans/2026-11-11-fechamentos-e-pagamentos.md`,
+   8 tarefas, execução por subagente. Tarefas 1 e 2 fechadas: o módulo puro de
+   período e elegibilidade (`lib/settlements/`) e a **migration 031, aplicada em
+   produção em 11/11** — `settlements`, `settlement_items`, índice único por
+   cupom, 4 triggers e 6 funções. O `scripts/verifica-031.sql` rodou no banco
+   real: 44 casos, 44 OK. Rode-o de novo antes e depois de mexer nessas tabelas;
+   ele é a prova, não a documentação. O maior buraco funcional: pagar comissão é
    cupom a cupom, o fee fixo não tem onde ser registrado, e a restituição que o
    contrato criou não tem tela.
 
@@ -219,11 +224,50 @@ no portal, criar a senha dela, preencher os dados e aceitar.
    porque os R$ 3.000 do @caiiuxo foram pagos em 01/10; e esse pagamento vira
    **lançamento retroativo** (forma `PIX`), para a promessa "nenhum cupom pago
    fora de um fechamento" valer desde a origem em vez de nascer com exceção.
-2. **Indique um Amigo** — spec e plano prontos, pausado por decisão dele.
-3. **Funil de prospecção** (subsistema 3) — sem spec.
-4. **O Financeiro pode reescrever o retrato de comissão** do cupom que ele paga.
+2. **Parceria de conteúdo, sem cupom** (pedido do César em 11/11) — a loja de Rio
+   Preto fechou com uma influenciadora num modelo que o sistema **não sabe
+   representar**: ela comprou a moto com 20% de desconto e paga com entrega
+   mensal (2 reels no feed com collab + 2 combos de stories, intercalando).
+   Decisões dele em 11/11, a serem obedecidas pela spec:
+
+   - **Sem cupom.** É contrato de conteúdo, não de venda. Comissão, validação no
+     balcão e fechamento não entram.
+   - **Exclusividade da loja fica só no texto do contrato**, sem trava no banco.
+     Ele sabe que qualquer loja consegue validar cupom; aceitou o risco porque
+     esta parceria não gera cupom nenhum.
+   - **Vários modelos de contrato**, escolhidos na hora de gerar — não um modelo
+     único com blocos condicionais.
+   - Fazer **depois** de Fechamentos.
+
+   Três fatos medidos no banco em 11/11 que a spec tem que encarar:
+
+   - `partnerships.discount_type`, `discount_value` e `validity_days` são
+     `not null` **sem default**. Toda parceria é obrigada a declarar um cupom;
+     parceria de conteúdo puro não entra sem mentir nesses campos.
+   - **Só existe um modelo ativo.** `lib/contracts/gerar.ts` pega
+     `ativo = true limit 1`, e `app/api/admin/contract-template/route.ts` desliga
+     o anterior ao salvar um novo. Hoje, "modelo diferente" = trocar o modelo de
+     todo mundo. Contratos já aceitos não mudam (o `corpo` é retrato), só os
+     próximos.
+   - Não há campo de entregas nem de contrapartida em lugar nenhum. O modelo só
+     cita `influenciador.{nome,cpf,estado_civil,endereco,cep,link}`,
+     `parceria.{vigencia,duracao,comissao,fee}` e
+     `contrato.{data,imagem_meses}`. A tela do contrato só exibe o `corpo`, não
+     deixa editar.
+
+   Pergunta em aberto para a spec: com vários modelos, as entregas podem ser
+   texto literal dentro do modelo dela — mais simples, com o risco de virar um
+   modelo por influenciadora. Decidir isso antes de escrever o plano.
+
+   Jurídico: o contrato atual diz que a comissão é o pagamento. No caso dela o
+   pagamento é a moto com desconto, que **já aconteceu**. Sem cláusula explícita,
+   ela recebeu antes de entregar e não há o que sustente a cobrança da entrega
+   mensal. Isso é para o advogado, não para o código.
+3. **Indique um Amigo** — spec e plano prontos, pausado por decisão dele.
+4. **Funil de prospecção** (subsistema 3) — sem spec.
+5. **O Financeiro pode reescrever o retrato de comissão** do cupom que ele paga.
    Segunda camada furada; a rota já barra. Conserto: quatro campos no trigger.
-5. **Reorganizar o resto do admin** — Cupons, Contratos, Configurações. O César
+6. **Reorganizar o resto do admin** — Cupons, Contratos, Configurações. O César
    quer, e pediu para fazer depois dos influenciadores. Merece spec antes.
 
 ### Do César, não técnico
@@ -495,7 +539,7 @@ antes derrubaria o site — foi assim que o balcão ficou 12 dias fora do ar.
 
 | O quê | Por quê importa |
 |---|---|
-| **Pagamento do fixo (`fee_amount`) não é controlado** | Existe o valor no contrato, mas nenhum campo diz se saiu. A tela mostra separado e não soma em "a pagar", para não dar número errado. Um `fee_paid_at` resolveria. |
+| ~~**Pagamento do fixo (`fee_amount`) não é controlado**~~ — **em conserto na Task 4 de Fechamentos (migration 033)** | Era: existe o valor no contrato, mas nenhum campo diz se saiu. A solução não foi o `fee_paid_at` que esta linha propunha: o fixo vira um lançamento `tipo='fixo'` no livro, que nasce `aberto` e é quitado como qualquer outro. Um campo a menos e um lugar só para olhar. Apagar esta linha quando a 033 for aplicada. |
 | **19 testes de banco dormindo** | `tests/permissions.db.test.ts` só roda com `SUPABASE_DB_URL`. O César preferiu não usar a senha do Postgres de produção — decisão certa. Para ligar, o caminho é um projeto Supabase separado para testes. |
 | **`campaigns.active` perdeu a função** | Desde 18/08 não derruba mais link. Vale avaliar se o campo ainda faz sentido ou se confunde. |
 | **Marcar comissão como paga é cupom a cupom** | Com volume maior vai pedir um "pagar tudo deste influenciador". |
