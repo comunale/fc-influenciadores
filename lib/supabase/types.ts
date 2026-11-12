@@ -476,6 +476,95 @@ export type Database = {
           },
         ]
       }
+      settlements: {
+        Row: {
+          id: string
+          partnership_id: string
+          tipo: string
+          status: string
+          periodo_de: string | null
+          periodo_ate: string | null
+          valor: number
+          paid_at: string | null
+          forma: string | null
+          identificador: string | null
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          partnership_id: string
+          tipo: string
+          status?: string
+          periodo_de?: string | null
+          periodo_ate?: string | null
+          valor: number
+          paid_at?: string | null
+          forma?: string | null
+          identificador?: string | null
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          partnership_id?: string
+          tipo?: string
+          status?: string
+          periodo_de?: string | null
+          periodo_ate?: string | null
+          valor?: number
+          paid_at?: string | null
+          forma?: string | null
+          identificador?: string | null
+          created_at?: string
+          created_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "settlements_partnership_id_fkey"
+            columns: ["partnership_id"]
+            isOneToOne: false
+            referencedRelation: "partnerships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      settlement_items: {
+        Row: {
+          id: string
+          settlement_id: string
+          coupon_id: string
+          valor: number
+        }
+        Insert: {
+          id?: string
+          settlement_id: string
+          coupon_id: string
+          valor: number
+        }
+        Update: {
+          id?: string
+          settlement_id?: string
+          coupon_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "settlement_items_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "settlements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "settlement_items_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "coupons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sellers: {
         Row: {
           id: string
