@@ -7,15 +7,20 @@
 -- Mesmas lições do verifica-031: cada caso confere SQLSTATE e o MOTIVO
 -- (pg_temp.tenta), e cada caso usa a sua PRÓPRIA parceria e o seu PRÓPRIO
 -- contrato. Parcerias de teste são clones de uma parceria real, com fee_amount
--- trocado. Se a 031 ou a 033 não estiverem aplicadas, o script para ou os
--- casos 1/3 ficam vermelhos (controle negativo).
+-- trocado. Se a 031 não estiver aplicada, o script para no setup.
+--
+-- RODAR ANTES de aplicar a 033 e DEPOIS dela. Antes, os casos 1, 1.1, 3.1, 5.2,
+-- 8.1 e 8.2 têm que ficar VERMELHOS (nada cria fixo nem restituição ainda):
+-- é isso que prova que o script mede alguma coisa. Os demais ficam verdes nas
+-- duas rodadas, inclusive o 3 e o 4 (a função antiga já funciona para admin).
 --
 -- registrar_descumprimento exige admin: os casos que a chamam assumem a
 -- identidade de um admin ativo (claims), como o caso 11 do verifica-031.
 --
 -- Casos: 1-2 fixo na criação; 3 restituição com fixo; 4 contrato aceito com
 -- fixo ZERO (a regressão que a guarda `fee > 0` evita: é o único cenário que
--- existe no banco hoje); 5 chamada dupla; 6 quem não é admin.
+-- existe no banco hoje); 5 chamada dupla; 6 quem não é admin; 7 sem
+-- identidade nenhuma (service_role); 8-9 o fixo nasce também por UPDATE.
 
 begin;
 
@@ -32,17 +37,36 @@ do $$ begin
   end if;
 end $$;
 
+-- Influenciador sem nenhuma parceria ativa: a fixture 'ativa' do caso 4 não
+-- colide com "uma ativa por influenciador".
+create temp table base as
+  select influencer_id from public.partnerships
+   group by influencer_id
+  having count(*) filter (where status = 'ativa') = 0
+   limit 1;
+
+do $$ begin
+  if not exists (select 1 from base) then
+    raise exception 'fixture base vazio: todo influenciador ja tem parceria ativa';
+  end if;
+end $$;
+
 -- ---------- auxiliares (só existem durante a transação) ----------
 
--- Parceria clonada com o fee informado, 'encerrada' (não colide com "uma ativa
--- por influenciador") e com contract_accepted_at preenchido (para provar que o
--- descumprimento zera). O INSERT dispara o trigger da 033.
-create function pg_temp.mkp(p_id uuid, p_fee numeric) returns void language sql as $f$
+-- Parceria clonada de uma parceria do influenciador `base` (um que NÃO tem
+-- parceria ativa: o índice único parcial só vale para status 'ativa'), com o
+-- fee, o status e o ends_at informados (ends_at nulo = mantém o do clone) e com
+-- contract_accepted_at preenchido (para provar que o descumprimento zera). O
+-- INSERT dispara o trigger da 033.
+create function pg_temp.mkp(p_id uuid, p_fee numeric, p_status text, p_ends date) returns void language sql as $f$
   insert into public.partnerships
   select (jsonb_populate_record(null::public.partnerships,
-           to_jsonb(b) || jsonb_build_object('id', p_id, 'status', 'encerrada',
-             'fee_amount', p_fee, 'contract_accepted_at', now()))).*
-  from (select * from public.partnerships limit 1) b;
+           to_jsonb(b) || jsonb_build_object('id', p_id, 'status', p_status,
+             'fee_amount', p_fee, 'contract_accepted_at', now())
+           || case when p_ends is null then '{}'::jsonb
+                   else jsonb_build_object('ends_at', p_ends) end)).*
+  from (select * from public.partnerships
+         where influencer_id = (select influencer_id from base) limit 1) b;
 $f$;
 
 create function pg_temp.mkct(p_id uuid, p_part uuid) returns void language sql as $f$
@@ -67,15 +91,15 @@ begin
          then 'OK' else 'CONFERIR -- barrou por outro motivo' end);
 end $f$;
 
-create function pg_temp.funciona(o numeric, t text, q text) returns void language plpgsql as $f$
-declare n int;
+create function pg_temp.nao_levanta(o numeric, t text, q text) returns void language plpgsql as $f$
 begin
+  -- Só prova que NÃO levantou exceção (um select de função void devolve sempre
+  -- 1 linha, então contar linhas não mediria nada). O efeito é medido pelos
+  -- casos `confere` que vêm depois.
   execute q;
-  get diagnostics n = row_count;
-  insert into r values (o, t, '1 linha afetada', n || ' linhas',
-    case when n > 0 then 'OK' else 'FALHOU -- 0 linhas' end);
+  insert into r values (o, t, 'nao levanta excecao', 'nao levantou', 'OK');
 exception when others then
-  insert into r values (o, t, '1 linha afetada', sqlstate || ' ' || left(sqlerrm, 70),
+  insert into r values (o, t, 'nao levanta excecao', sqlstate || ' ' || left(sqlerrm, 70),
     'FALHOU -- a chamada que deveria funcionar foi barrada');
 end $f$;
 
@@ -90,20 +114,25 @@ exception when others then
 end $f$;
 
 -- ---------- fixtures (como superusuário, auth.uid() nulo = service_role) ----------
--- a01 fee 1500 | a02 fee 0 | a03 fee 800 | a04 fee 0 | a05 fee 600 | a06 fee 700
+-- a01 fee 1500 | a02 fee 0 | a03 fee 800 | a04 fee 0 ATIVA | a05 fee 600 | a06 fee 700
+-- a07 fee 900 | a08 fee 0 (UPDATE 0->500->800) | a09 fee 0 (UPDATE para 0)
 
-select pg_temp.mkp('00000000-0000-0000-0033-000000000a01', 1500);
-select pg_temp.mkp('00000000-0000-0000-0033-000000000a02', 0);
-select pg_temp.mkp('00000000-0000-0000-0033-000000000a03', 800);
-select pg_temp.mkp('00000000-0000-0000-0033-000000000a04', 0);
-select pg_temp.mkp('00000000-0000-0000-0033-000000000a05', 600);
-select pg_temp.mkp('00000000-0000-0000-0033-000000000a06', 700);
+select pg_temp.mkp('00000000-0000-0000-0033-000000000a01', 1500, 'encerrada', null);
+select pg_temp.mkp('00000000-0000-0000-0033-000000000a02', 0, 'encerrada', null);
+select pg_temp.mkp('00000000-0000-0000-0033-000000000a03', 800, 'encerrada', null);
+select pg_temp.mkp('00000000-0000-0000-0033-000000000a04', 0, 'ativa', current_date + 30);
+select pg_temp.mkp('00000000-0000-0000-0033-000000000a05', 600, 'encerrada', null);
+select pg_temp.mkp('00000000-0000-0000-0033-000000000a06', 700, 'encerrada', null);
+select pg_temp.mkp('00000000-0000-0000-0033-000000000a07', 900, 'encerrada', null);
+select pg_temp.mkp('00000000-0000-0000-0033-000000000a08', 0, 'encerrada', null);
+select pg_temp.mkp('00000000-0000-0000-0033-000000000a09', 0, 'encerrada', null);
 
 -- Contratos aceitos para os casos 3 a 6.
 select pg_temp.mkct('00000000-0000-0000-0033-000000000c03', '00000000-0000-0000-0033-000000000a03');
 select pg_temp.mkct('00000000-0000-0000-0033-000000000c04', '00000000-0000-0000-0033-000000000a04');
 select pg_temp.mkct('00000000-0000-0000-0033-000000000c05', '00000000-0000-0000-0033-000000000a05');
 select pg_temp.mkct('00000000-0000-0000-0033-000000000c06', '00000000-0000-0000-0033-000000000a06');
+select pg_temp.mkct('00000000-0000-0000-0033-000000000c07', '00000000-0000-0000-0033-000000000a07');
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password,
                         email_confirmed_at, created_at, updated_at)
@@ -126,6 +155,43 @@ select pg_temp.confere(1.1, 'fee 1500: nenhum outro lancamento alem do fixo',
   '1');
 select pg_temp.confere(2,   'fee 0: nenhum lancamento',
   $q$select count(*)::text from public.settlements where partnership_id = '00000000-0000-0000-0033-000000000a02'$q$,
+  '0');
+
+-- ===== 7: SEM identidade nenhuma é recusado (de propósito) =====
+-- Ainda somos superusuário, sem claims: auth.uid() é nulo, exatamente como para
+-- service_role. A recusa é o comportamento CORRETO e deliberado (Ruling 17):
+-- registrar_descumprimento continua conferindo is_admin() no banco, e a rota
+-- chama com a sessão do admin (createClient), não com a chave de serviço. Este
+-- caso existe para a próxima pessoa não "consertar" a função liberando
+-- auth.uid() nulo -- o que deixaria a rota como única guarda. (Até a 033 a rota
+-- usava service_role e a função recusava sempre: o descumprimento nunca
+-- funcionou em produção.)
+select pg_temp.tenta(7, 'sem identidade (service_role) chamando registrar_descumprimento',
+  'P0001 apenas admin',
+  $q$select public.registrar_descumprimento('00000000-0000-0000-0033-000000000c07')$q$,
+  'P0001', 'apenas admin');
+select pg_temp.confere(7.1, 'recusa sem identidade nao mudou o contrato',
+  $q$select status from public.contracts where id = '00000000-0000-0000-0033-000000000c07'$q$, 'aceito');
+
+-- ===== 8-9: o fixo nasce também por UPDATE do fee_amount =====
+-- É assim que o valor chega às parcerias existentes (influencer-save). Nasce
+-- uma vez; mudar o fee depois não mexe no lançamento (decisão do Financeiro).
+select pg_temp.confere(8,   'antes do UPDATE: fee 0, nenhum lancamento',
+  $q$select count(*)::text from public.settlements where partnership_id = '00000000-0000-0000-0033-000000000a08'$q$,
+  '0');
+update public.partnerships set fee_amount = 500 where id = '00000000-0000-0000-0033-000000000a08';
+select pg_temp.confere(8.1, 'UPDATE 0 -> 500: nasce 1 fixo aberto de 500',
+  $q$select count(*) || '|' || coalesce(min(valor)::text, 'null') from public.settlements
+     where partnership_id = '00000000-0000-0000-0033-000000000a08' and tipo = 'fixo' and status = 'aberto'$q$,
+  '1|500');
+update public.partnerships set fee_amount = 800 where id = '00000000-0000-0000-0033-000000000a08';
+select pg_temp.confere(8.2, 'UPDATE 500 -> 800: nao duplica e nao ajusta (segue 1 de 500)',
+  $q$select count(*) || '|' || coalesce(min(valor)::text, 'null') from public.settlements
+     where partnership_id = '00000000-0000-0000-0033-000000000a08' and tipo = 'fixo'$q$,
+  '1|500');
+update public.partnerships set fee_amount = 0 where id = '00000000-0000-0000-0033-000000000a09';
+select pg_temp.confere(9,   'UPDATE para 0: nenhum lancamento',
+  $q$select count(*)::text from public.settlements where partnership_id = '00000000-0000-0000-0033-000000000a09'$q$,
   '0');
 
 -- ===== 6: quem não é admin (financeiro) é recusado =====
@@ -152,7 +218,7 @@ select pg_temp.confere(6.2, 'recusa nao criou restituicao',
      where partnership_id = '00000000-0000-0000-0033-000000000a06' and tipo = 'restituicao'$q$, '0');
 
 -- 3: contrato aceito COM fixo (800).
-select pg_temp.funciona(3,   'admin registra descumprimento (fee 800)',
+select pg_temp.nao_levanta(3,   'admin registra descumprimento (fee 800)',
   $q$select public.registrar_descumprimento('00000000-0000-0000-0033-000000000c03')$q$);
 select pg_temp.confere(3.1, 'nasce 1 restituicao aberta de 800',
   $q$select count(*) || '|' || coalesce(min(valor)::text, 'null') from public.settlements
@@ -167,20 +233,27 @@ select pg_temp.confere(3.3, 'parceria: contract_accepted_at zerado',
 
 -- 4: contrato aceito com fixo ZERO. Regressão P1: sem a guarda `fee > 0` o
 -- insert com valor nulo abortaria a função toda e o contrato continuaria aceito.
-select pg_temp.funciona(4,   'admin registra descumprimento (fee 0)',
+select pg_temp.nao_levanta(4,   'admin registra descumprimento (fee 0)',
   $q$select public.registrar_descumprimento('00000000-0000-0000-0033-000000000c04')$q$);
 select pg_temp.confere(4.1, 'contrato descumprido, fee_a_restituir nulo',
   $q$select status || '|' || coalesce(fee_a_restituir::text, 'null') from public.contracts
      where id = '00000000-0000-0000-0033-000000000c04'$q$, 'descumprido|null');
-select pg_temp.confere(4.2, 'parceria encerrada: contract_accepted_at zerado',
+-- A fixture a04 nasce 'ativa' e com ends_at daqui a 30 dias: status e ends_at
+-- só mudam se o UPDATE da parceria realmente rodou (medição, não tautologia).
+select pg_temp.confere(4.2, 'parceria: contract_accepted_at zerado',
   $q$select (contract_accepted_at is null)::text from public.partnerships
+     where id = '00000000-0000-0000-0033-000000000a04'$q$, 'true');
+select pg_temp.confere(4.4, 'parceria ativa passou a encerrada',
+  $q$select status from public.partnerships where id = '00000000-0000-0000-0033-000000000a04'$q$, 'encerrada');
+select pg_temp.confere(4.5, 'parceria: ends_at encurtado para hoje (least)',
+  $q$select (ends_at = current_date)::text from public.partnerships
      where id = '00000000-0000-0000-0033-000000000a04'$q$, 'true');
 select pg_temp.confere(4.3, 'fee 0: nenhum lancamento (nem restituicao)',
   $q$select count(*)::text from public.settlements where partnership_id = '00000000-0000-0000-0033-000000000a04'$q$,
   '0');
 
 -- 5: chamar duas vezes. A primeira funciona; a segunda falha e não duplica.
-select pg_temp.funciona(5,   'primeira chamada (fee 600)',
+select pg_temp.nao_levanta(5,   'primeira chamada (fee 600)',
   $q$select public.registrar_descumprimento('00000000-0000-0000-0033-000000000c05')$q$);
 select pg_temp.tenta(5.1, 'segunda chamada no mesmo contrato', 'P0001 contrato nao esta aceito',
   $q$select public.registrar_descumprimento('00000000-0000-0000-0033-000000000c05')$q$,
@@ -190,12 +263,13 @@ select pg_temp.confere(5.2, 'continua 1 restituicao so',
      where partnership_id = '00000000-0000-0000-0033-000000000a05' and tipo = 'restituicao'$q$,
   '1|600');
 
--- Resumo. 17 casos: 1, 1.1, 2, 3 a 3.3, 4 a 4.3, 5 a 5.2, 6 a 6.2.
+-- Resumo. 25 casos: 1, 1.1, 2 (3); 3 a 3.3 (4); 4 a 4.5 (6); 5 a 5.2 (3);
+-- 6 a 6.2 (3); 7, 7.1 (2); 8 a 8.2 (3); 9 (1) = 25.
 -- (recontar se casos mudarem)
 insert into r
-select 999, 'RESUMO', 'total 17, nenhum nao-OK',
+select 999, 'RESUMO', 'total 25, nenhum nao-OK',
        count(*) || ' linhas, ' || count(*) filter (where veredito not like 'OK%') || ' nao-OK',
-       case when count(*) = 17 and count(*) filter (where veredito not like 'OK%') = 0
+       case when count(*) = 25 and count(*) filter (where veredito not like 'OK%') = 0
             then 'OK' else 'FALHOU -- linhas faltando ou casos nao-OK' end
   from r;
 

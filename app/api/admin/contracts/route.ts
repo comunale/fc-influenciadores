@@ -1,4 +1,4 @@
-import { requireAdmin, createAdminClient } from '@/lib/supabase/server'
+import { requireAdmin, createClient } from '@/lib/supabase/server'
 import { sincronizarContrato } from '@/lib/contracts/gerar'
 import { NextResponse } from 'next/server'
 
@@ -41,8 +41,11 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Contrato é obrigatório.' }, { status: 400 })
     }
 
-    const admin = createAdminClient()
-    const { error } = await admin.rpc('registrar_descumprimento', { p_contrato: contract_id })
+    // Sessão do admin, NÃO service-role: registrar_descumprimento confere
+    // is_admin(), que lê auth.uid(), e para a chave de serviço auth.uid() é nulo.
+    // Com createAdminClient() a função sempre recusava com 'apenas admin'.
+    const supabase = await createClient()
+    const { error } = await supabase.rpc('registrar_descumprimento', { p_contrato: contract_id })
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
     return NextResponse.json({ success: true })

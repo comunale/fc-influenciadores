@@ -12,7 +12,9 @@
 --
 -- O QUE FAZ
 --
---   * Trigger `after insert on partnerships`: se `fee_amount > 0`, insere 1
+--   * Trigger `after insert or update of fee_amount on partnerships`: se o novo
+--     `fee_amount > 0` e a parceria AINDA NÃO TEM lançamento `fixo` em nenhum
+--     status, insere 1
 --     lançamento `tipo 'fixo'`, `status 'aberto'`, `valor = fee_amount`.
 --     É regra de DADO, não de identidade: dispara também para service_role e
 --     SQL Editor (auth.uid() nulo). Por isso NÃO há bypass de auth.uid().
@@ -24,9 +26,23 @@
 --
 -- O QUE NÃO FAZ
 --
---   * Nenhum retroativo. O trigger só olha INSERT novo: as parcerias
---     encerradas com fee_amount 500 não ganham lançamento, e as 3 ativas têm
---     fee_amount 0.
+--   * Nenhum retroativo. Nada é varrido ao aplicar: as parcerias encerradas
+--     com fee_amount 500 só ganham fixo se alguém EDITAR o fee_amount delas, e
+--     as 3 ativas têm fee_amount 0 (o valor chega a elas por UPDATE, em
+--     influencer-save; o INSERT só acontece na renovação).
+--   * NÃO ajusta um fixo existente. O fixo nasce UMA vez; mudar o fee depois
+--     NÃO altera o lançamento já criado -- isso é decisão humana, na tela do
+--     Financeiro (Task 6).
+--   * A partir daqui, parceria com fee não pode mais ser apagada:
+--     `settlements_partnership_id_fkey` é `on delete restrict` e
+--     influencers -> partnerships é `on delete cascade`, então apagar um
+--     influenciador assim falha com 23503. Nenhuma rota do app apaga
+--     influenciador; só morde no painel do Supabase.
+--   * `registrar_descumprimento` continua só para quem tem sessão de admin:
+--     service_role (auth.uid() nulo) é recusado de propósito. A rota
+--     app/api/admin/contracts chama com a sessão do admin (createClient), não
+--     com a chave de serviço. Desde a 024 a chamada via service_role falhava
+--     sempre com 'apenas admin'.
 --   * `fee_timing` fica de fora: diz quando o fixo VENCE (alimenta o aviso da
 --     tarefa 8), não cria nem paga nada.
 --   * A função continua com `if not public.is_admin()` e com
@@ -77,9 +93,11 @@ security definer
 set search_path to 'public'
 as $fn$
 begin
-  if coalesce(new.fee_amount, 0) > 0 then
+  if coalesce(new.fee_amount, 0) > 0
+     and not exists (select 1 from public.settlements
+                      where partnership_id = new.id and tipo = 'fixo') then
     insert into public.settlements(partnership_id, tipo, status, valor, created_by)
-    values (new.id, 'fixo', 'aberto', new.fee_amount, 'migration 033 (fixo na criacao)');
+    values (new.id, 'fixo', 'aberto', new.fee_amount, 'partnerships_gera_fixo');
   end if;
   return new;
 end;
@@ -87,7 +105,7 @@ $fn$;
 
 drop trigger if exists partnerships_gera_fixo on public.partnerships;
 create trigger partnerships_gera_fixo
-  after insert on public.partnerships
+  after insert or update of fee_amount on public.partnerships
   for each row execute function public.partnerships_gera_fixo();
 
 create or replace function public.registrar_descumprimento(p_contrato uuid)
