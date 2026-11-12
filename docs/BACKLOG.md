@@ -622,10 +622,16 @@ select s.id, c.coupon_number from settlements s
 Também da revisão da Task 5. Nenhuma das duas corrompe nada; as duas fazem o total
 aparecer menor do que o operador espera, sem dizer por quê.
 
-- **Cupom pago no regime antigo** (`paid = true` sem `settlement_item`) é pulado por
-  `cuponsElegiveis` e **não** entra no `excluidos` que a rota devolve. Hoje são zero no
-  banco — a 032 cuidou dos 6 que existiam —, mas volta a acontecer se alguém usar a tela
-  antiga (ver buraco 3).
+- ~~**Cupom pago no regime antigo**~~ — **em conserto na rodada 1 da Task 6**: passa a
+  ser contado nos `excluidos`, com motivo próprio. Era: `paid = true` sem
+  `settlement_item` é pulado por `cuponsElegiveis` e some da prestação de contas.
+- **A explicação de quem ficou de fora é efêmera.** A tela mostra os `excluidos` logo
+  depois do fechamento; atualizou a página, some, e fica só o valor. **Decisão do César
+  em 12/11: deixar assim.** As duas alternativas que recusou foram recalcular ao abrir a
+  tela (sem mudar o banco, mas mostrando a situação de hoje e não a do dia do fechamento)
+  e gravar no lançamento (mais honesto, custa uma migration). Se um dia um fechamento
+  antigo precisar ser explicado, a resposta está nos cupons daquele período — não no
+  lançamento.
 - **Cupom cujo `partnership_id` mudou depois de entrar no lançamento** continua pagável:
   a 034 só reconfere `verified`. É defensável (o item já congelou o valor), e o
   `partnership_id` editável pelo Financeiro é o buraco 2 desta mesma lista.
