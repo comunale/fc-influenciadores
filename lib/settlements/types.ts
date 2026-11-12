@@ -15,4 +15,8 @@ export type CupomElegivel = { coupon_id: string; valor: number }
  * Estendemos aqui em vez de mexer em lib/commission.ts: os testes de comissao
  * ficam intactos e a dependencia vai num sentido so.
  */
-export type VendaComUso = VendaParaComissao & { used_at: string | null }
+export type VendaComUso = VendaParaComissao & {
+  used_at: string | null
+  /** Opcional so para nao quebrar quem ja monta VendaComUso sem ele; a rota de fechar sempre o le. */
+  status?: string
+}

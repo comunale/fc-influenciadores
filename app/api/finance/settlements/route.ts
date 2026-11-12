@@ -4,10 +4,14 @@ import { cuponsElegiveis } from '@/lib/settlements/periodo'
 import {
   PAPEIS_DO_LIVRO,
   camposDeFechamento,
+  centavos,
+  filtrarInclusao,
   recusaDeFechar,
+  resumoDeExcluidos,
+  somaDoLancamento,
   traduzErroDoLivro,
+  type CupomExcluido,
 } from '@/lib/settlements/rotas'
-import type { VendaComUso } from '@/lib/settlements/types'
 
 /**
  * Fecha um periodo: cria o lancamento de comissao e os itens que ele quita.
@@ -48,7 +52,7 @@ export async function POST(request: Request) {
     // (inclusive pagas e de fora do periodo); o recorte vem depois, em cuponsElegiveis.
     const { data: cupons, error: erroCupons } = await supabase
       .from('coupons')
-      .select('id, verified, paid, created_at, commission_per_sale, partnership_id, used_at')
+      .select('id, status, verified, paid, created_at, commission_per_sale, partnership_id, used_at')
       .eq('influencer_id', parceria.influencer_id)
     if (erroCupons) {
       console.error('settlements fechar: cupons', erroCupons)
@@ -56,7 +60,7 @@ export async function POST(request: Request) {
     }
 
     const todos = cuponsElegiveis(
-      (cupons ?? []) as VendaComUso[],
+      cupons ?? [],
       {
         commission_per_sale: parceria.commission_per_sale,
         commission_starts_at: parceria.commission_starts_at,
@@ -67,26 +71,45 @@ export async function POST(request: Request) {
       periodo
     )
 
-    // Cupom que ja esta em outro lancamento (aberto) nao entra de novo. O indice
-    // unico barraria de qualquer jeito; aqui evitamos falhar o fechamento inteiro.
-    let elegiveis = todos
-    if (todos.length > 0) {
+    // A POSICAO da venda foi contada no historico todo (certo e deliberado);
+    // a INCLUSAO e so da parceria do lancamento e so de cupom que o trigger
+    // aceitaria. Cupom fora da regra e PULADO e CONTADO: o trigger nao diz qual
+    // cupom o barrou, e status e campo so do admin, entao deixar o trigger
+    // recusar mandaria uma tarefa do Financeiro para o admin toda vez.
+    const { incluidos, excluidos: foraDaRegra } = filtrarInclusao(todos, cupons ?? [], partnership_id)
+
+    // Cupom que ja esta em outro lancamento (aberto) tambem nao entra de novo.
+    // O indice unico barraria de qualquer jeito.
+    const excluidos: CupomExcluido[] = [...foraDaRegra]
+    let elegiveis = incluidos
+    if (incluidos.length > 0) {
       const { data: jaLancados, error: erroItens } = await supabase
         .from('settlement_items')
         .select('coupon_id')
-        .in('coupon_id', todos.map((c) => c.coupon_id))
+        .in('coupon_id', incluidos.map((c) => c.coupon_id))
       if (erroItens) {
         console.error('settlements fechar: itens existentes', erroItens)
         return NextResponse.json({ error: 'Não foi possível conferir os lançamentos existentes.' }, { status: 500 })
       }
       const ocupados = new Set((jaLancados ?? []).map((i) => i.coupon_id))
-      elegiveis = todos.filter((c) => !ocupados.has(c.coupon_id))
+      elegiveis = incluidos.filter((c) => !ocupados.has(c.coupon_id))
+      for (const c of incluidos) {
+        if (ocupados.has(c.coupon_id)) {
+          excluidos.push({ coupon_id: c.coupon_id, valor: c.valor, motivo: 'cupom ja esta em outro lancamento' })
+        }
+      }
     }
+    const resumoExcluidos = resumoDeExcluidos(excluidos)
 
     const recusa = recusaDeFechar(elegiveis)
-    if (recusa) return NextResponse.json({ error: recusa.error }, { status: recusa.status })
+    if (recusa) {
+      return NextResponse.json({ error: recusa.error, excluidos: resumoExcluidos }, { status: recusa.status })
+    }
 
-    const valor = Math.round(elegiveis.reduce((soma, c) => soma + c.valor, 0) * 100) / 100
+    // Cada item arredondado a centavos e o total e a soma dos itens ja
+    // arredondados: settlements.valor bate com sum(settlement_items.valor).
+    const itensDoLancamento = elegiveis.map((c) => ({ ...c, valor: centavos(c.valor) }))
+    const valor = somaDoLancamento(itensDoLancamento)
 
     const { data: lancamento, error: erroLanc } = await supabase
       .from('settlements')
@@ -109,7 +132,7 @@ export async function POST(request: Request) {
 
     const { error: erroItensIns } = await supabase
       .from('settlement_items')
-      .insert(elegiveis.map((c) => ({ settlement_id: lancamento.id, coupon_id: c.coupon_id, valor: c.valor })))
+      .insert(itensDoLancamento.map((c) => ({ settlement_id: lancamento.id, coupon_id: c.coupon_id, valor: c.valor })))
 
     if (erroItensIns) {
       // Insercao em lote e atomica: nenhum item entrou. Desfaz o lancamento
@@ -121,7 +144,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: r.error }, { status: r.status })
     }
 
-    return NextResponse.json({ settlement_id: lancamento.id, valor, itens: elegiveis.length })
+    return NextResponse.json({
+      settlement_id: lancamento.id,
+      valor,
+      itens: itensDoLancamento.length,
+      // O que ficou de fora e por que, para a tela nao mostrar um total menor
+      // sem explicar.
+      excluidos: resumoExcluidos,
+    })
   } catch (err) {
     console.error('settlements fechar error:', err)
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 })

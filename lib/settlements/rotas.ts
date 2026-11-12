@@ -11,14 +11,13 @@
  * editar e apagar lancamento PAGO. Estas guardas sao a primeira camada; RLS e
  * triggers sao a segunda.
  */
-import type { CupomElegivel, Periodo } from './types'
+import type { CupomElegivel, Periodo, VendaComUso } from './types'
 
-/** Quem mexe no livro. Lojista e influenciador nao tem nem politica de RLS. */
+/**
+ * Quem mexe no livro. Lojista e influenciador nao tem nem politica de RLS.
+ * As rotas fazem requireRole([...PAPEIS_DO_LIVRO]); o banco repete a regra.
+ */
 export const PAPEIS_DO_LIVRO = ['admin', 'finance'] as const
-
-export function papelPodeLancar(role: string | null | undefined): boolean {
-  return !!role && (PAPEIS_DO_LIVRO as readonly string[]).includes(role)
-}
 
 export type Recusa = { status: number; error: string }
 
@@ -59,6 +58,66 @@ export function camposDeFechamento(body: unknown): CamposDeFechamento {
   return { ok: true, partnership_id, periodo: { de, ate } }
 }
 
+/** Arredonda para centavos. 0.1 + 0.2 nao pode virar 0.30000000000000004 no livro. */
+export function centavos(n: number): number {
+  return Math.round(n * 100) / 100
+}
+
+/**
+ * Total do lancamento = soma dos itens JA arredondados. Assim settlements.valor
+ * e sum(settlement_items.valor) batem ao centavo (arredondar so o total deixaria
+ * 3 x 0.333 dar 1.00 contra itens que somam 0.99).
+ */
+export function somaDoLancamento(elegiveis: CupomElegivel[]): number {
+  return centavos(elegiveis.reduce((soma, c) => soma + centavos(c.valor), 0))
+}
+
+export type CupomExcluido = { coupon_id: string; valor: number; motivo: string }
+
+/**
+ * Espelha as condicoes de DADO de settlement_motivo_recusa (migration 031) para
+ * que um cupom fora da regra seja PULADO, e contado, em vez de o trigger
+ * derrubar o fechamento inteiro. cuponsElegiveis conta posicao no historico
+ * todo do influenciador (correto); aqui a INCLUSAO passa a ser da parceria do
+ * lancamento. O trigger continua sendo a rede de seguranca.
+ */
+export function filtrarInclusao(
+  elegiveis: CupomElegivel[],
+  cupons: VendaComUso[],
+  partnershipId: string
+): { incluidos: CupomElegivel[]; excluidos: CupomExcluido[] } {
+  const porId = new Map(cupons.map((c) => [c.id, c]))
+  const incluidos: CupomElegivel[] = []
+  const excluidos: CupomExcluido[] = []
+  for (const e of elegiveis) {
+    const c = porId.get(e.coupon_id)
+    let motivo: string | null = null
+    if (!c) motivo = 'cupom inexistente'
+    else if (c.status !== 'used') motivo = 'cupom nao foi usado no balcao'
+    else if (!c.used_at) motivo = 'cupom sem data de uso'
+    else if (!c.verified) motivo = 'cupom nao conferido'
+    else if (c.partnership_id !== partnershipId) motivo = 'cupom de outra parceria'
+    if (motivo) excluidos.push({ coupon_id: e.coupon_id, valor: e.valor, motivo })
+    else incluidos.push(e)
+  }
+  return { incluidos, excluidos }
+}
+
+/** O que a tela precisa para dizer por que o total e menor do que o prometido. */
+export function resumoDeExcluidos(excluidos: CupomExcluido[]): {
+  quantidade: number
+  valor: number
+  por_motivo: Record<string, number>
+} {
+  const por_motivo: Record<string, number> = {}
+  for (const e of excluidos) por_motivo[e.motivo] = (por_motivo[e.motivo] ?? 0) + 1
+  return {
+    quantidade: excluidos.length,
+    valor: centavos(excluidos.reduce((soma, e) => soma + centavos(e.valor), 0)),
+    por_motivo,
+  }
+}
+
 export function recusaDeFechar(elegiveis: CupomElegivel[]): Recusa | null {
   if (elegiveis.length === 0) {
     return { status: 422, error: 'Nenhum cupom elegível neste período: confira se há vendas conferidas e ainda sem lançamento.' }
@@ -97,8 +156,15 @@ export function validarPagamento(c: CamposDePagamento): string | null {
 
 // --- estado -----------------------------------------------------------------
 
-export function recusaDePagar(status: string): Recusa | null {
-  if (status === 'aberto') return null
+export function recusaDePagar(status: string, tipo?: string, itens?: number): Recusa | null {
+  if (status === 'aberto') {
+    // Zero itens e legitimo para fixo e restituicao; comissao sem itens
+    // gravaria dinheiro pago contra comissoes que a tela segue mostrando devidas.
+    if (tipo === 'comissao' && itens === 0) {
+      return { status: 409, error: 'Lançamento de comissão sem cupons não pode ser pago.' }
+    }
+    return null
+  }
   return { status: 409, error: status === 'pago' ? 'Este lançamento já foi pago.' : 'Este lançamento foi cancelado e não pode ser pago.' }
 }
 
@@ -121,6 +187,18 @@ export function recusaDeCancelar(status: string): Recusa | null {
  */
 export function traduzErroDoLivro(err: { code?: string; message: string }): Recusa {
   const msg = err.message ?? ''
+  if (/apenas admin ou financeiro/i.test(msg)) {
+    return { status: 403, error: 'Sem permissão para esta ação.' }
+  }
+  if (/lancamento inexistente ou nao esta aberto/i.test(msg)) {
+    return { status: 409, error: 'Este lançamento já foi pago ou cancelado.' }
+  }
+  if (/comissao sem itens/i.test(msg)) {
+    return { status: 409, error: 'Lançamento de comissão sem cupons não pode ser pago.' }
+  }
+  if (/cupom nao conferido:/i.test(msg)) {
+    return { status: 422, error: `Há cupom do lançamento que deixou de estar conferido: ${msg.split(':').slice(1).join(':').trim()}. Reconfira o cupom e tente de novo.` }
+  }
   if (err.code === '23505' || /settlement_items_coupon_unico|duplicate key/i.test(msg)) {
     return { status: 409, error: 'Algum cupom deste período já pertence a outro lançamento. Atualize a tela e tente de novo.' }
   }

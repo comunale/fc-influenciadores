@@ -476,6 +476,66 @@ export type Database = {
           },
         ]
       }
+      sellers: {
+        Row: {
+          id: string
+          name: string
+          store_name: string
+          active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          store_name: string
+          active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          store_name?: string
+          active?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      settlement_items: {
+        Row: {
+          id: string
+          settlement_id: string
+          coupon_id: string
+          valor: number
+        }
+        Insert: {
+          id?: string
+          settlement_id: string
+          coupon_id: string
+          valor: number
+        }
+        Update: {
+          id?: string
+          settlement_id?: string
+          coupon_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "settlement_items_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "settlements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "settlement_items_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: true
+            referencedRelation: "coupons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       settlements: {
         Row: {
           id: string
@@ -529,66 +589,6 @@ export type Database = {
           },
         ]
       }
-      settlement_items: {
-        Row: {
-          id: string
-          settlement_id: string
-          coupon_id: string
-          valor: number
-        }
-        Insert: {
-          id?: string
-          settlement_id: string
-          coupon_id: string
-          valor: number
-        }
-        Update: {
-          id?: string
-          settlement_id?: string
-          coupon_id?: string
-          valor?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "settlement_items_settlement_id_fkey"
-            columns: ["settlement_id"]
-            isOneToOne: false
-            referencedRelation: "settlements"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "settlement_items_coupon_id_fkey"
-            columns: ["coupon_id"]
-            isOneToOne: false
-            referencedRelation: "coupons"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      sellers: {
-        Row: {
-          id: string
-          name: string
-          store_name: string
-          active: boolean
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          store_name: string
-          active?: boolean
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          store_name?: string
-          active?: boolean
-          created_at?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
@@ -619,6 +619,16 @@ export type Database = {
       registrar_descumprimento: {
         Args: { p_contrato: string }
         Returns: undefined
+      }
+      settlement_pagar: {
+        Args: {
+          p_id: string
+          p_paid_at: string
+          p_forma: string
+          p_identificador: string | null
+          p_quem: string
+        }
+        Returns: number
       }
       portal_vendas: {
         Args: Record<string, never>
