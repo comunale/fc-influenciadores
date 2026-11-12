@@ -30,7 +30,15 @@ function Excluidas({ ex }: { ex: Excluidos }) {
  * e se confirma. Cupom usado depois do fim da parceria e escolhido um a um e
  * comeca desmarcado.
  */
-export function FecharPeriodo({ partnershipId, previa }: { partnershipId: string; previa: PreviaDaTela }) {
+export function FecharPeriodo({
+  partnershipId,
+  previa,
+  calendario,
+}: {
+  partnershipId: string
+  previa: PreviaDaTela
+  calendario: string
+}) {
   const router = useRouter()
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -98,9 +106,19 @@ export function FecharPeriodo({ partnershipId, previa }: { partnershipId: string
           {' - '}
           {regulares.length} cupom(ns) -{' '}
           <span className="text-white font-medium">{brl(previa.total)}</span>
+          {marcados.length > 0 && (
+            <span className="text-yellow-300">
+              {' '}+ {marcados.length} usado(s) depois do fim, marcado(s): {brl(somaMarcados)} = {brl(totalDaVez)}
+            </span>
+          )}
         </p>
       ) : (
-        <p className="text-xs text-gray-600">Sem período a fechar agora.</p>
+        <p className="text-xs text-gray-600">
+          Sem período a fechar agora:{' '}
+          {calendario === 'fim'
+            ? 'esta parceria só fecha quando termina, e o término dela ainda não chegou.'
+            : 'o primeiro mês fechado ainda não terminou.'}
+        </p>
       )}
 
       {periodo && regulares.length === 0 && posFim.length === 0 && (

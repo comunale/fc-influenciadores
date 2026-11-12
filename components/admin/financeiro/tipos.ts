@@ -53,8 +53,12 @@ export function dia(iso: string | null): string {
 }
 
 /** Dia do balcao (Sao Paulo), igual ao recorte de lib/settlements/periodo.ts. */
-export const diaDoUso = (iso: string) =>
-  new Date(iso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+export function diaIsoDoUso(iso: string): string {
+  // Data pura (YYYY-MM-DD) ja e dia civil: nao passa por fuso (igual a diaDoBalcao).
+  if (iso.length === 10) return iso
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(iso))
+}
+export const diaDoUso = (iso: string) => dia(diaIsoDoUso(iso))
 
 export const SITUACAO: Record<string, { texto: string; classe: string }> = {
   aberto:    { texto: 'Aberto',    classe: 'bg-yellow-950 text-yellow-400' },

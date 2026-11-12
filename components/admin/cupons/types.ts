@@ -32,6 +32,9 @@ export type CouponRow = {
   sellers: { id: string; name: string; store_name: string } | null
   influencers: { id: string; name: string; instagram_handle: string } | null
   campaigns: { name: string } | null
+  // Lancamento do Financeiro a que o cupom pertence (PostgREST devolve objeto
+  // ou lista, conforme a cardinalidade inferida). Ausente/nulo = em nenhum.
+  settlement_items?: { settlements: { status: string } | null } | { settlements: { status: string } | null }[] | null
 }
 
 export type InfluencerOption = { id: string; name: string; instagram_handle: string }

@@ -42,6 +42,15 @@ export function previaDoFechamento(e: EntradaDaPrevia): Previa {
   const { cupons, contrato, periodo, fimDaParceria, emLancamento } = e
   const partnershipId = contrato.partnership_id as string
   const todas = vendasQueContam(cupons, contrato)
+  // Cupom de OUTRA parceria nao e candidato deste fechamento: a posicao dele
+  // conta (historico), mas o dinheiro e pago no fechamento da parceria dele.
+  // Acusa-lo aqui como "deixado de fora" seria contar como perda o que sera
+  // pago la. Cupom sem parceria (nulo) segue para o portao e aparece.
+  const donos = new Map(cupons.map((c) => [c.id, c.partnership_id]))
+  const daOutra = (id: string) => {
+    const dono = donos.get(id)
+    return dono != null && dono !== partnershipId
+  }
   const noPeriodo = (dia: string) =>
     periodo !== null && dia >= periodo.de && dia <= periodo.ate && (!fimDaParceria || dia <= fimDaParceria)
 
@@ -49,7 +58,7 @@ export function previaDoFechamento(e: EntradaDaPrevia): Previa {
 
   // Regulares: nao pagos, no periodo, ate o fim da parceria.
   const candidatos = todas
-    .filter((v) => !v.paid && noPeriodo(v.dia))
+    .filter((v) => !v.paid && noPeriodo(v.dia) && !daOutra(v.coupon_id))
     .map((v) => ({ coupon_id: v.coupon_id, valor: v.valor }))
   const { incluidos, excluidos: foraDaRegra } = filtrarInclusao(candidatos, cupons, partnershipId)
   excluidos.push(...foraDaRegra)
@@ -62,7 +71,7 @@ export function previaDoFechamento(e: EntradaDaPrevia): Previa {
   // Ja pagos fora de lancamento: o mesmo portao dos demais antes de serem
   // contados, para nao acusar como "deixado de fora" o que nunca foi candidato.
   const pagos = todas
-    .filter((v) => v.paid && noPeriodo(v.dia) && !emLancamento.has(v.coupon_id))
+    .filter((v) => v.paid && noPeriodo(v.dia) && !emLancamento.has(v.coupon_id) && !daOutra(v.coupon_id))
     .map((v) => ({ coupon_id: v.coupon_id, valor: v.valor }))
   if (pagos.length > 0) {
     const gate = filtrarInclusao(pagos, cupons, partnershipId)
@@ -74,7 +83,6 @@ export function previaDoFechamento(e: EntradaDaPrevia): Previa {
   // ainda sem lancamento (os ja lancados sao pagamentos normais, nao ruido).
   const posFim: CupomElegivel[] = []
   if (fimDaParceria) {
-    const donos = new Map(cupons.map((c) => [c.id, c.partnership_id]))
     const depois = todas
       .filter(
         (v) =>

@@ -88,7 +88,7 @@ export type CupomExcluido = { coupon_id: string; valor: number; motivo: string }
 /**
  * Espelha as condicoes de DADO de settlement_motivo_recusa (migration 031) para
  * que um cupom fora da regra seja PULADO, e contado, em vez de o trigger
- * derrubar o fechamento inteiro. cuponsElegiveis conta posicao no historico
+ * derrubar o fechamento inteiro. vendasQueContam conta posicao no historico
  * todo do influenciador (correto); aqui a INCLUSAO passa a ser da parceria do
  * lancamento. O trigger continua sendo a rede de seguranca.
  */
@@ -206,6 +206,15 @@ export function traduzErroDoLivro(err: { code?: string; message: string }): Recu
   }
   if (/lancamento inexistente ou nao esta aberto/i.test(msg)) {
     return { status: 409, error: 'Este lançamento já foi pago ou cancelado.' }
+  }
+  if (/cupom ja marcado como pago:/i.test(msg)) {
+    return {
+      status: 409,
+      error: `Há cupom deste lançamento já marcado como pago à mão: ${msg.split(':').slice(1).join(':').trim()}. Peça a um administrador para desmarcar o "Pago" dele na tela de Cupons e pague de novo.`,
+    }
+  }
+  if (/pagamento de cupom de lancamento fechado|nao pode ter o pagamento desfeito/i.test(msg)) {
+    return { status: 409, error: 'Este cupom está num lançamento fechado: o pagamento dele não pode ser desfeito nem alterado.' }
   }
   if (/comissao sem itens/i.test(msg)) {
     return { status: 409, error: 'Lançamento de comissão sem cupons não pode ser pago.' }

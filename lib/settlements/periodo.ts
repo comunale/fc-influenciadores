@@ -85,6 +85,12 @@ export function periodoSugerido(
  * as ja pagas e as de fora do periodo, igual ao calculo que o sistema ja usa;
  * so depois se recorta o que e deste fechamento.
  */
+/**
+ * @deprecated Nao use em codigo de producao: nao passa pelo portao de inclusao
+ * (status, conferencia, parceria), nao olha lancamentos existentes e nao conhece
+ * a regra de pos-fim. Use previaDoFechamento (lib/settlements/previa.ts). Fica
+ * so porque os testes de periodo.test.ts a usam como especificacao do recorte.
+ */
 export function cuponsElegiveis(
   cupons: VendaComUso[],
   contrato: ContratoInfluencer,
@@ -100,6 +106,7 @@ export function cuponsElegiveis(
  * os que estão em lançamento (normais) dos pagos fora de lançamento (anteriores
  * a esta funcionalidade), e só estes viram exclusão contada.
  */
+/** @deprecated Ver cuponsElegiveis: use previaDoFechamento. */
 export function cuponsJaPagos(
   cupons: VendaComUso[],
   contrato: ContratoInfluencer,

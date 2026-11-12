@@ -176,4 +176,18 @@ describe('erros da funcao settlement_pagar', () => {
     expect(r.status).toBe(422)
     expect(r.error).toContain('FOX123, FOX456')
   })
+
+  test('cupom ja marcado como pago a mao: 409 que nomeia os cupons e a saida', () => {
+    const r = traduzErroDoLivro({ message: 'cupom ja marcado como pago: FOX-1, FOX-2' })
+    expect(r.status).toBe(409)
+    expect(r.error).toContain('FOX-1, FOX-2')
+    expect(r.error).toMatch(/administrador/i)
+  })
+
+  test('trava de pagamento de lancamento fechado vira 409 legivel, nao 500', () => {
+    const r = traduzErroDoLivro({
+      message: 'Cupom de lancamento fechado (pago ou cancelado) nao pode ter o pagamento desfeito ou alterado.',
+    })
+    expect(r.status).toBe(409)
+  })
 })

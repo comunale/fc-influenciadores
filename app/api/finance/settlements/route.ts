@@ -19,7 +19,7 @@ import {
  * auth.uid() e nulo e os triggers de imutabilidade da migration 031 deixariam
  * o Financeiro editar e apagar lancamento pago. Por isso tambem nao chamamos
  * settlement_pode_incluir (so service_role executa): a elegibilidade sai de
- * cuponsElegiveis e o trigger settlement_items_valida e a ultima palavra.
+ * previaDoFechamento (a mesma funcao da tela) e o trigger settlement_items_valida e a ultima palavra.
  *
  * Ordem inegociavel: o lancamento nasce 'aberto' e SO ENTAO recebe os itens
  * (o trigger recusa item em lancamento que nao esta aberto). Pagar e outra
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     if (!parceria) return NextResponse.json({ error: 'Parceria não encontrada.' }, { status: 404 })
 
     // A posicao da venda depende de TODAS as vendas conferidas do influenciador
-    // (inclusive pagas e de fora do periodo); o recorte vem depois, em cuponsElegiveis.
+    // (inclusive pagas e de fora do periodo); o recorte vem depois, em previaDoFechamento.
     const { data: cupons, error: erroCupons } = await supabase
       .from('coupons')
       .select('id, status, verified, paid, created_at, commission_per_sale, partnership_id, used_at')

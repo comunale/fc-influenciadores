@@ -81,7 +81,11 @@ export default async function FinanceiroPage() {
     // Parceria encerrada fecha a vida inteira dela (como 'fim'), qualquer que
     // seja o calendario: oferecer "o mes passado" de quem acabou em marco e
     // sempre um fechamento vazio.
-    const encerrada = p.status === 'encerrada'
+    // Tambem conta como encerrada a parceria com ends_at JA PASSADO que ninguem
+    // marcou como 'encerrada': sem isso ela fica sem periodo e com os cupons
+    // pos-fim sem como fechar.
+    const hojeIso = hoje.toISOString().slice(0, 10)
+    const encerrada = p.status === 'encerrada' || (p.ends_at !== null && p.ends_at < hojeIso)
     const periodo = periodoSugerido(
       encerrada || p.payment_schedule === 'fim' ? 'fim' : 'mensal',
       { starts_at: p.starts_at, ends_at: p.ends_at, status: encerrada ? 'encerrada' : 'ativa' },

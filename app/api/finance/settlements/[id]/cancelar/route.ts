@@ -16,7 +16,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
  * Ordem inegociavel: apaga os itens PRIMEIRO e so depois marca 'cancelado'.
  * settlement_items_congela so deixa o item mudar enquanto o pai esta 'aberto';
  * marcar cancelado antes tornaria os proprios itens inapagaveis.
- * Cancelar nao toca em coupons.paid: lancamento aberto nunca marcou cupom.
+ * Cancelar nao toca em coupons.paid: o lancamento aberto nao marcou cupom. Um
+ * cupom dele pode estar pago a mao (o admin marca na tela de Cupons); isso e do
+ * cupom, nao do lancamento, e cancelar nao o desfaz.
  */
 export async function POST(_request: Request, ctx: { params: Promise<{ id: string }> }) {
   try {

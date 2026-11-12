@@ -69,13 +69,26 @@ describe('previaDoFechamento', () => {
     expect(p.excluidos).toEqual([])
   })
 
-  test('pago de OUTRA parceria nao e acusado como deixado de fora desta (e nao soma o valor)', () => {
+  test('cupom de OUTRA parceria (pago ou nao) nao e acusado como deixado de fora desta', () => {
     const p = previaDoFechamento({
       ...base,
-      cupons: [cupom('a', '2026-10-05'), cupom('alheio', '2026-10-06', { paid: true, partnership_id: 'P0' })],
+      cupons: [
+        cupom('a', '2026-10-05'),
+        cupom('alheio-pago', '2026-10-06', { paid: true, partnership_id: 'P0' }),
+        cupom('alheio', '2026-10-07', { partnership_id: 'P0' }),
+      ],
     })
-    expect(p.excluidos.map((e) => e.motivo)).toEqual(['cupom de outra parceria'])
-    expect(p.excluidos.some((e) => e.motivo === MOTIVO_PAGO_FORA)).toBe(false)
+    expect(ids(p.regulares)).toEqual(['a'])
+    expect(p.excluidos).toEqual([])
+  })
+
+  test('cupom sem parceria nao some em silencio: aparece nas exclusoes', () => {
+    const p = previaDoFechamento({
+      ...base,
+      cupons: [cupom('a', '2026-10-05'), cupom('orfao', '2026-10-06', { partnership_id: null })],
+    })
+    expect(ids(p.regulares)).toEqual(['a'])
+    expect(p.excluidos.map((e) => e.coupon_id)).toEqual(['orfao'])
   })
 
   test('usado depois do fim da parceria vai para posFim, nunca para regulares', () => {
@@ -172,6 +185,12 @@ describe('camposDeFechamento: cupom_ids', () => {
   test('ausente fica ausente; vazia e preservada como vazia', () => {
     expect(camposDeFechamento(corpo)).not.toHaveProperty('cupom_ids')
     expect(camposDeFechamento({ ...corpo, cupom_ids: [] })).toMatchObject({ ok: true, cupom_ids: [] })
+  })
+
+  test('null, objeto e lista gigante sao recusados', () => {
+    expect(camposDeFechamento({ ...corpo, cupom_ids: null })).toMatchObject({ ok: false })
+    expect(camposDeFechamento({ ...corpo, cupom_ids: {} })).toMatchObject({ ok: false })
+    expect(camposDeFechamento({ ...corpo, cupom_ids: Array.from({ length: 5001 }, () => id) })).toMatchObject({ ok: false })
   })
 
   test('deduplica e valida', () => {

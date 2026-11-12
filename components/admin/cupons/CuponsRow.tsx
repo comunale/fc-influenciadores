@@ -43,6 +43,10 @@ export function CuponsRowItem({
   const podeConferir = can(role, 'coupons.verify')
   const podePagar = can(role, 'coupons.pay')
   const podeNF = can(role, 'coupons.invoice')
+  // O cupom pertence a um lancamento do Financeiro? So informa: o admin segue
+  // podendo marcar/desmarcar (decisao do dono), mas ve o conflito antes de cria-lo.
+  const itemLancamento = Array.isArray(c.settlement_items) ? c.settlement_items[0] : c.settlement_items
+  const statusLancamento = itemLancamento?.settlements?.status ?? null
   const temAcoes = podeEditar || podeExcluir
 
   const semNF = !nf.trim()
@@ -197,6 +201,19 @@ export function CuponsRowItem({
               )}
               {paid && c.paid_at && (
                 <div className="text-[10px] text-gray-500 mt-0.5">{formatDate(c.paid_at)}</div>
+              )}
+              {statusLancamento && (
+                <Link
+                  href="/admin/financeiro"
+                  title={
+                    statusLancamento === 'pago'
+                      ? 'Este cupom está num lançamento já pago. Desmarcar aqui faz o cupom divergir do lançamento.'
+                      : 'Este cupom está num lançamento aberto. Marcar como pago aqui impede o Financeiro de pagar o lançamento até você desmarcar.'
+                  }
+                  className="block text-[10px] text-yellow-400 hover:text-yellow-300 mt-0.5"
+                >
+                  {statusLancamento === 'pago' ? 'em lançamento pago' : 'em lançamento aberto'}
+                </Link>
               )}
             </>
           ) : (

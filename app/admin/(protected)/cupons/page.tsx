@@ -39,7 +39,7 @@ export default async function CuponsPage({
   let query = supabase
     .from('coupons')
     .select(
-      '*, influencers(id, name, instagram_handle), campaigns(name), sellers(id, name, store_name)'
+      '*, influencers(id, name, instagram_handle), campaigns(name), sellers(id, name, store_name), settlement_items(settlements(status))'
     )
 
   if (params.status) query = query.eq('status', params.status)
