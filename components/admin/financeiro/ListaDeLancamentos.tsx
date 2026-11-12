@@ -90,10 +90,10 @@ export function ListaDeLancamentos({ grupos }: { grupos: GrupoDoInfluenciador[] 
             {g.parcerias.map((p) => (
               <div key={p.id} className="flex flex-col gap-3">
                 <p className="text-xs text-gray-500">
-                  Parceria {p.status === 'ativa' ? 'ativa' : 'encerrada'} desde {dia(p.starts_at)}
+                  Parceria {p.encerrada ? 'encerrada' : 'ativa'} desde {dia(p.starts_at)}
                   {p.ends_at ? ` até ${dia(p.ends_at)}` : ''} - fechamento {p.payment_schedule === 'mensal' ? 'mensal' : 'ao fim da parceria'}
                 </p>
-                <FecharPeriodo partnershipId={p.id} previa={p.previa} calendario={p.payment_schedule} />
+                <FecharPeriodo partnershipId={p.id} previa={p.previa} calendario={p.payment_schedule} encerrada={p.encerrada} />
                 {p.lancamentos.length > 0 && (
                   <ul className="flex flex-col gap-2">
                     {p.lancamentos.map((l) => <LinhaDoLancamento key={l.id} l={l} />)}

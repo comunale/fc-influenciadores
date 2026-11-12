@@ -144,7 +144,7 @@ describe('filtrarInclusao', () => {
     expect(r.incluidos.map((c) => c.coupon_id)).toEqual(['ok'])
     expect(Object.fromEntries(r.excluidos.map((e) => [e.coupon_id, e.motivo]))).toEqual({
       outra: 'cupom de outra parceria',
-      nulo: 'cupom de outra parceria',
+      nulo: 'cupom sem parceria',
       pendente: 'cupom nao foi usado no balcao',
       semdata: 'cupom sem data de uso',
       naoconf: 'cupom nao conferido',
@@ -156,7 +156,8 @@ describe('filtrarInclusao', () => {
       quantidade: 5,
       valor: 50,
       por_motivo: {
-        'cupom de outra parceria': 2,
+        'cupom de outra parceria': 1,
+        'cupom sem parceria': 1,
         'cupom nao foi usado no balcao': 1,
         'cupom sem data de uso': 1,
         'cupom nao conferido': 1,

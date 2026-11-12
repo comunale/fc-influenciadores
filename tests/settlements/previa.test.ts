@@ -88,7 +88,7 @@ describe('previaDoFechamento', () => {
       cupons: [cupom('a', '2026-10-05'), cupom('orfao', '2026-10-06', { partnership_id: null })],
     })
     expect(ids(p.regulares)).toEqual(['a'])
-    expect(p.excluidos.map((e) => e.coupon_id)).toEqual(['orfao'])
+    expect(p.excluidos.map((e) => [e.coupon_id, e.motivo])).toEqual([['orfao', 'cupom sem parceria']])
   })
 
   test('usado depois do fim da parceria vai para posFim, nunca para regulares', () => {

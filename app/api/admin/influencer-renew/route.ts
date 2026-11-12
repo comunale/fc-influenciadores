@@ -2,6 +2,7 @@ import { sincronizarContrato } from '@/lib/contracts/gerar'
 import { requireRole, createClient } from '@/lib/supabase/server'
 import { mensagemDeErro } from '@/lib/db-errors'
 import { NextResponse } from 'next/server'
+import { fimAoEncerrar } from '@/lib/partnership'
 
 /**
  * Prorrogar e Renovar uma parceria.
@@ -53,7 +54,8 @@ export async function POST(request: Request) {
   // Encerrar ANTES de criar: o índice único recusa duas ativas.
   const { error: erroEncerrar } = await supabase
     .from('partnerships')
-    .update({ status: 'encerrada' })
+    // Sempre com ends_at: sem ele a parceria encerrada nao tem periodo a fechar.
+    .update({ status: 'encerrada', ends_at: fimAoEncerrar(atual.ends_at, new Date().toISOString().slice(0, 10)) })
     .eq('id', atual.id)
 
   if (erroEncerrar) {

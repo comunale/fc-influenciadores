@@ -107,6 +107,7 @@ export function filtrarInclusao(
     else if (c.status !== 'used') motivo = 'cupom nao foi usado no balcao'
     else if (!c.used_at) motivo = 'cupom sem data de uso'
     else if (!c.verified) motivo = 'cupom nao conferido'
+    else if (c.partnership_id == null) motivo = 'cupom sem parceria'
     else if (c.partnership_id !== partnershipId) motivo = 'cupom de outra parceria'
     if (motivo) excluidos.push({ coupon_id: e.coupon_id, valor: e.valor, motivo })
     else incluidos.push(e)

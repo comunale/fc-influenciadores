@@ -84,8 +84,7 @@ export function periodoSugerido(
  * A posicao e contada sobre todas as vendas conferidas do contrato, inclusive
  * as ja pagas e as de fora do periodo, igual ao calculo que o sistema ja usa;
  * so depois se recorta o que e deste fechamento.
- */
-/**
+ *
  * @deprecated Nao use em codigo de producao: nao passa pelo portao de inclusao
  * (status, conferencia, parceria), nao olha lancamentos existentes e nao conhece
  * a regra de pos-fim. Use previaDoFechamento (lib/settlements/previa.ts). Fica

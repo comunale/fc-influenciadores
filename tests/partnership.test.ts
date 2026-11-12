@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parceriaAtiva, parceriaVigente, rotuloDesconto, type Parceria } from '@/lib/partnership'
+import { parceriaAtiva, parceriaVigente, fimAoEncerrar, rotuloDesconto, type Parceria } from '@/lib/partnership'
 
 const base: Parceria = {
   id: 'p1', status: 'ativa', starts_at: '2026-06-01', ends_at: null,
@@ -64,5 +64,18 @@ describe('rotuloDesconto', () => {
 
   it('percentual sai com o simbolo', () => {
     expect(rotuloDesconto({ discount_type: 'percentage', discount_value: 15 })).toBe('15%')
+  })
+})
+
+describe('fimAoEncerrar', () => {
+  it('sem data combinada, encerra hoje', () => {
+    expect(fimAoEncerrar(null, '2026-11-12')).toBe('2026-11-12')
+    expect(fimAoEncerrar(undefined, '2026-11-12')).toBe('2026-11-12')
+  })
+  it('data combinada futura nao vale: encerra hoje', () => {
+    expect(fimAoEncerrar('2026-12-31', '2026-11-12')).toBe('2026-11-12')
+  })
+  it('data combinada ja passada e mantida', () => {
+    expect(fimAoEncerrar('2026-10-01', '2026-11-12')).toBe('2026-10-01')
   })
 })

@@ -38,6 +38,8 @@ export type GrupoDoInfluenciador = {
   influencer: { id: string; name: string; instagram_handle: string | null }
   parcerias: (ParceriaDoFinanceiro & {
     previa: PreviaDaTela
+    /** Encerrada de fato: status 'encerrada' OU ends_at ja passado. O mesmo criterio da oferta de fechamento. */
+    encerrada: boolean
     lancamentos: Lancamento[]
   })[]
 }

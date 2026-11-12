@@ -64,3 +64,13 @@ export function parceriaVigente(p: Parceria | null): boolean {
 export function rotuloDesconto(p: { discount_type: string; discount_value: number }): string {
   return p.discount_type === 'fixed' ? `R$ ${p.discount_value}` : `${p.discount_value}%`
 }
+
+/**
+ * O `ends_at` de uma parceria que esta sendo encerrada AGORA: o que ja estava
+ * combinado, se for anterior a hoje, senao hoje. Mesma formula das migrations
+ * 024 e 033: `least(coalesce(ends_at, current_date), current_date)`. Sem data de
+ * fim a parceria encerrada nao tem periodo fechavel (periodoSugerido 'fim').
+ */
+export function fimAoEncerrar(endsAt: string | null | undefined, hoje: string): string {
+  return endsAt && endsAt < hoje ? endsAt : hoje
+}

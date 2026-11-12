@@ -34,10 +34,12 @@ export function FecharPeriodo({
   partnershipId,
   previa,
   calendario,
+  encerrada,
 }: {
   partnershipId: string
   previa: PreviaDaTela
   calendario: string
+  encerrada: boolean
 }) {
   const router = useRouter()
   const [enviando, setEnviando] = useState(false)
@@ -115,9 +117,11 @@ export function FecharPeriodo({
       ) : (
         <p className="text-xs text-gray-600">
           Sem período a fechar agora:{' '}
-          {calendario === 'fim'
-            ? 'esta parceria só fecha quando termina, e o término dela ainda não chegou.'
-            : 'o primeiro mês fechado ainda não terminou.'}
+          {encerrada
+            ? 'esta parceria está encerrada, mas a data de término nunca foi registrada, então não há período para fechar. Peça a um administrador para registrar a data de término dela.'
+            : calendario === 'fim'
+              ? 'esta parceria só fecha quando termina, e ela ainda está ativa.'
+              : 'o primeiro mês fechado ainda não terminou.'}
         </p>
       )}
 

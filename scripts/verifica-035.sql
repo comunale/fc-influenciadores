@@ -33,7 +33,8 @@
 -- de lançamento já 'pago' passa (é o que settlement_pagar faz por dentro);
 -- 8 settlement_pagar chamado pelo financeiro segue funcionando de ponta a ponta;
 -- 9 settlement_pagar recusa, pelo nome e sem gravar nada, lançamento com cupom
--- já marcado como pago a mão (a 035 carrega a recusa).
+-- já marcado como pago a mão (a 035 carrega a recusa); 10 o ADMIN, ao contrário,
+-- paga esse mesmo lançamento e o pagamento sobrescreve o paid_at/paid_by manuais.
 
 begin;
 
@@ -137,8 +138,10 @@ end $f$;
 --   81 NAO pago em lancamento 'pago'  (caso 7, o estado no meio de settlement_pagar)
 --   91 nao pago em lancamento aberto  (caso 8, settlement_pagar de verdade)
 --   92 PAGO a mao em lancamento aberto (caso 9, a recusa nomeada de settlement_pagar)
+--   94 pago em lancamento 'pago' proprio (caso 9.2: pagar de novo => "nao esta aberto")
+--   95 PAGO a mao em lancamento aberto (caso 10: o ADMIN paga e o lancamento sobrescreve)
 
-select pg_temp.mkp(('00000000-0000-0000-0035-000000000a0' || g)::uuid) from generate_series(1, 9) g;
+select pg_temp.mkp(('00000000-0000-0000-0035-000000000a' || lpad(g::text, 2, '0'))::uuid) from generate_series(1, 11) g;
 
 select pg_temp.mkc(11, '00000000-0000-0000-0035-000000000a01');
 select pg_temp.mkc(21, '00000000-0000-0000-0035-000000000a02');
@@ -150,6 +153,8 @@ select pg_temp.mkc(71, '00000000-0000-0000-0035-000000000a06');
 select pg_temp.mkc(81, '00000000-0000-0000-0035-000000000a07');
 select pg_temp.mkc(91, '00000000-0000-0000-0035-000000000a08');
 select pg_temp.mkc(92, '00000000-0000-0000-0035-000000000a09');
+select pg_temp.mkc(94, '00000000-0000-0000-0035-000000000a10');
+select pg_temp.mkc(95, '00000000-0000-0000-0035-000000000a11');
 
 select pg_temp.mks('00000000-0000-0000-0035-000000000b01', '00000000-0000-0000-0035-000000000a01', 10);
 select pg_temp.mks('00000000-0000-0000-0035-000000000b03', '00000000-0000-0000-0035-000000000a03', 10);
@@ -159,6 +164,8 @@ select pg_temp.mks('00000000-0000-0000-0035-000000000b06', '00000000-0000-0000-0
 select pg_temp.mks('00000000-0000-0000-0035-000000000b07', '00000000-0000-0000-0035-000000000a07', 10);
 select pg_temp.mks('00000000-0000-0000-0035-000000000b08', '00000000-0000-0000-0035-000000000a08', 10);
 select pg_temp.mks('00000000-0000-0000-0035-000000000b09', '00000000-0000-0000-0035-000000000a09', 10);
+select pg_temp.mks('00000000-0000-0000-0035-000000000b10', '00000000-0000-0000-0035-000000000a10', 10);
+select pg_temp.mks('00000000-0000-0000-0035-000000000b11', '00000000-0000-0000-0035-000000000a11', 10);
 
 select pg_temp.mki('00000000-0000-0000-0035-000000000b01', 11, 10);
 select pg_temp.mki('00000000-0000-0000-0035-000000000b03', 31, 10);
@@ -168,34 +175,36 @@ select pg_temp.mki('00000000-0000-0000-0035-000000000b06', 71, 10);
 select pg_temp.mki('00000000-0000-0000-0035-000000000b07', 81, 10);
 select pg_temp.mki('00000000-0000-0000-0035-000000000b08', 91, 10);
 select pg_temp.mki('00000000-0000-0000-0035-000000000b09', 92, 10);
+select pg_temp.mki('00000000-0000-0000-0035-000000000b10', 94, 10);
+select pg_temp.mki('00000000-0000-0000-0035-000000000b11', 95, 10);
 
 -- Cupons pagos (exceto 81 e 91), depois os lançamentos viram 'pago' (exceto 03 e 08).
 update public.coupons set paid = true, paid_at = now(), paid_by = 'fixture'
  where id in (select ('00000000-0000-0000-0035-0000000001' || lpad(n::text, 2, '0'))::uuid
-                from unnest(array[11, 21, 41, 61, 71]) n);
+                from unnest(array[11, 21, 41, 61, 71, 94]) n);
 -- 92: o admin marcou "Pago" a mao num cupom de lancamento ABERTO (caso 9).
-update public.coupons set paid = true, paid_at = now(), paid_by = 'manual'
- where id = '00000000-0000-0000-0035-000000000192';
+update public.coupons set paid = true, paid_at = '2026-01-01T00:00:00Z', paid_by = 'manual'
+ where id in ('00000000-0000-0000-0035-000000000192', '00000000-0000-0000-0035-000000000195');
 update public.settlements set status = 'pago', paid_at = now(), forma = 'PIX'
  where id in ('00000000-0000-0000-0035-000000000b01', '00000000-0000-0000-0035-000000000b04',
               '00000000-0000-0000-0035-000000000b05', '00000000-0000-0000-0035-000000000b06',
-              '00000000-0000-0000-0035-000000000b07');
+              '00000000-0000-0000-0035-000000000b07', '00000000-0000-0000-0035-000000000b10');
 update public.coupons set verified = false
  where id = '00000000-0000-0000-0035-000000000151';
 
 -- Guardas de fixture: sem elas um setup que não montou nada passaria em silêncio.
 do $$ begin
   if (select count(*) from public.settlement_items
-       where settlement_id::text like '00000000-0000-0000-0035-000000000b0%') <> 8 then
-    raise exception 'fixture: esperava 8 itens de lancamento';
+       where settlement_id::text like '00000000-0000-0000-0035-000000000b%') <> 10 then
+    raise exception 'fixture: esperava 10 itens de lancamento';
   end if;
   if (select count(*) from public.settlements
-       where id::text like '00000000-0000-0000-0035-000000000b0%' and status = 'pago') <> 5 then
-    raise exception 'fixture: esperava 5 lancamentos pagos';
+       where id::text like '00000000-0000-0000-0035-000000000b%' and status = 'pago') <> 6 then
+    raise exception 'fixture: esperava 6 lancamentos pagos';
   end if;
   if (select count(*) from public.coupons
-       where coupon_number like 'T035-%' and paid) <> 6 then
-    raise exception 'fixture: esperava 6 cupons pagos';
+       where coupon_number like 'T035-%' and paid) <> 8 then
+    raise exception 'fixture: esperava 8 cupons pagos';
   end if;
 end $$;
 
@@ -305,7 +314,7 @@ select pg_temp.confere(9.1, 'a recusa nao gravou nada (lancamento aberto, paid_b
         and c.id = '00000000-0000-0000-0035-000000000192'$q$, 'aberto|manual');
 select pg_temp.tenta(9.2, 'lancamento ja pago segue recebendo "nao esta aberto", nao a recusa nova',
   'P0001 nao esta aberto',
-  $q$select public.settlement_pagar('00000000-0000-0000-0035-000000000b01', now(), 'PIX', null, 'x')$q$,
+  $q$select public.settlement_pagar('00000000-0000-0000-0035-000000000b10', now(), 'PIX', null, 'x')$q$,
   'P0001', 'nao esta aberto');
 
 -- 5: ADMIN limpa Pago de cupom em lançamento pago (decisão do dono).
@@ -321,16 +330,26 @@ select pg_temp.confere(5.1, 'o cupom ficou nao pago',
   $q$select paid::text from public.coupons where id = '00000000-0000-0000-0035-000000000161'$q$, 'false');
 
 -- Resumo. 26 casos: 1, 1.1, 1.2, 1.3 (4); 2, 2.1 (2); 3, 3.1, 3.2, 3.3 (4);
--- 4, 4.1, 4.2, 4.3, 4.4 (5); 5, 5.1 (2); 6, 6.1 (2); 7, 7.1 (2); 8, 8.1 (2); 9, 9.1, 9.2 (3) = 26.
+-- 4, 4.1, 4.2, 4.3, 4.4 (5); 5, 5.1 (2); 6, 6.1 (2); 7, 7.1 (2); 8, 8.1 (2); 9, 9.1, 9.2 (3); 10, 10.1 (2) = 28.
 -- (recontar se casos mudarem)
 insert into r
-select 999, 'RESUMO', 'total 26, nenhum nao-OK',
+select 999, 'RESUMO', 'total 28, nenhum nao-OK',
        count(*) || ' linhas, ' || count(*) filter (where veredito not like 'OK%') || ' nao-OK',
-       case when count(*) = 26 and count(*) filter (where veredito not like 'OK%') = 0
+       case when count(*) = 28 and count(*) filter (where veredito not like 'OK%') = 0
             then 'OK' else 'FALHOU -- linhas faltando ou casos nao-OK' end
   from r;
 
-reset role;
-select * from r order by ordem;
+-- 10: o ADMIN paga lancamento com cupom ja marcado a mao (Ruling 38): passa, e
+-- o paid_at/paid_by do cupom passam a ser os do lancamento.
+select pg_temp.confere(10, 'admin paga lancamento com cupom ja pago a mao: devolve 1',
+  $q$select public.settlement_pagar('00000000-0000-0000-0035-000000000b11',
+       '2026-11-10T12:00:00Z', 'PIX', null, 'Admin Quem')::text$q$, '1');
+select pg_temp.confere(10.1, 'lancamento pago e o cupom ficou com paid_at/paid_by do lancamento',
+  $q$select s.status || '|' || c.paid_by || '|' || (c.paid_at = '2026-11-10T12:00:00Z')::text
+       from public.settlements s, public.coupons c
+      where s.id = '00000000-0000-0000-0035-000000000b11'
+        and c.id = '00000000-0000-0000-0035-000000000195'$q$, 'pago|Admin Quem|true');
+
+-- Resumo. 28 casos:
 
 rollback;

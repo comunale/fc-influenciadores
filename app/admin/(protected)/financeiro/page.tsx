@@ -114,6 +114,7 @@ export default async function FinanceiroPage() {
       payment_schedule: p.payment_schedule,
       commission_per_sale: p.commission_per_sale,
       previa: previaParaTela(previa, cupons, periodo, p.ends_at),
+      encerrada,
       lancamentos: [...(p.settlements ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at)),
     })
     porInfluenciador.set(p.influencers.id, grupo)

@@ -52,6 +52,14 @@
 --   ninguém entende. Pior, de forma determinística: o financeiro nunca
 --   consegue pagar aquele lançamento.
 --
+--   POR QUE A RECUSA É SÓ PARA O FINANCEIRO (assimetria de propósito, não
+--   "conserte"): a trava acima só existe para o financeiro; o admin passa
+--   direto por ela (curto-circuito do topo da função). Recusar o admin aqui
+--   o obrigaria a desfazer a própria marca deliberada, contrariando a decisão
+--   do dono de que o admin NÃO é restringido. Decisão do dono (Ruling 38): para
+--   o admin, o lançamento é a autoridade, e o pagamento dele SOBRESCREVE o
+--   paid_at/paid_by manuais do cupom.
+--
 --   A saída é uma recusa NOMEADA no começo, antes de reivindicar o lançamento:
 --   "cupom ja marcado como pago: <números>". Dá a quem paga um erro legível e
 --   uma saída (desmarcar o cupom, que é do admin, e pagar). NÃO se resolve
@@ -59,9 +67,17 @@
 --   ficariam apontando para o pagamento manual, e o conferidor
 --   v_marcados <> v_itens abortaria.
 --
+-- Janela estreita: entre o SELECT da recusa e o update que reivindica o
+-- lançamento, alguém pode marcar um cupom como pago. Se acontecer, a trava
+-- aborta a transação inteira (nada fica gravado) e a nova tentativa já recebe
+-- a recusa nomeada. Autocurável; não vale lock.
+--
 -- Aplicar DEPOIS da 031 (settlement_items) e da 034.
 --
--- PARA DESFAZER (restaura o corpo da 003 e o corpo da 034, exatamente):
+-- PARA DESFAZER (restaura o corpo da 003 e o corpo da 034, exatamente).
+-- Os DOIS blocos têm de ser revertidos JUNTOS: reverter só a função traz o
+-- bug de volta (a trava aborta o pagamento do financeiro sem explicação);
+-- reverter só a trava deixa uma recusa que não protege nada.
 --
 --   -- 1. a trava, corpo da 003:
 --
@@ -314,14 +330,18 @@ begin
   -- le. Recusa nomeando os cupons, ANTES de reivindicar o lancamento. So olha
   -- lancamento 'aberto': pagar de novo um lancamento ja pago segue recebendo
   -- a mensagem de "nao esta aberto".
-  select string_agg(c.coupon_number, ', ' order by c.coupon_number) into v_ja_pagos
-    from public.settlements s
-    join public.settlement_items i on i.settlement_id = s.id
-    join public.coupons c on c.id = i.coupon_id
-   where s.id = p_id and s.status = 'aberto' and c.paid is true;
+  -- Admin passa (Ruling 38): a trava nao existe para ele, e o lancamento e a
+  -- autoridade -- o pagamento sobrescreve o paid_at/paid_by manuais.
+  if not public.is_admin() then
+    select string_agg(c.coupon_number, ', ' order by c.coupon_number) into v_ja_pagos
+      from public.settlements s
+      join public.settlement_items i on i.settlement_id = s.id
+      join public.coupons c on c.id = i.coupon_id
+     where s.id = p_id and s.status = 'aberto' and c.paid is true;
 
-  if v_ja_pagos is not null then
-    raise exception 'cupom ja marcado como pago: %', v_ja_pagos;
+    if v_ja_pagos is not null then
+      raise exception 'cupom ja marcado como pago: %', v_ja_pagos;
+    end if;
   end if;
 
   update public.settlements
