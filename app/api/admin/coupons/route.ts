@@ -1,6 +1,6 @@
 import { requireRole, createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import type { Role } from '@/lib/auth/roles'
+import { CAMPOS_POR_PAPEL } from '@/lib/auth/campos-do-cupom'
 import type { Database } from '@/lib/supabase/types'
 
 type CouponUpdate = Database['public']['Tables']['coupons']['Update']
@@ -27,17 +27,6 @@ function traduzErroDoBanco(msg: string): string {
   return 'Não foi possível salvar a alteração.'
 }
 
-const FIELDS_BY_ROLE: Record<Role, string[]> = {
-  admin: ['status', 'customer_name', 'customer_phone', 'customer_email', 'customer_cpf',
-          'verified', 'paid', 'invoice_number'],
-  // Sem 'paid': o Financeiro paga por lancamento (app/api/finance/settlements).
-  // Pagar cupom a cupom aqui deixava desmarcar um cupom de lancamento pago.
-  // O admin MANTEM 'paid' por decisao do dono.
-  finance: ['verified', 'invoice_number'],
-  moderator: [],
-  // O influenciador nao edita cupom nenhum: o portal dele e so leitura.
-  influencer: [],
-}
 
 // DELETE — exclui um ou mais cupons
 export async function DELETE(request: Request) {
@@ -65,7 +54,7 @@ export async function PATCH(request: Request) {
   const { id, ...data } = body
   if (!id) return NextResponse.json({ error: 'id obrigatório' }, { status: 400 })
 
-  const allowed = FIELDS_BY_ROLE[auth.role]
+  const allowed = CAMPOS_POR_PAPEL[auth.role]
   const update: Record<string, unknown> = {}
 
   for (const [key, value] of Object.entries(data)) {

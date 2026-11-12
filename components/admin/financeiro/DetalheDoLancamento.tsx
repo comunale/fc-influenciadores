@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { brl, dia, diaHora, INPUT, lerResposta, type Lancamento } from './tipos'
+import { brl, dia, diaDoUso, INPUT, lerResposta, type Lancamento } from './tipos'
 
 const FORMAS = ['PIX', 'TED', 'Transferência', 'Dinheiro']
 
@@ -74,7 +74,7 @@ export function DetalheDoLancamento({ l }: { l: Lancamento }) {
             <tr key={i.id} className="border-t border-[#1a1a1a] text-gray-300">
               <td className="py-1.5 font-mono text-xs">{i.coupons?.coupon_number ?? '-'}</td>
               <td className="py-1.5">{i.coupons?.customer_name ?? '-'}</td>
-              <td className="py-1.5">{i.coupons?.used_at ? diaHora(i.coupons.used_at) : '-'}</td>
+              <td className="py-1.5">{i.coupons?.used_at ? diaDoUso(i.coupons.used_at) : '-'}</td>
               <td className="py-1.5 text-right">{brl(i.valor)}</td>
             </tr>
           ))}

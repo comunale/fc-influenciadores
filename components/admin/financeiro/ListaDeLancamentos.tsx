@@ -9,7 +9,7 @@ const TIPO: Record<string, string> = { comissao: 'Comissão', fixo: 'Fixo', rest
 
 function LinhaDoLancamento({ l }: { l: Lancamento }) {
   const [aberta, setAberta] = useState(l.status === 'aberto')
-  const s = SITUACAO[l.status] ?? SITUACAO.cancelado
+  const s = SITUACAO[l.status] ?? { texto: l.status, classe: 'bg-[#2a2a2a] text-gray-400' }
   const periodo = l.periodo_de && l.periodo_ate ? `${dia(l.periodo_de)} a ${dia(l.periodo_ate)}` : 'sem período'
   // Um botao por linha, e o rotulo diz o que ele faz com esta linha.
   const rotulo = aberta ? 'Recolher' : l.status === 'aberto' ? 'Pagar ou cancelar' : 'Ver cupons'
@@ -67,9 +67,15 @@ export function ListaDeLancamentos({ grupos }: { grupos: GrupoDoInfluenciador[] 
               <p className="text-xs text-gray-400">
                 Em aberto <span className="text-yellow-400 font-medium">{brl(soma('aberto'))}</span>
                 {' - '}
-                Pago <span className="text-[#00ff87] font-medium">{brl(soma('pago'))}</span>
+                Pago em lançamentos <span className="text-[#00ff87] font-medium">{brl(soma('pago'))}</span>
               </p>
             </header>
+            {g.pagosForaDeLancamento > 0 && (
+              <p className="text-xs text-gray-500 bg-[#0f0f0f] border border-[#1e1e1e] rounded-lg px-3 py-2">
+                Mais {g.pagosForaDeLancamento} cupom(ns) já marcado(s) como pago fora de lançamento (anteriores ao Financeiro).
+                Eles aparecem como &quot;já pago&quot; no portal do influenciador, mas não entram no total acima.
+              </p>
+            )}
 
             {g.parcerias.map((p) => (
               <div key={p.id} className="flex flex-col gap-3">

@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
@@ -176,24 +177,39 @@ export function CuponsRowItem({
         </td>
 
         <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-          <span title={!verified ? 'Confira o cupom antes de marcar como pago' : undefined} className="inline-block">
-          <input
-            type="checkbox"
-            checked={paid}
-            disabled={!podePagar || !verified || saving}
-            onChange={async (e) => {
-              const alvo = e.target.checked
-              setPaid(alvo)
-              if (!(await patch({ paid: alvo }))) setPaid(!alvo)
-            }}
-            className="accent-[#00ff87] w-4 h-4 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-          />
-          </span>
-          {!verified && podePagar && (
-            <div className="text-[10px] text-gray-600 mt-0.5">falta conferir</div>
-          )}
-          {paid && c.paid_at && (
-            <div className="text-[10px] text-gray-500 mt-0.5">{formatDate(c.paid_at)}</div>
+          {podePagar ? (
+            <>
+              <span title={!verified ? 'Confira o cupom antes de marcar como pago' : undefined} className="inline-block">
+              <input
+                type="checkbox"
+                checked={paid}
+                disabled={!verified || saving}
+                onChange={async (e) => {
+                  const alvo = e.target.checked
+                  setPaid(alvo)
+                  if (!(await patch({ paid: alvo }))) setPaid(!alvo)
+                }}
+                className="accent-[#00ff87] w-4 h-4 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+              />
+              </span>
+              {!verified && (
+                <div className="text-[10px] text-gray-600 mt-0.5">falta conferir</div>
+              )}
+              {paid && c.paid_at && (
+                <div className="text-[10px] text-gray-500 mt-0.5">{formatDate(c.paid_at)}</div>
+              )}
+            </>
+          ) : (
+            // Quem nao paga cupom a cupom (Financeiro) paga por lancamento, na
+            // tela do Financeiro: o texto diz para onde a acao foi.
+            <>
+              <div className="text-xs text-gray-400">
+                {paid && c.paid_at ? formatDate(c.paid_at) : '—'}
+              </div>
+              <Link href="/admin/financeiro" className="text-[10px] text-gray-600 hover:text-[#00ff87]">
+                pago pelo Financeiro
+              </Link>
+            </>
           )}
         </td>
         </>

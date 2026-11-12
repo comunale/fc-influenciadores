@@ -33,6 +33,16 @@ function diaDoBalcao(usedAt: string): string {
 }
 
 /**
+ * "Hoje" no balcao: o dia civil de Sao Paulo, devolvido como um Date cujos
+ * campos UTC sao esse dia (meio-dia, longe de qualquer virada). periodoSugerido
+ * le getUTC*; entre 21h e meia-noite em Brasilia o UTC ja virou o mes e a tela
+ * ofereceria fechar um mes que ainda nao acabou aqui.
+ */
+export function hojeNoBalcao(agora: Date): Date {
+  return new Date(diaDoBalcao(agora.toISOString()) + 'T12:00:00Z')
+}
+
+/**
  * O periodo que o Financeiro deveria fechar agora, ou null se ainda nao ha.
  *
  * 'mensal': o mes civil anterior a `hoje`. Mes corrente nunca e proposto, pois
@@ -80,6 +90,30 @@ export function cuponsElegiveis(
   contrato: ContratoInfluencer,
   periodo: Periodo
 ): CupomElegivel[] {
+  return percorrer(cupons, contrato, periodo, false)
+}
+
+/**
+ * O espelho de cuponsElegiveis: os cupons do periodo que ja constam como
+ * `paid = true`. Quem fecha precisa contá-los, porque cuponsElegiveis os
+ * descarta em silêncio e o total sairia completo na aparência. A rota separa
+ * os que estão em lançamento (normais) dos pagos fora de lançamento (anteriores
+ * a esta funcionalidade), e só estes viram exclusão contada.
+ */
+export function cuponsJaPagos(
+  cupons: VendaComUso[],
+  contrato: ContratoInfluencer,
+  periodo: Periodo
+): CupomElegivel[] {
+  return percorrer(cupons, contrato, periodo, true)
+}
+
+function percorrer(
+  cupons: VendaComUso[],
+  contrato: ContratoInfluencer,
+  periodo: Periodo,
+  pagos: boolean
+): CupomElegivel[] {
   const conferidas = cupons
     .filter((c) => c.verified)
     .sort((a, b) => a.created_at.localeCompare(b.created_at))
@@ -93,7 +127,7 @@ export function cuponsElegiveis(
     const entra = atual.vendasQueContam > anterior.vendasQueContam
     const dia = c.used_at ? diaDoBalcao(c.used_at) : null
 
-    if (entra && !c.paid && dia && dia >= periodo.de && dia <= periodo.ate) {
+    if (entra && Boolean(c.paid) === pagos && dia && dia >= periodo.de && dia <= periodo.ate) {
       resultado.push({ coupon_id: c.id, valor: atual.comissaoGerada - anterior.comissaoGerada })
     }
     anterior = atual

@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import { periodoSugerido, cuponsElegiveis } from '@/lib/settlements/periodo'
+import { periodoSugerido, cuponsElegiveis, cuponsJaPagos, hojeNoBalcao } from '@/lib/settlements/periodo'
 
 describe('periodoSugerido', () => {
   test('mensal sugere o mes anterior fechado', () => {
@@ -26,6 +26,15 @@ describe('periodoSugerido', () => {
     const p = periodoSugerido('mensal',
       { starts_at: '2026-06-10', ends_at: null, status: 'ativa' }, new Date('2026-07-05T12:00:00Z'))
     expect(p).toEqual({ de: '2026-06-10', ate: '2026-06-30' })
+  })
+})
+
+describe('hojeNoBalcao', () => {
+  test('21h30 de 30/06 em Brasilia ainda e junho, mesmo ja sendo julho em UTC', () => {
+    const hoje = hojeNoBalcao(new Date('2026-07-01T00:30:00Z'))
+    expect(hoje.getUTCMonth()).toBe(5)
+    expect(periodoSugerido('mensal', { starts_at: '2026-05-01', ends_at: null, status: 'ativa' }, hoje))
+      .toEqual({ de: '2026-05-01', ate: '2026-05-31' })
   })
 })
 
@@ -56,6 +65,16 @@ describe('cuponsElegiveis', () => {
   test('exclui cupom ja pago', () => {
     const r = cuponsElegiveis([cupom('x', '2026-06-05', { paid: true }), valido], contrato, junho)
     expect(r).toEqual(soOValido)
+  })
+
+  test('cuponsJaPagos devolve so o pago do periodo, para a rota contar a exclusao', () => {
+    const cupons = [
+      cupom('pago', '2026-06-05', { paid: true }),
+      cupom('pago-julho', '2026-07-05', { paid: true }),
+      valido,
+    ]
+    expect(cuponsJaPagos(cupons, contrato, junho)).toEqual([{ coupon_id: 'pago', valor: 500 }])
+    expect(cuponsElegiveis(cupons, contrato, junho)).toEqual(soOValido)
   })
 
   test('exclui cupom com used_at nulo', () => {

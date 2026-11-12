@@ -1,6 +1,7 @@
 import { requireRole, createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { cuponsElegiveis } from '@/lib/settlements/periodo'
+import type { ContratoInfluencer } from '@/lib/commission'
+import { cuponsElegiveis, cuponsJaPagos } from '@/lib/settlements/periodo'
 import {
   PAPEIS_DO_LIVRO,
   camposDeFechamento,
@@ -59,17 +60,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Não foi possível ler os cupons.' }, { status: 500 })
     }
 
-    const todos = cuponsElegiveis(
-      cupons ?? [],
-      {
-        commission_per_sale: parceria.commission_per_sale,
-        commission_starts_at: parceria.commission_starts_at,
-        fee_amount: parceria.fee_amount,
-        commission_counts_from: parceria.commission_counts_from === 'historico' ? 'historico' : 'parceria',
-        partnership_id: parceria.id,
-      },
-      periodo
-    )
+    const contratoDaParceria: ContratoInfluencer = {
+      commission_per_sale: parceria.commission_per_sale,
+      commission_starts_at: parceria.commission_starts_at,
+      fee_amount: parceria.fee_amount,
+      commission_counts_from: parceria.commission_counts_from === 'historico' ? 'historico' : 'parceria',
+      partnership_id: parceria.id,
+    }
+    const todos = cuponsElegiveis(cupons ?? [], contratoDaParceria, periodo)
 
     // A POSICAO da venda foi contada no historico todo (certo e deliberado);
     // a INCLUSAO e so da parceria do lancamento e so de cupom que o trigger
@@ -96,6 +94,27 @@ export async function POST(request: Request) {
       for (const c of incluidos) {
         if (ocupados.has(c.coupon_id)) {
           excluidos.push({ coupon_id: c.coupon_id, valor: c.valor, motivo: 'cupom ja esta em outro lancamento' })
+        }
+      }
+    }
+    // Cupom ja pago (paid = true) do periodo que NAO esta em lancamento: pago
+    // antes desta funcionalidade. cuponsElegiveis o descarta, e sem contar aqui o
+    // total sairia completo na aparencia. Os que estao em lancamento sao
+    // pagamentos normais e nao sao exclusao.
+    const jaPagos = cuponsJaPagos(cupons ?? [], contratoDaParceria, periodo)
+    if (jaPagos.length > 0) {
+      const { data: pagosEmLancamento, error: erroPagos } = await supabase
+        .from('settlement_items')
+        .select('coupon_id')
+        .in('coupon_id', jaPagos.map((c) => c.coupon_id))
+      if (erroPagos) {
+        console.error('settlements fechar: pagos', erroPagos)
+        return NextResponse.json({ error: 'Não foi possível conferir os cupons já pagos.' }, { status: 500 })
+      }
+      const emLancamento = new Set((pagosEmLancamento ?? []).map((i) => i.coupon_id))
+      for (const c of jaPagos) {
+        if (!emLancamento.has(c.coupon_id)) {
+          excluidos.push({ coupon_id: c.coupon_id, valor: c.valor, motivo: 'ja consta como pago fora de um lancamento' })
         }
       }
     }

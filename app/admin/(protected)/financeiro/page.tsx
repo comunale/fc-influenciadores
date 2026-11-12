@@ -1,6 +1,6 @@
 import { createClient, getUserRole } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { periodoSugerido } from '@/lib/settlements/periodo'
+import { periodoSugerido, hojeNoBalcao } from '@/lib/settlements/periodo'
 import { ListaDeLancamentos } from '@/components/admin/financeiro/ListaDeLancamentos'
 import type { GrupoDoInfluenciador, Lancamento } from '@/components/admin/financeiro/tipos'
 
@@ -32,11 +32,27 @@ export default async function FinanceiroPage() {
     )
     .order('starts_at', { ascending: false })
 
-  const hoje = new Date()
+  // Cupons pagos fora de lancamento, por influenciador: o portal os soma em
+  // "Ja pago" e a soma dos lancamentos nao, entao a tela diz que existem.
+  const { data: pagos } = await supabase
+    .from('coupons')
+    .select('influencer_id, settlement_items(id)')
+    .eq('paid', true)
+  const foraDeLancamento = new Map<string, number>()
+  for (const c of (pagos ?? []) as unknown as { influencer_id: string; settlement_items: unknown }[]) {
+    const emLancamento = Array.isArray(c.settlement_items) ? c.settlement_items.length > 0 : Boolean(c.settlement_items)
+    if (!emLancamento) foraDeLancamento.set(c.influencer_id, (foraDeLancamento.get(c.influencer_id) ?? 0) + 1)
+  }
+
+  const hoje = hojeNoBalcao(new Date())
   const porInfluenciador = new Map<string, GrupoDoInfluenciador>()
   for (const p of (data ?? []) as unknown as ParceriaLinha[]) {
     if (!p.influencers) continue
-    const grupo = porInfluenciador.get(p.influencers.id) ?? { influencer: p.influencers, parcerias: [] }
+    const grupo = porInfluenciador.get(p.influencers.id) ?? {
+      influencer: p.influencers,
+      pagosForaDeLancamento: foraDeLancamento.get(p.influencers.id) ?? 0,
+      parcerias: [],
+    }
     grupo.parcerias.push({
       id: p.id,
       status: p.status,

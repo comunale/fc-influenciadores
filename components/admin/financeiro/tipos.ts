@@ -31,6 +31,8 @@ export type ParceriaDoFinanceiro = {
 }
 
 export type GrupoDoInfluenciador = {
+  /** Cupons com paid = true que nao estao em nenhum lancamento (pagos antes do Financeiro). */
+  pagosForaDeLancamento: number
   influencer: { id: string; name: string; instagram_handle: string | null }
   parcerias: (ParceriaDoFinanceiro & {
     sugerido: { de: string; ate: string } | null
@@ -48,7 +50,9 @@ export function dia(iso: string | null): string {
   return `${d}/${m}/${a}`
 }
 
-export const diaHora = (iso: string) => new Date(iso).toLocaleDateString('pt-BR')
+/** Dia do balcao (Sao Paulo), igual ao recorte de lib/settlements/periodo.ts. */
+export const diaDoUso = (iso: string) =>
+  new Date(iso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
 
 export const SITUACAO: Record<string, { texto: string; classe: string }> = {
   aberto:    { texto: 'Aberto',    classe: 'bg-yellow-950 text-yellow-400' },
