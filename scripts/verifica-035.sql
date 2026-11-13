@@ -329,18 +329,9 @@ select pg_temp.nao_levanta(5, 'admin limpa Pago de cupom em lancamento pago',
 select pg_temp.confere(5.1, 'o cupom ficou nao pago',
   $q$select paid::text from public.coupons where id = '00000000-0000-0000-0035-000000000161'$q$, 'false');
 
--- Resumo. 26 casos: 1, 1.1, 1.2, 1.3 (4); 2, 2.1 (2); 3, 3.1, 3.2, 3.3 (4);
--- 4, 4.1, 4.2, 4.3, 4.4 (5); 5, 5.1 (2); 6, 6.1 (2); 7, 7.1 (2); 8, 8.1 (2); 9, 9.1, 9.2 (3); 10, 10.1 (2) = 28.
--- (recontar se casos mudarem)
-insert into r
-select 999, 'RESUMO', 'total 28, nenhum nao-OK',
-       count(*) || ' linhas, ' || count(*) filter (where veredito not like 'OK%') || ' nao-OK',
-       case when count(*) = 28 and count(*) filter (where veredito not like 'OK%') = 0
-            then 'OK' else 'FALHOU -- linhas faltando ou casos nao-OK' end
-  from r;
-
 -- 10: o ADMIN paga lancamento com cupom ja marcado a mao (Ruling 38): passa, e
--- o paid_at/paid_by do cupom passam a ser os do lancamento.
+-- o paid_at/paid_by do cupom passam a ser os do lancamento. Roda AQUI porque
+-- depende das claims de admin que o caso 5 acabou de assumir.
 select pg_temp.confere(10, 'admin paga lancamento com cupom ja pago a mao: devolve 1',
   $q$select public.settlement_pagar('00000000-0000-0000-0035-000000000b11',
        '2026-11-10T12:00:00Z', 'PIX', null, 'Admin Quem')::text$q$, '1');
@@ -350,6 +341,25 @@ select pg_temp.confere(10.1, 'lancamento pago e o cupom ficou com paid_at/paid_b
       where s.id = '00000000-0000-0000-0035-000000000b11'
         and c.id = '00000000-0000-0000-0035-000000000195'$q$, 'pago|Admin Quem|true');
 
--- Resumo. 28 casos:
+-- Resumo. 28 casos: 1, 1.1, 1.2, 1.3 (4); 2, 2.1 (2); 3, 3.1, 3.2, 3.3 (4);
+-- 4, 4.1, 4.2, 4.3, 4.4 (5); 5, 5.1 (2); 6, 6.1 (2); 7, 7.1 (2); 8, 8.1 (2);
+-- 9, 9.1, 9.2 (3); 10, 10.1 (2) = 28.
+-- (recontar se casos mudarem)
+--
+-- O RESUMO tem de ser o ULTIMO insert em `r`, depois de TODOS os casos: ele
+-- conta o que ja esta na tabela. Em 13/11 ele ficou antes dos casos 10/10.1 e
+-- passou a contar 26 enquanto exigia 28 -- e, pior, o arquivo terminava num
+-- `select pg_temp.confere(...)`, entao o SQL Editor mostrava so a coluna vazia
+-- dessa funcao em vez da tabela de resultados. O `select * from r` abaixo e a
+-- ultima instrucao do arquivo e e o que voce le.
+insert into r
+select 999, 'RESUMO', 'total 28, nenhum nao-OK',
+       count(*) || ' linhas, ' || count(*) filter (where veredito not like 'OK%') || ' nao-OK',
+       case when count(*) = 28 and count(*) filter (where veredito not like 'OK%') = 0
+            then 'OK' else 'FALHOU -- linhas faltando ou casos nao-OK' end
+  from r;
+
+reset role;
+select * from r order by ordem;
 
 rollback;
