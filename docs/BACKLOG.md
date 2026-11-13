@@ -206,16 +206,32 @@ no portal, criar a senha dela, preencher os dados e aceitar.
 
 ### O que continua em aberto
 
-1. **Fechamentos e pagamentos** (subsistema 2) — **em execução desde 11/11**.
-   Plano: `docs/superpowers/plans/2026-11-11-fechamentos-e-pagamentos.md`,
-   8 tarefas, execução por subagente. Tarefas 1 e 2 fechadas: o módulo puro de
-   período e elegibilidade (`lib/settlements/`) e a **migration 031, aplicada em
-   produção em 11/11** — `settlements`, `settlement_items`, índice único por
-   cupom, 4 triggers e 6 funções. O `scripts/verifica-031.sql` rodou no banco
-   real: 44 casos, 44 OK. Rode-o de novo antes e depois de mexer nessas tabelas;
-   ele é a prova, não a documentação. O maior buraco funcional: pagar comissão é
-   cupom a cupom, o fee fixo não tem onde ser registrado, e a restituição que o
-   contrato criou não tem tela.
+1. **Fechamentos e pagamentos** (subsistema 2) — **entregue em 12/11 nas tarefas
+   1 a 6. As tarefas 7 e 8 foram adiadas por decisão do César**, que considerou
+   a etapa desproporcional: *"isso é só um checklist, não estou montando uma
+   plataforma de pagamentos"*. Ele tem razão — o inchaço foi do executor, não do
+   plano: cada revisão achava defeito real num caminho de dinheiro e eu tratava
+   todo defeito real como defeito a consertar, até virar cinco rodadas numa tela.
+
+   **O que ficou no ar:** migrations 031 a 035, as rotas de fechar/pagar/cancelar
+   e a tela `/admin/financeiro`. Fechamento funciona de ponta a ponta.
+
+   **O que ficou de fora, e é o que resta se um dia valer a pena:**
+   - **Task 7 — portal do influenciador** (migration 036): a influenciadora não
+     vê os fechamentos dela. Hoje o portal mostra "já pago" derivado de
+     `coupons.paid`, que concorda com o livro, então não há número errado — só
+     falta a visão por lançamento.
+   - **Task 8 — aviso no painel**: nada lembra que existe fixo vencido ou
+     restituição a cobrar. O `fee_timing` da parceria existe justamente para
+     isso e continua sem consumidor.
+
+   Plano com as 8 tarefas: `docs/superpowers/plans/2026-11-11-fechamentos-e-pagamentos.md`.
+   Diário de execução, com 39 decisões registradas e o porquê de cada uma:
+   `.superpowers/sdd/2026-11-11-fechamentos-e-pagamentos/progress.md`.
+
+   **Os scripts de verificação são a prova, não a documentação.** `verifica-031`
+   (44 casos), `034` (23) e `035` (26) rodam em `begin/rollback` e não alteram
+   nada. Rode-os antes e depois de mexer nessas tabelas.
 
    Três coisas decididas em 11/11 que não estão na spec de agosto: o período
    recorta por **`used_at`** e nunca por `verified_at` (as 5 vendas de junho do
