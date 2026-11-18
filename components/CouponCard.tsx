@@ -36,7 +36,8 @@ export function CouponCard({ coupon }: CouponCardProps) {
       ? formatCurrency(coupon.discount_value ?? 0)
       : `${coupon.discount_value ?? 0}%`
 
-  const isExpired = new Date(coupon.expires_at) < new Date()
+  // Cupom do Programa de Indicacao nasce sem vencimento (036): null = nunca vence.
+  const isExpired = coupon.expires_at !== null && new Date(coupon.expires_at) < new Date()
   const isUsed = coupon.status === 'used'
 
   async function captureAsJpeg(): Promise<string> {
@@ -180,8 +181,8 @@ export function CouponCard({ coupon }: CouponCardProps) {
               <div className="text-[#00ff87] font-black text-xl">{discountLabel}</div>
             </div>
             <div className="bg-[#141414] rounded-lg p-3 text-center border border-[#1e1e1e]">
-              <div className="text-xs text-gray-500 mb-1">Válido até</div>
-              <div className="text-white font-bold text-sm">{formatDate(coupon.expires_at)}</div>
+              <div className="text-xs text-gray-500 mb-1">{coupon.expires_at ? 'Válido até' : 'Validade'}</div>
+              <div className="text-white font-bold text-sm">{coupon.expires_at ? formatDate(coupon.expires_at) : 'Sem vencimento'}</div>
             </div>
           </div>
 

@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Cupom cancelado.', coupon }, { status: 400 })
     }
 
-    if (coupon.status === 'expired' || new Date(coupon.expires_at) < new Date()) {
+    if (coupon.status === 'expired' || (coupon.expires_at !== null && new Date(coupon.expires_at) < new Date())) {
       await supabase.from('coupons').update({ status: 'expired' }).eq('id', coupon.id)
       return NextResponse.json({ error: 'Cupom expirado.', coupon }, { status: 400 })
     }
@@ -124,7 +124,7 @@ export async function GET(request: Request) {
     }
 
     // Verificar expiração dinamicamente
-    if (coupon.status === 'pending' && new Date(coupon.expires_at) < new Date()) {
+    if (coupon.status === 'pending' && coupon.expires_at !== null && new Date(coupon.expires_at) < new Date()) {
       await supabase.from('coupons').update({ status: 'expired' }).eq('id', coupon.id)
       coupon.status = 'expired'
     }

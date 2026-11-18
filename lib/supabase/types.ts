@@ -12,6 +12,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      indicadores: {
+        Row: {
+          id: string; nome: string; cpf: string; telefone: string
+          sexo: string; data_nascimento: string; codigo: string
+          teto_usos: number | null; ativo: boolean
+          encerrado_em: string | null; encerrado_por: string | null
+          aceite_termos: boolean; aceite_comunicacoes: boolean
+          aceite_at: string; aceite_ip: string | null; created_at: string
+        }
+        Insert: {
+          id?: string; nome: string; cpf: string; telefone: string
+          sexo: string; data_nascimento: string; codigo: string
+          teto_usos?: number | null; ativo?: boolean
+          encerrado_em?: string | null; encerrado_por?: string | null
+          aceite_termos: boolean; aceite_comunicacoes?: boolean
+          aceite_at?: string; aceite_ip?: string | null; created_at?: string
+        }
+        Update: {
+          id?: string; nome?: string; cpf?: string; telefone?: string
+          sexo?: string; data_nascimento?: string; codigo?: string
+          teto_usos?: number | null; ativo?: boolean
+          encerrado_em?: string | null; encerrado_por?: string | null
+          aceite_termos?: boolean; aceite_comunicacoes?: boolean
+          aceite_at?: string; aceite_ip?: string | null; created_at?: string
+        }
+        Relationships: []
+      }
+      indicador_cliques: {
+        Row: {
+          id: number; indicador_id: string; created_at: string
+          ip: string | null; user_agent: string | null
+        }
+        Insert: {
+          id?: number; indicador_id: string; created_at?: string
+          ip?: string | null; user_agent?: string | null
+        }
+        Update: {
+          id?: number; indicador_id?: string; created_at?: string
+          ip?: string | null; user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "indicador_cliques_indicador_id_fkey"
+            columns: ["indicador_id"]
+            isOneToOne: false
+            referencedRelation: "indicadores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contract_templates: {
         Row: {
           id: string; versao: number; titulo: string; corpo: string
@@ -87,6 +137,7 @@ export type Database = {
           email: string | null
           id: string
           influencer_id: string | null
+          indicador_id: string | null
           name: string
           role: string
           store_name: string | null
@@ -98,6 +149,7 @@ export type Database = {
           email?: string | null
           id: string
           influencer_id?: string | null
+          indicador_id?: string | null
           name: string
           role?: string
           store_name?: string | null
@@ -109,6 +161,7 @@ export type Database = {
           email?: string | null
           id?: string
           influencer_id?: string | null
+          indicador_id?: string | null
           name?: string
           role?: string
           store_name?: string | null
@@ -202,12 +255,14 @@ export type Database = {
           coupon_number: string
           created_at: string
           customer_cpf: string
-          customer_email: string
+          customer_email: string | null
           customer_name: string
           customer_phone: string
-          expires_at: string
+          expires_at: string | null
           id: string
-          influencer_id: string
+          influencer_id: string | null
+          indicador_id: string | null
+          indicador_cpf: string | null
           status: string
           used_at: string | null
           used_by_admin: string | null
@@ -230,12 +285,14 @@ export type Database = {
           coupon_number: string
           created_at?: string
           customer_cpf: string
-          customer_email: string
+          customer_email?: string | null
           customer_name: string
           customer_phone: string
-          expires_at: string
+          expires_at?: string | null
           id?: string
-          influencer_id: string
+          influencer_id?: string | null
+          indicador_id?: string | null
+          indicador_cpf?: string | null
           status?: string
           used_at?: string | null
           used_by_admin?: string | null
@@ -258,12 +315,14 @@ export type Database = {
           coupon_number?: string
           created_at?: string
           customer_cpf?: string
-          customer_email?: string
+          customer_email?: string | null
           customer_name?: string
           customer_phone?: string
-          expires_at?: string
+          expires_at?: string | null
           id?: string
-          influencer_id?: string
+          influencer_id?: string | null
+          indicador_id?: string | null
+          indicador_cpf?: string | null
           status?: string
           used_at?: string | null
           used_by_admin?: string | null
@@ -594,6 +653,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      indicador_do_usuario: {
+        Args: Record<string, never>
+        Returns: string | null
+      }
+      indicacao_meus_cliques: {
+        Args: Record<string, never>
+        Returns: number
+      }
+      indicacao_minhas_indicacoes: {
+        Args: Record<string, never>
+        Returns: {
+          coupon_number: string; primeiro_nome: string; status: string
+          verified: boolean; premio: number | null
+          criado_em: string; usado_em: string | null
+        }[]
+      }
       portal_meu_contrato: {
         Args: Record<string, never>
         Returns: {
@@ -695,3 +770,4 @@ export type Coupon = Database['public']['Tables']['coupons']['Row']
 export type AdminProfile = Database['public']['Tables']['admin_profiles']['Row']
 
 export type CouponStatus = 'pending' | 'used' | 'expired' | 'cancelled'
+export type Indicador = Database['public']['Tables']['indicadores']['Row']
