@@ -662,3 +662,58 @@ e `003:66-68`), e `auth.uid()` é NULL para `service_role` — que é o que
 Eles existem para barrar um lojista batendo direto na API REST com o token dele, e
 nisso funcionam. Mas **regra nova escrita como trigger nesse padrão nasce sem efeito.**
 O que sobrevive ao `service_role` é `unique index`, `check constraint` e FK.
+
+---
+
+## Programa de Indicação — entregue em 18/11/2026, ainda não deployado
+
+Spec `docs/superpowers/specs/2026-11-17-programa-de-indicacao-design.md`,
+plano `docs/superpowers/plans/2026-11-18-programa-de-indicacao.md`, 7 tarefas,
+branch `programa-de-indicacao`.
+
+**Migrações 036 e 037 já estão aplicadas em produção.** O código ainda não.
+Enquanto o deploy não sair, nada quebra: as colunas novas são nuláveis e
+ninguém as escreve. Mas as duas telas novas (`/indique`, `/admin/indicadores`)
+só existem no branch.
+
+### O que precisa de você
+
+- **Deploy.** Sobe junto o que estava pendente da entrega de fechamentos
+  (correção do descumprimento, rotas de lançamento, `/admin/financeiro`).
+- **Apagar um índice duplicado.** A 036 criou `coupons_invoice_number_key`
+  sem saber que `coupons_invoice_number_unico` já existia e é melhor (exclui
+  string vazia também). O harness recusou o `DROP INDEX` sem confirmação, então
+  ele ficou no banco. É inofensivo — índice redundante numa tabela pequena —
+  mas o certo é rodar:
+
+  ```sql
+  drop index if exists public.coupons_invoice_number_key;
+  ```
+
+- **Decidir o teto.** Ele nasce desligado por decisão sua (decisão 15 da spec).
+  Enquanto estiver desligado, não existe limite de indicações por pessoa, e a
+  única conferência antes de premiar é o relatório.
+
+### O que o programa deliberadamente NÃO faz
+
+- Não paga. Não escreve em `coupons.paid`, não cria `settlements`. A
+  exportação é o produto final.
+- Não manda e-mail. Senha esquecida se resolve por `marketing@foxcycles.com.br`.
+- A rota de cupom express (`/api/admin/coupon-express`) **não participa** do
+  programa. Se um dia participar, a defesa principal contra o
+  vendedor-cúmplice deixa de existir: o cupom precisa nascer pelo link, antes
+  de a pessoa chegar na loja.
+
+### Buracos conhecidos
+
+- **A trava "CPF de influenciador não entra no programa" só alcança quem
+  preencheu o CPF na ficha.** Em 18/11/2026 isso era 1 influenciador de 19.
+  Ela fecha o caminho honesto, não todos. Quem não tem CPF na ficha consegue se
+  cadastrar e acumular prêmio de indicação além da comissão de parceria.
+- **Cupom de indicação aparece em `previa.excluidos`** com motivo "cupom sem
+  parceria", se a lista chegar lá por outro caminho. Hoje não chega: a rota de
+  fechar filtra por `influencer_id`, e cupom de indicação tem esse campo nulo.
+- **Cliques contam robô que o regex não conhece.** O filtro cobre os
+  previewers conhecidos (WhatsApp, Telegram, Facebook, Slack, Discord e
+  crawlers genéricos). Um novo infla a métrica de cliques — não o cupom, nem o
+  uso, que são o que paga.
