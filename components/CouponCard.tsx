@@ -17,6 +17,10 @@ interface CouponCardProps {
     influencers: Pick<Influencer, 'name' | 'instagram_handle'> | null
     indicadores: { nome: string } | null
     partnerships: { coupon_title: string | null; coupon_description: string | null } | null
+    // Cupom de indicação não tem parceria: os textos vêm da campanha do
+    // programa. Sem isto o cupom IMPRESSO saía com o título em branco -- e é o
+    // papel que o comprador leva para a loja.
+    campaigns: { coupon_title: string | null; coupon_description: string | null } | null
   }
 }
 
@@ -135,7 +139,9 @@ export function CouponCard({ coupon }: CouponCardProps) {
         {/* Topo colorido */}
         <div className="bg-[#00ff87] px-6 py-4 flex flex-col items-center gap-1">
           <div className="text-black text-xs font-bold uppercase tracking-widest">FoxCycles</div>
-          <div className="text-black text-lg font-black">{coupon.partnerships?.coupon_title}</div>
+          <div className="text-black text-lg font-black">
+            {coupon.partnerships?.coupon_title || coupon.campaigns?.coupon_title}
+          </div>
         </div>
 
         {/* Separador dentilhado */}
@@ -212,7 +218,7 @@ export function CouponCard({ coupon }: CouponCardProps) {
 
           {/* Descrição */}
           <div className="text-xs text-gray-500 text-center leading-relaxed border-t border-[#1e1e1e] pt-3">
-            {coupon.partnerships?.coupon_description}
+            {coupon.partnerships?.coupon_description || coupon.campaigns?.coupon_description}
           </div>
         </div>
       </div>

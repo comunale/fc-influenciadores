@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { formatCPF } from '@/lib/validators/cpf'
 
 type Dados = { cpf: string | null; estado_civil: string | null;
                endereco: string | null; cep: string | null } | null
@@ -97,10 +98,16 @@ export function ContratoAceite({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Com máscara desde 18/11/2026. Sem ela este campo aceitava
+                qualquer forma, e a coluna guardava `123.456.789-09` ao lado de
+                `12345678909` — o que fez a trava do Programa de Indicação, que
+                compara CPF de influenciador, não barrar ninguém. */}
             <Input
               label="CPF"
+              placeholder="000.000.000-00"
+              inputMode="numeric"
               value={form.cpf}
-              onChange={(e) => setForm((p) => ({ ...p, cpf: e.target.value }))}
+              onChange={(e) => setForm((p) => ({ ...p, cpf: formatCPF(e.target.value) }))}
               required
               disabled={loading}
             />

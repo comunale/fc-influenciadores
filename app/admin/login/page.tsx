@@ -2,6 +2,7 @@
 
 import { useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { destinoSeguro } from '@/lib/indicacao/regras'
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/supabase/client'
 import { FoxLogo } from '@/components/FoxLogo'
@@ -10,7 +11,8 @@ import { Button } from '@/components/ui/button'
 
 function LoginForm() {
   const searchParams = useSearchParams()
-  const next = searchParams.get('next') || '/admin'
+  // Mesma trava das outras duas portas: ?next= nao escolhe outro site.
+  const next = destinoSeguro(searchParams.get('next'), '/admin')
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ email: '', password: '' })
 

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { checkRateLimit, getClientIp, COUPON_RULES } from '@/lib/rate-limit'
 import { validarCadastro } from '@/lib/indicacao/cadastro'
-import { emailSinteticoDoCpf, gerarCodigoDeIndicacao } from '@/lib/indicacao/regras'
+import { emailSinteticoDoCpf, gerarCodigoDeIndicacao, mesmoCpf } from '@/lib/indicacao/regras'
 import { parceriaAtiva, parceriaVigente, type Parceria } from '@/lib/partnership'
 
 const UNIQUE_VIOLATION = '23505'
@@ -70,11 +70,17 @@ export async function POST(request: Request) {
     //
     // A checagem só alcança quem preencheu o CPF na ficha. Em 18/11/2026 isso
     // era 1 influenciador de 19 — então ela fecha o caminho honesto, não todos.
-    const { data: ficha } = await supabase
+    // Compara DÍGITOS, não texto. A ficha guarda o CPF como o portal recebeu, e
+    // o campo do portal não tinha máscara: quem digitou `123.456.789-09` não
+    // casava com `12345678909`, e a trava não barrava ninguém — exatamente o
+    // defeito silencioso que a revisão de 18/11 achou. São 19 influenciadores,
+    // então trazer a coluna e comparar aqui é barato e pega os dois formatos.
+    const { data: fichas } = await supabase
       .from('influencer_ficha')
-      .select('influencer_id')
-      .eq('cpf', dados.cpf)
-      .maybeSingle()
+      .select('influencer_id, cpf')
+      .not('cpf', 'is', null)
+
+    const ficha = (fichas ?? []).find((f) => mesmoCpf(f.cpf, dados.cpf))
 
     if (ficha?.influencer_id) {
       // Duas consultas, e não um join aninhado: a FK de influencer_ficha ainda
@@ -105,6 +111,22 @@ export async function POST(request: Request) {
     })
     if (erroAuth || !novoUsuario.user) {
       console.error('indicacao/cadastro createUser:', erroAuth)
+
+      // O e-mail sintético já existe. Dois caminhos levam aqui, e os dois
+      // precisam da MESMA frase da checagem de CPF acima:
+      //
+      //  - dois envios simultâneos do mesmo CPF;
+      //  - uma tentativa anterior que criou o usuário, falhou depois e não
+      //    conseguiu apagá-lo. Sem este ramo, essa pessoa recebia "tente
+      //    novamente em instantes" para sempre, sem caminho nenhum.
+      const motivo = `${erroAuth?.message ?? ''} ${erroAuth?.code ?? ''}`.toLowerCase()
+      if (motivo.includes('already') || motivo.includes('exist') || motivo.includes('registered')) {
+        return NextResponse.json(
+          { error: 'Este CPF já está cadastrado. Entre com seu CPF e sua senha.' },
+          { status: 409 }
+        )
+      }
+
       return NextResponse.json(
         { error: 'Não foi possível criar seu acesso. Tente novamente em instantes.' },
         { status: 400 }
@@ -113,7 +135,16 @@ export async function POST(request: Request) {
     const userId = novoUsuario.user.id
 
     async function desfazer() {
-      await supabase.auth.admin.deleteUser(userId)
+      const { error } = await supabase.auth.admin.deleteUser(userId)
+      // Se nem apagar deu, a conta fica órfã no Auth. Grita no log com o id,
+      // porque sem isso ela é invisível: o CPF não existe em `indicadores` e o
+      // e-mail sintético está ocupado.
+      if (error) {
+        console.error(
+          `indicacao/cadastro: CONTA ORFA no Auth, user ${userId}, sem linha em indicadores. Apagar a mao.`,
+          error
+        )
+      }
     }
 
     // O código é sorteado: colisão manda sortear outro, não falhar.

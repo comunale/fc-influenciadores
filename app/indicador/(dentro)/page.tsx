@@ -9,7 +9,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 /**
  * O painel de quem indica.
  *
- * Lê pelas funções `indicacao_minhas_indicacoes()` e
+ * Lê pelas funções `indicacao_minhas_vendas()` e
  * `indicacao_meus_cliques()`, e NÃO por query direta em `coupons`. O motivo
  * está na migration 036: RLS filtra linha e não coluna, então uma policy por
  * `indicador_id` deixaria a pessoa pedir /rest/v1/coupons?select=* e ler nome,
@@ -23,7 +23,7 @@ export default async function PainelDoIndicador() {
   const supabase = await createClient()
 
   const [{ data: linhas }, { data: cliques }] = await Promise.all([
-    supabase.rpc('indicacao_minhas_indicacoes'),
+    supabase.rpc('indicacao_minhas_vendas'),
     supabase.rpc('indicacao_meus_cliques'),
   ])
 
@@ -31,7 +31,7 @@ export default async function PainelDoIndicador() {
   const resumo = resumoDasIndicacoes(indicacoes)
   const estado = podeGerar(
     { ativo: indicador.ativo, teto_usos: indicador.tetoUsos },
-    resumo.usos
+    resumo.naFila
   )
 
   return (
@@ -63,7 +63,11 @@ export default async function PainelDoIndicador() {
           rotulo="A receber"
           valor={formatCurrency(resumo.aReceber)}
           destaque
-          detalhe={`${resumo.premiados} conferida${resumo.premiados === 1 ? '' : 's'}`}
+          detalhe={
+            resumo.jaPremiado > 0
+              ? `já recebeu ${formatCurrency(resumo.jaPremiado)}`
+              : `${resumo.premiados} conferida${resumo.premiados === 1 ? '' : 's'}`
+          }
         />
       </div>
 
@@ -91,7 +95,12 @@ export default async function PainelDoIndicador() {
                     {i.coupon_number} · gerado em {formatDate(i.criado_em)}
                   </div>
                 </div>
-                <Situacao status={i.status} verified={i.verified} premio={i.premio} />
+                <Situacao
+                  status={i.status}
+                  verified={i.verified}
+                  premio={i.premio}
+                  premiadoEm={i.premiado_em}
+                />
               </li>
             ))}
           </ul>
@@ -143,12 +152,21 @@ function Situacao({
   status,
   verified,
   premio,
+  premiadoEm,
 }: {
   status: string
   verified: boolean
   premio: number | null
+  premiadoEm: string | null
 }) {
   if (status === 'used' && verified) {
+    if (premiadoEm) {
+      return (
+        <span className="shrink-0 text-gray-500 text-sm">
+          {formatCurrency(premio ?? 0)} · pago
+        </span>
+      )
+    }
     return (
       <span className="shrink-0 text-[#00ff87] text-sm font-bold">
         {formatCurrency(premio ?? 0)}

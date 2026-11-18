@@ -22,7 +22,7 @@ export default async function IndicadoresPage() {
     supabase.from('indicadores').select('*').order('created_at', { ascending: false }),
     supabase
       .from('coupons')
-      .select('indicador_id, status, verified, commission_per_sale')
+      .select('indicador_id, status, verified, commission_per_sale, indicacao_premiado_em')
       .not('indicador_id', 'is', null),
     supabase.rpc('indicacao_cliques_por_indicador'),
   ])
@@ -35,6 +35,7 @@ export default async function IndicadoresPage() {
       status: c.status,
       verified: c.verified,
       commission_per_sale: c.commission_per_sale,
+      premiado_em: c.indicacao_premiado_em,
     })
     porIndicador.set(c.indicador_id, lista)
   }
@@ -57,6 +58,7 @@ export default async function IndicadoresPage() {
   }))
 
   const aPagar = linhas.reduce((s, l) => s + l.aReceber, 0)
+  const jaPago = linhas.reduce((s, l) => s + l.jaPremiado, 0)
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 flex flex-col gap-6">
@@ -68,7 +70,12 @@ export default async function IndicadoresPage() {
         </p>
       </div>
 
-      <ListaDeIndicadores linhas={linhas} aPagar={aPagar} role={(role ?? '') as Role} />
+      <ListaDeIndicadores
+        linhas={linhas}
+        aPagar={aPagar}
+        jaPago={jaPago}
+        role={(role ?? '') as Role}
+      />
     </div>
   )
 }

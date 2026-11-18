@@ -4,6 +4,7 @@ import { checkRateLimit, getClientIp, COUPON_RULES } from '@/lib/rate-limit'
 import { validateCPF } from '@/lib/validators/cpf'
 import { validarCelular } from '@/lib/validators/telefone'
 import { insertCouponWithRetry } from '@/lib/coupons/insert'
+import { mesmoCpf } from '@/lib/indicacao/regras'
 import {
   podeGerar,
   NOME_DA_CAMPANHA,
@@ -66,21 +67,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Link de indicação inválido.' }, { status: 404 })
     }
 
-    // O teto conta USOS: cupom que virou venda no balcão. Conta aqui, na hora
-    // de gerar, porque batido o teto o link para de gerar (decisão 14).
-    const { count: usos } = await supabase
+    // O teto conta a FILA: cupom pendente ou já usado. Contar só os usados foi
+    // o defeito achado na revisão de 18/11 — cupom nasce 'pending', então gerar
+    // cupom não movia o número que o teto olhava, e duzentos pendentes passavam
+    // por um teto de dez. Expirado e cancelado não ocupam lugar: morreram.
+    const { count: naFila } = await supabase
       .from('coupons')
       .select('id', { count: 'exact', head: true })
       .eq('indicador_id', indicador.id)
-      .eq('status', 'used')
+      .in('status', ['pending', 'used'])
 
-    const liberado = podeGerar(indicador, usos ?? 0)
+    const liberado = podeGerar(indicador, naFila ?? 0)
     if (!liberado.ok) {
       return NextResponse.json({ error: liberado.erro }, { status: 409 })
     }
 
     // O CHECK coupons_sem_autoindicacao é a rede. Esta é a frase.
-    if (cpfLimpo === indicador.cpf) {
+    if (mesmoCpf(cpfLimpo, indicador.cpf)) {
       return NextResponse.json(
         { error: 'Você não pode usar o seu próprio link. Indique outra pessoa.' },
         { status: 400 }

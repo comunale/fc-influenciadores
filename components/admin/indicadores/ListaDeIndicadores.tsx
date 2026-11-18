@@ -12,6 +12,7 @@ import type { IndicadorNaTela } from './tipos'
 interface Props {
   linhas: IndicadorNaTela[]
   aPagar: number
+  jaPago: number
   role: Role
 }
 
@@ -22,7 +23,7 @@ interface Props {
  * "38 usos, teto vazio" é quem decide pôr um teto, e mandar essa pessoa para
  * outra tela para fazê-lo é como a decisão deixa de ser tomada.
  */
-export function ListaDeIndicadores({ linhas, aPagar, role }: Props) {
+export function ListaDeIndicadores({ linhas, aPagar, jaPago, role }: Props) {
   const router = useRouter()
   const podeEditar = can(role, 'indicadores.edit')
   const [salvando, setSalvando] = useState<string | null>(null)
@@ -61,6 +62,39 @@ export function ListaDeIndicadores({ linhas, aPagar, role }: Props) {
     salvar(l.id, { teto_usos: n }, `${l.nome}: teto de ${n} usos.`)
   }
 
+  /**
+   * O botão existe porque, sem ele, a exportação reimprimiria o mesmo prêmio
+   * todo mês e a pessoa cobraria de novo o que já recebeu. O sistema não paga —
+   * ele registra que VOCÊ pagou.
+   */
+  async function marcarPremiado(l: IndicadorNaTela) {
+    if (
+      !confirm(
+        `Marcar ${formatCurrency(l.aReceber)} de ${l.nome} como pago?\n\n` +
+          `Isso NÃO paga nada: registra que você já pagou, para esse valor sair ` +
+          `da próxima exportação e do "a receber" que ela vê na área dela.`
+      )
+    )
+      return
+
+    setSalvando(l.id)
+    try {
+      const res = await fetch('/api/admin/indicadores/premiar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ indicador_id: l.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Erro ao marcar.')
+      toast.success(`${l.nome}: ${data.premiados} prêmio(s) marcado(s) como pago.`)
+      router.refresh()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Tente novamente.')
+    } finally {
+      setSalvando(null)
+    }
+  }
+
   function alternarSituacao(l: IndicadorNaTela) {
     if (l.ativo) {
       if (
@@ -95,15 +129,27 @@ export function ListaDeIndicadores({ linhas, aPagar, role }: Props) {
           <div className="text-2xl font-black text-[#00ff87]">{formatCurrency(aPagar)}</div>
         </div>
         <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl px-5 py-4">
+          <div className="text-xs text-gray-500 uppercase tracking-wider">Já pago</div>
+          <div className="text-2xl font-black text-gray-400">{formatCurrency(jaPago)}</div>
+        </div>
+        <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl px-5 py-4">
           <div className="text-xs text-gray-500 uppercase tracking-wider">Participantes</div>
           <div className="text-2xl font-black text-white">{linhas.length}</div>
         </div>
-        <a
-          href="/api/admin/indicadores/export"
-          className="ml-auto inline-flex h-11 items-center rounded-lg bg-[#00ff87] px-5 text-sm font-semibold text-black hover:bg-[#00cc6a]"
-        >
-          Exportar para premiar
-        </a>
+        <div className="ml-auto flex gap-3">
+          <a
+            href="/api/admin/indicadores/export"
+            className="inline-flex h-11 items-center rounded-lg bg-[#00ff87] px-5 text-sm font-semibold text-black hover:bg-[#00cc6a]"
+          >
+            Exportar o que falta pagar
+          </a>
+          <a
+            href="/api/admin/indicadores/export?todos=1"
+            className="inline-flex h-11 items-center rounded-lg border border-[#2a2a2a] px-5 text-sm font-semibold text-white hover:bg-[#1e1e1e]"
+          >
+            Exportar tudo
+          </a>
+        </div>
       </div>
 
       <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl overflow-x-auto">
@@ -140,8 +186,25 @@ export function ListaDeIndicadores({ linhas, aPagar, role }: Props) {
                   {l.usos}
                   <div className="text-gray-600 text-xs">{l.premiados} conferidas</div>
                 </td>
-                <td className="px-4 py-3 text-right font-bold text-[#00ff87] whitespace-nowrap">
-                  {formatCurrency(l.aReceber)}
+                <td className="px-4 py-3 text-right whitespace-nowrap">
+                  <div className="font-bold text-[#00ff87]">{formatCurrency(l.aReceber)}</div>
+                  {l.jaPremiado > 0 && (
+                    <div className="text-gray-500 text-xs">
+                      já pago {formatCurrency(l.jaPremiado)}
+                    </div>
+                  )}
+                  {podeEditar && l.aReceber > 0 && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      loading={salvando === l.id}
+                      onClick={() => marcarPremiado(l)}
+                      className="mt-1"
+                    >
+                      Marcar como pago
+                    </Button>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   {podeEditar ? (
@@ -168,7 +231,7 @@ export function ListaDeIndicadores({ linhas, aPagar, role }: Props) {
                   ) : (
                     <span className="text-gray-300">{l.tetoUsos ?? 'sem teto'}</span>
                   )}
-                  {l.tetoUsos !== null && l.usos >= l.tetoUsos && (
+                  {l.tetoUsos !== null && l.naFila >= l.tetoUsos && (
                     <div className="text-yellow-500 text-xs mt-1">
                       teto batido — o link não gera mais
                     </div>

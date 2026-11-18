@@ -7,11 +7,14 @@ import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { formatCPF } from '@/lib/validators/cpf'
-import { emailSinteticoDoCpf } from '@/lib/indicacao/regras'
+import { emailSinteticoDoCpf, destinoSeguro } from '@/lib/indicacao/regras'
 
 function Formulario() {
   const searchParams = useSearchParams()
-  const next = searchParams.get('next') || '/indicador'
+  // destinoSeguro recusa URL de outro site: esta tela e divulgada por WhatsApp,
+  // e um ?next= livre deixaria um link legitimo da FOX largar a pessoa logada
+  // numa pagina que pede dado bancario "para receber o premio".
+  const next = destinoSeguro(searchParams.get('next'), '/indicador')
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ cpf: '', senha: '' })
 

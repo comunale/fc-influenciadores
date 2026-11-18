@@ -62,13 +62,14 @@ export function CartaoDeBeneficios({ nome, codigo }: { nome: string; codigo: str
         </div>
 
         <div className="text-center">
-          <div className="text-gray-500 text-[10px] uppercase tracking-widest">Seu cupom</div>
+          <div className="text-gray-500 text-[10px] uppercase tracking-widest">Seu código</div>
           <div className="text-[#00ff87] font-black text-2xl tracking-wider">{codigo}</div>
         </div>
 
         <div className="w-full border-t border-[#2a2a2a] pt-4 text-center">
           <p className="text-gray-400 text-xs leading-relaxed">
-            Quem comprar com este cupom leva <strong className="text-white">R$ 300</strong> de
+            Quem comprar <strong className="text-white">pelo seu link</strong> leva{' '}
+            <strong className="text-white">R$ 300</strong> de
             desconto. Você recebe <strong className="text-white">R$ 200</strong> por venda
             conferida.
           </p>

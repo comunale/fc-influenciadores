@@ -29,6 +29,12 @@ export interface CouponData {
   // Programa de Indicacao. Os dois sao nulaveis, e o vendedor precisa saber de
   // qual programa e o cupom que ele esta validando.
   influencers: { name: string; instagram_handle: string } | null
+  // As COLUNAS decidem a origem. A RLS nao libera a tabela indicadores para o
+  // Lojista, entao o objeto embutido vem nulo exatamente na tela dele -- e era
+  // ele, o unico papel cujo trabalho e validar, que ficava sem saber de qual
+  // programa era o cupom.
+  influencer_id: string | null
+  indicador_id: string | null
   indicadores: { nome: string } | null
   campaigns: { name: string; discount_value: number; discount_type: string; coupon_title: string }
 }
@@ -58,10 +64,27 @@ const statusConfig = {
 
 const emptyExpress = { name: '', cpf: '', phone: '', email: '' }
 
-function normalize(raw: string): { type: 'coupon' | 'influencer'; value: string } {
+/**
+ * O que a pessoa digitou: cupom, perfil de influenciador, ou o código de quem
+ * indicou.
+ *
+ * O terceiro caso existe porque o cartão de benefícios do Programa de Indicação
+ * mostra um `IND-XXXXXX` em destaque, e o comprador tende a mostrar ESSE código
+ * no balcão. Sem este ramo o vendedor recebia "não encontrado", a venda saía sem
+ * desconto e o prêmio de quem indicou se perdia.
+ */
+function normalize(raw: string): { type: 'coupon' | 'influencer' | 'indicacao'; value: string } {
   const v = raw.trim().replace(/^@/, '').toUpperCase()
-  return { type: v.startsWith('FOX-') ? 'coupon' : 'influencer', value: v }
+  if (v.startsWith('FOX-')) return { type: 'coupon', value: v }
+  if (v.startsWith('IND-')) return { type: 'indicacao', value: v }
+  return { type: 'influencer', value: v }
 }
+
+/** A frase que o vendedor precisa quando o cliente mostra o cartão errado. */
+const AVISO_CODIGO_DE_INDICACAO =
+  'Esse é o código de quem indicou, não um cupom. Peça ao cliente o cupom ' +
+  '(FOX-…) que ele gerou pelo link da indicação — ou peça para ele gerar agora, ' +
+  'pelo link que está no cartão.'
 
 /**
  * O desconto vem do RETRATO gravado no proprio registro desde 18/08/2026.
@@ -111,7 +134,8 @@ export function ValidarClient({
     if (initialCode && !didAutoSearch.current) {
       didAutoSearch.current = true
       const { type, value } = normalize(initialCode)
-      if (type === 'coupon') searchCoupon(value)
+      if (type === "coupon") searchCoupon(value)
+      else if (type === "indicacao") setErrorMsg(AVISO_CODIGO_DE_INDICACAO)
       else searchInfluencer(value)
     }
   }, [initialCode])
@@ -177,8 +201,13 @@ export function ValidarClient({
     e.preventDefault()
     if (!code.trim()) return
     const { type, value } = normalize(code)
-    if (type === 'coupon') await searchCoupon(value)
-    else await searchInfluencer(value)
+    if (type === "coupon") await searchCoupon(value)
+    else if (type === "indicacao") {
+      setCoupon(null)
+      setInfluencer(null)
+      setSuccessCoupon(null)
+      setErrorMsg(AVISO_CODIGO_DE_INDICACAO)
+    } else await searchInfluencer(value)
   }
 
   async function handleValidate() {
@@ -339,9 +368,11 @@ export function ValidarClient({
                 <div className="text-white text-sm">
                   {coupon.influencers
                     ? coupon.influencers.instagram_handle
-                    : coupon.indicadores
-                      ? `Indicacao · ${coupon.indicadores.nome}`
-                      : '—'}
+                    : coupon.indicador_id
+                      ? `Indicação${coupon.indicadores ? ` · ${coupon.indicadores.nome}` : ''}`
+                      : coupon.influencer_id
+                        ? '(influenciador)'
+                        : '—'}
                 </div>
               </div>
             </div>

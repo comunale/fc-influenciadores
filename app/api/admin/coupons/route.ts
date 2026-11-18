@@ -60,6 +60,13 @@ export async function PATCH(request: Request) {
     if (!allowed.includes(key)) continue
     if (key === 'verified' || key === 'paid') {
       update[key] = Boolean(value)
+    } else if (key === 'customer_cpf') {
+      // Só dígitos. As duas travas que dependem deste campo comparam TEXTO:
+      // `coupons_sem_autoindicacao` (o CPF do indicador contra o do comprador) e
+      // `coupons_customer_cpf_campaign_id_key` (um cupom por CPF por campanha).
+      // Gravar `999.003.600-01` onde o indicador tem `99900360001` passava pelas
+      // duas, e dois cupons do mesmo CPF caberiam na mesma campanha.
+      update[key] = String(value).replace(/\D/g, '')
     } else {
       update[key] = String(value).trim()
     }

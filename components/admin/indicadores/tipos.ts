@@ -15,10 +15,14 @@ export type IndicadorNaTela = {
   cliques: number
   /** De resumoDoIndicador: cupons gerados. */
   cupons: number
-  /** Vendas feitas — é o que o teto conta. */
+  /** Cupons vivos (pendentes + usados): é o que o teto limita. */
+  naFila: number
+  /** Vendas feitas. */
   usos: number
   /** Vendas com NF conferida — é o que vira prêmio. */
   premiados: number
-  /** Em reais. */
+  /** Conferidas e AINDA NAO pagas, em reais. */
   aReceber: number
+  /** Premios que o Cesar ja pagou, em reais. */
+  jaPremiado: number
 }

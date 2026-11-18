@@ -4,12 +4,14 @@ import { useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/supabase/client'
+import { destinoSeguro } from '@/lib/indicacao/regras'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
 function Formulario() {
   const searchParams = useSearchParams()
-  const next = searchParams.get('next') || '/portal'
+  // Mesma trava da area de indicacao: ?next= nao escolhe outro site.
+  const next = destinoSeguro(searchParams.get('next'), '/portal')
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ email: '', password: '' })
 

@@ -34,6 +34,11 @@ export type CouponRow = {
   // UM dono por cupom (migration 036): influenciador OU indicador.
   influencers: { id: string; name: string; instagram_handle: string } | null
   indicadores: { id: string; nome: string } | null
+  // As COLUNAS, que chegam para todo papel pelo select('*'). A origem se decide
+  // por elas, nunca pelos objetos embutidos: indicadores_select nao libera a
+  // tabela para o Lojista, e a origem ficaria '—' justamente na tela dele.
+  influencer_id: string | null
+  indicador_id: string | null
   campaigns: { name: string } | null
   // Lancamento do Financeiro a que o cupom pertence (PostgREST devolve objeto
   // ou lista, conforme a cardinalidade inferida). Ausente/nulo = em nenhum.
@@ -71,8 +76,8 @@ export function discountLabel(c: CouponRow) {
  * nomear a origem, quem lê a tela não tem como saber qual dos dois é.
  */
 export function origemDoCupom(c: CouponRow): 'parceria' | 'indicacao' | 'desconhecida' {
-  if (c.influencers) return 'parceria'
-  if (c.indicadores) return 'indicacao'
+  if (c.influencer_id) return 'parceria'
+  if (c.indicador_id) return 'indicacao'
   return 'desconhecida'
 }
 
@@ -85,6 +90,10 @@ export const ORIGEM_LABEL: Record<ReturnType<typeof origemDoCupom>, string> = {
 /** Quem indicou, qualquer que seja o programa. */
 export function quemIndicou(c: CouponRow): string {
   if (c.influencers) return c.influencers.instagram_handle
+  if (c.influencer_id) return '(influenciador)'
   if (c.indicadores) return c.indicadores.nome
+  // O Lojista nao alcanca a tabela indicadores pela RLS, entao o objeto vem
+  // nulo para ele. A ORIGEM vem da coluna e continua certa; so o nome falta.
+  if (c.indicador_id) return 'Programa de Indicação'
   return '—'
 }

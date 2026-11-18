@@ -270,6 +270,8 @@ export type Database = {
           influencer_id: string | null
           indicador_id: string | null
           indicador_cpf: string | null
+          indicacao_premiado_em: string | null
+          indicacao_premiado_por: string | null
           status: string
           used_at: string | null
           used_by_admin: string | null
@@ -300,6 +302,8 @@ export type Database = {
           influencer_id?: string | null
           indicador_id?: string | null
           indicador_cpf?: string | null
+          indicacao_premiado_em?: string | null
+          indicacao_premiado_por?: string | null
           status?: string
           used_at?: string | null
           used_by_admin?: string | null
@@ -330,6 +334,8 @@ export type Database = {
           influencer_id?: string | null
           indicador_id?: string | null
           indicador_cpf?: string | null
+          indicacao_premiado_em?: string | null
+          indicacao_premiado_por?: string | null
           status?: string
           used_at?: string | null
           used_by_admin?: string | null
@@ -678,6 +684,14 @@ export type Database = {
       indicacao_meus_cliques: {
         Args: Record<string, never>
         Returns: number
+      }
+      indicacao_minhas_vendas: {
+        Args: Record<string, never>
+        Returns: {
+          coupon_number: string; primeiro_nome: string; status: string
+          verified: boolean; premio: number | null; premiado_em: string | null
+          criado_em: string; usado_em: string | null
+        }[]
       }
       indicacao_minhas_indicacoes: {
         Args: Record<string, never>

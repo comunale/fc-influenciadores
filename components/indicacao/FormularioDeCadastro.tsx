@@ -99,8 +99,12 @@ export function FormularioDeCadastro() {
     return (
       <div className="flex flex-col gap-5 text-center">
         <div>
-          <p className="text-sm text-gray-400">Seu número de cupom</p>
+          <p className="text-sm text-gray-400">Seu código de indicação</p>
           <p className="text-3xl font-black text-[#00ff87] tracking-wider mt-1">{pronto.codigo}</p>
+          <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+            Este código identifica você. Quem for comprar precisa gerar o cupom
+            pelo seu link — mostrar este código na loja não vale desconto.
+          </p>
         </div>
 
         <div className="border-t border-[#1e1e1e] pt-5">

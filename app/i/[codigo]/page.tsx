@@ -86,26 +86,45 @@ export default async function LinkDeIndicacaoPage({ params }: PageProps) {
   const cabecalhos = await headers()
   const userAgent = cabecalhos.get('user-agent') ?? ''
 
+  const ip =
+    cabecalhos.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    cabecalhos.get('x-real-ip') ||
+    null
+
   if (!ROBOS.test(userAgent)) {
-    // Clique registrado antes de qualquer trava: saber que o link foi aberto e
-    // não gerou cupom é justamente o que a métrica existe para contar.
-    await supabase.from('indicador_cliques').insert({
-      indicador_id: indicador.id,
-      ip:
-        cabecalhos.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-        cabecalhos.get('x-real-ip') ||
-        null,
-      user_agent: userAgent.slice(0, 500) || null,
-    })
+    // Um clique por IP por hora, e não um por carregamento.
+    //
+    // Sem isso a rota é um INSERT público sem autenticação e sem limite: um
+    // `while true; do curl ...` enche a tabela e infla a métrica, e a própria
+    // pessoa infla a dela segurando F5. Com a janela, "cliques" volta a
+    // significar gente que abriu o link, que é o que a decisão 7 queria medir.
+    const umaHoraAtras = new Date(Date.now() - 3600_000).toISOString()
+    const { count: jaContou } = await supabase
+      .from('indicador_cliques')
+      .select('id', { count: 'exact', head: true })
+      .eq('indicador_id', indicador.id)
+      .eq('ip', ip ?? '')
+      .gte('created_at', umaHoraAtras)
+
+    if (!jaContou) {
+      // Clique registrado antes de qualquer trava: saber que o link foi aberto
+      // e não gerou cupom é justamente o que a métrica existe para contar.
+      await supabase.from('indicador_cliques').insert({
+        indicador_id: indicador.id,
+        ip,
+        user_agent: userAgent.slice(0, 500) || null,
+      })
+    }
   }
 
-  const { count: usos } = await supabase
+  // O teto conta a FILA (pendente + usado), igual à rota que gera o cupom.
+  const { count: naFila } = await supabase
     .from('coupons')
     .select('id', { count: 'exact', head: true })
     .eq('indicador_id', indicador.id)
-    .eq('status', 'used')
+    .in('status', ['pending', 'used'])
 
-  const liberado = podeGerar(indicador, usos ?? 0)
+  const liberado = podeGerar(indicador, naFila ?? 0)
   if (!liberado.ok) return <LinkForaDoAr motivo={liberado.erro} />
 
   const primeiroNome = indicador.nome.trim().split(' ')[0]

@@ -31,24 +31,32 @@ const HEADERS = [
   'Prêmio (R$)',
 ]
 
-export async function GET() {
+export async function GET(request: Request) {
   const auth = await requireRole(['admin', 'finance'])
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  // Por padrão, só o que FALTA pagar. Até 18/11/2026 esta rota trazia toda
+  // venda conferida, sempre: cinco prêmios pagos em novembro reapareciam em
+  // dezembro na mesma planilha, com o total somando os dois meses.
+  const todos = new URL(request.url).searchParams.get('todos') === '1'
+
+  let query = supabase
     .from('coupons')
     .select(
       `coupon_number, customer_name, customer_cpf, customer_phone, used_at, invoice_number,
-       commission_per_sale,
+       commission_per_sale, indicacao_premiado_em, indicacao_premiado_por,
        indicadores(nome, cpf, telefone, codigo),
        sellers(name, store_name)`
     )
     .not('indicador_id', 'is', null)
     .eq('status', 'used')
     .eq('verified', true)
-    .order('used_at', { ascending: true })
+
+  if (!todos) query = query.is('indicacao_premiado_em', null)
+
+  const { data, error } = await query.order('used_at', { ascending: true })
 
   if (error) {
     console.error('admin/indicadores/export:', error)
@@ -72,28 +80,36 @@ export async function GET() {
       c.used_at ? formatDateTime(c.used_at) : '',
       c.invoice_number ?? '',
       c.commission_per_sale ?? 0,
+      c.indicacao_premiado_em ? formatDateTime(c.indicacao_premiado_em) : '',
+      c.indicacao_premiado_por ?? '',
     ]
   })
 
-  const total = linhas.reduce((s, l) => s + Number(l[12] || 0), 0)
+  // Soma só o que NÃO foi pago: numa exportação com ?todos=1 o rodapé não pode
+  // dizer "a pagar" sobre linha que já foi paga.
+  const total = (data ?? []).reduce(
+    (s, c) => s + (c.indicacao_premiado_em ? 0 : Number(c.commission_per_sale ?? 0)),
+    0
+  )
 
   const sheet = XLSX.utils.aoa_to_sheet([
     HEADERS,
     ...linhas,
     // O total fecha a planilha para quem vai pagar conferir a soma sem fórmula.
     [],
-    ['TOTAL A PAGAR', '', '', '', '', '', '', '', '', '', '', '', total],
+    ['TOTAL A PAGAR', '', '', '', '', '', '', '', '', '', '', '', total, '', ''],
   ])
   const book = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(book, sheet, 'A premiar')
+  XLSX.utils.book_append_sheet(book, sheet, todos ? 'Todas' : 'A premiar')
 
   const buffer = XLSX.write(book, { type: 'buffer', bookType: 'xlsx' }) as Buffer
   const hoje = new Date().toISOString().slice(0, 10)
+  const sufixo = todos ? 'completo' : 'a-pagar'
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="indicacoes-a-premiar-${hoje}.xlsx"`,
+      'Content-Disposition': `attachment; filename="indicacoes-${sufixo}-${hoje}.xlsx"`,
       // Dado de cliente não fica em cache de proxy nenhum.
       'Cache-Control': 'no-store',
     },
