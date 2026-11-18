@@ -717,3 +717,42 @@ só existem no branch.
   previewers conhecidos (WhatsApp, Telegram, Facebook, Slack, Discord e
   crawlers genéricos). Um novo infla a métrica de cliques — não o cupom, nem o
   uso, que são o que paga.
+
+### Limpeza pendente no banco (precisa de você)
+
+O harness recusa `DROP` sem a sua confirmação, então dois objetos mortos
+ficaram em produção. Nenhum dos dois atrapalha nada; os dois são lixo:
+
+```sql
+-- Índice duplicado de nota fiscal (a 036 criou sem saber que já existia
+-- coupons_invoice_number_unico, que é melhor: exclui string vazia também).
+drop index if exists public.coupons_invoice_number_key;
+
+-- Função substituída pela indicacao_minhas_vendas() da 038. Trocar a
+-- assinatura exige DROP FUNCTION, então a 038 criou com nome novo.
+drop function if exists public.indicacao_minhas_indicacoes();
+```
+
+### Achados da revisão que ficaram para depois
+
+Revisão independente do branch em 18/11. Os três críticos e os oito importantes
+foram corrigidos no mesmo dia; estes sobraram, em ordem de quanto incomodam:
+
+- **O 409 de "CPF já cadastrado" é um toast**, e o link para entrar fica no pé
+  da landing. Contra a regra "ação mora junto da informação": a frase e o
+  caminho deveriam estar no mesmo lugar.
+- **"Cupons recentes" do dashboard não mostra a origem.** Não quebra — só não
+  distingue um cupom de indicação de um de parceria.
+- **`/admin/indicadores` não tem paginação.** Carrega todos os indicadores e
+  todos os cupons de indicação de uma vez.
+- **`WIDTHS` do `exportCupons.ts` tem 19 entradas para 21 colunas** desde que
+  a origem entrou; as duas últimas saem com largura padrão.
+- **O ramo `role !== 'indicador'` de `getIndicadorDaSessao` não tem teste
+  próprio.** É a segunda camada que impede um usuário interno de cair na área
+  da pessoa; hoje está coberto pelo proxy e pelo layout.
+- **`sellers` e `campaigns` são legíveis pelo papel `indicador`** (políticas
+  antigas, da era `using(true)`, que a migration 014 não apertou). Sem PII, mas
+  um participante do programa consegue enumerar nomes de loja e de vendedor.
+- **Não existe caminho de exclusão/portabilidade LGPD para `indicadores`**, que
+  agora guarda CPF, telefone, sexo, data de nascimento e IP do aceite. Nem a
+  spec nem o plano levantaram isso — é decisão sua, não defeito da entrega.
