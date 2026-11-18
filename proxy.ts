@@ -148,5 +148,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/portal/:path*', '/c/:path*'],
+  // /c, /i e /indique entram pelo redirect de dominio legado (vercel.app -> dominio
+  // customizado): sao links compartilhados por WhatsApp, e o 301 precisa valer
+  // neles, nao so nas areas logadas.
+  matcher: ['/admin/:path*', '/portal/:path*', '/c/:path*', '/i/:path*', '/indique'],
 }
