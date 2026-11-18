@@ -70,16 +70,27 @@ export async function proxy(request: NextRequest) {
   // O portal do influenciador é uma área separada, não uma versão reduzida do
   // admin. Quem é de dentro não tem o que fazer lá, e quem é de fora não sai de lá.
   const isPortalRoute = pathname.startsWith('/portal') && pathname !== '/portal/login'
-  const isLoginPage = pathname === '/admin/login' || pathname === '/portal/login'
+  // A área de quem indica (Programa de Indicação) é uma TERCEIRA área, nem
+  // admin nem portal: os termos são do programa, não de uma parceria.
+  const isIndicadorRoute =
+    pathname.startsWith('/indicador') && pathname !== '/indicador/login'
+  const isLoginPage =
+    pathname === '/admin/login' ||
+    pathname === '/portal/login' ||
+    pathname === '/indicador/login'
 
   // Não autenticado → login da área correspondente (preserva destino via ?next=)
-  if ((isAdminRoute || isPortalRoute) && !user) {
+  if ((isAdminRoute || isPortalRoute || isIndicadorRoute) && !user) {
     const next = encodeURIComponent(request.nextUrl.pathname + request.nextUrl.search)
-    const login = isPortalRoute ? '/portal/login' : '/admin/login'
+    const login = isPortalRoute
+      ? '/portal/login'
+      : isIndicadorRoute
+        ? '/indicador/login'
+        : '/admin/login'
     return NextResponse.redirect(new URL(`${login}?next=${next}`, request.url))
   }
 
-  if ((isAdminRoute || isPortalRoute || isLoginPage) && user) {
+  if ((isAdminRoute || isPortalRoute || isIndicadorRoute || isLoginPage) && user) {
     const { data: profile } = await supabase
       .from('admin_profiles')
       .select('role, active, senha_definida_at')
@@ -87,16 +98,22 @@ export async function proxy(request: NextRequest) {
       .single()
 
     const ehInfluencer = profile?.role === 'influencer'
+    const ehIndicador = profile?.role === 'indicador'
     const casa = ehInfluencer
       ? '/portal'
-      : ALLOWED_BY_ROLE[profile?.role ?? '']?.[0]?.path ?? '/admin'
+      : ehIndicador
+        ? '/indicador'
+        : ALLOWED_BY_ROLE[profile?.role ?? '']?.[0]?.path ?? '/admin'
+    const portaDeEntrada = ehInfluencer
+      ? '/portal/login'
+      : ehIndicador
+        ? '/indicador/login'
+        : '/admin/login'
 
     // Perfil inativo ou ausente → desloga na porta por onde entrou
     if (profile && !profile.active) {
       await supabase.auth.signOut()
-      return NextResponse.redirect(
-        new URL(ehInfluencer ? '/portal/login' : '/admin/login', request.url)
-      )
+      return NextResponse.redirect(new URL(portaDeEntrada, request.url))
     }
 
     // Já logado numa tela de login.
@@ -109,13 +126,21 @@ export async function proxy(request: NextRequest) {
     // devolvê-lo ao admin sem explicação parece um bug do sistema. A página
     // conta o que está acontecendo e oferece sair.
     if (isLoginPage) {
-      if (ehInfluencer) return NextResponse.redirect(new URL('/portal', request.url))
+      if (ehInfluencer || ehIndicador) return NextResponse.redirect(new URL(casa, request.url))
       if (pathname === '/admin/login') return NextResponse.redirect(new URL(casa, request.url))
     }
 
     // A trava cruzada: cada um na sua área.
-    if (ehInfluencer && isAdminRoute) {
-      return NextResponse.redirect(new URL('/portal', request.url))
+    if ((ehInfluencer || ehIndicador) && isAdminRoute) {
+      return NextResponse.redirect(new URL(casa, request.url))
+    }
+    if (ehIndicador && isPortalRoute) {
+      return NextResponse.redirect(new URL('/indicador', request.url))
+    }
+    // Quem não é indicador não tem o que fazer na área de quem indica -- nem o
+    // influenciador, que tem a dele.
+    if (!ehIndicador && isIndicadorRoute) {
+      return NextResponse.redirect(new URL(casa, request.url))
     }
 
     // Senha ainda é a que o admin gerou e mandou por WhatsApp: o portal fica
@@ -132,7 +157,7 @@ export async function proxy(request: NextRequest) {
     ) {
       return NextResponse.redirect(new URL('/portal/senha', request.url))
     }
-    if (!ehInfluencer && isPortalRoute) {
+    if (!ehInfluencer && !ehIndicador && isPortalRoute) {
       return NextResponse.redirect(new URL(casa, request.url))
     }
 
@@ -151,5 +176,12 @@ export const config = {
   // /c, /i e /indique entram pelo redirect de dominio legado (vercel.app -> dominio
   // customizado): sao links compartilhados por WhatsApp, e o 301 precisa valer
   // neles, nao so nas areas logadas.
-  matcher: ['/admin/:path*', '/portal/:path*', '/c/:path*', '/i/:path*', '/indique'],
+  matcher: [
+    '/admin/:path*',
+    '/portal/:path*',
+    '/indicador/:path*',
+    '/c/:path*',
+    '/i/:path*',
+    '/indique',
+  ],
 }

@@ -5,6 +5,7 @@ import {
   gerarCodigoDeIndicacao,
   tetoAtingido,
   resumoDoIndicador,
+  resumoDasIndicacoes,
 } from '@/lib/indicacao/regras'
 
 describe('emailSinteticoDoCpf', () => {
@@ -103,5 +104,39 @@ describe('resumoDoIndicador', () => {
       { status: 'cancelled', verified: true, commission_per_sale: 200 },
     ])
     expect(r).toEqual({ cupons: 1, usos: 0, premiados: 0, aReceber: 0 })
+  })
+})
+
+describe('resumoDasIndicacoes', () => {
+  function linha(over: Record<string, unknown> = {}) {
+    return {
+      coupon_number: 'FOX-AAAAAA',
+      primeiro_nome: 'Jose',
+      status: 'used',
+      verified: true,
+      premio: 200,
+      criado_em: '2026-11-18T12:00:00Z',
+      usado_em: '2026-11-18T13:00:00Z',
+      ...over,
+    }
+  }
+
+  // Se a coluna `premio` do SQL for renomeada, este teste quebra. Sem ele, a
+  // area da pessoa passaria a mostrar R$ 0 a receber, calada.
+  test('le o premio da coluna premio, nao de commission_per_sale', () => {
+    expect(resumoDasIndicacoes([linha()]).aReceber).toBe(200)
+  })
+
+  test('mesma regra do resumo: usos conta used, a receber conta used E verified', () => {
+    const r = resumoDasIndicacoes([
+      linha(),
+      linha({ verified: false }),
+      linha({ status: 'pending', verified: false, usado_em: null }),
+    ])
+    expect(r).toEqual({ cupons: 3, usos: 2, premiados: 1, aReceber: 200 })
+  })
+
+  test('lista vazia da tudo zero', () => {
+    expect(resumoDasIndicacoes([])).toEqual({ cupons: 0, usos: 0, premiados: 0, aReceber: 0 })
   })
 })

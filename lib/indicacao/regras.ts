@@ -100,3 +100,31 @@ export function resumoDoIndicador(cupons: CupomDoIndicador[]): ResumoDoIndicador
     aReceber: premiados.reduce((soma, c) => soma + (c.commission_per_sale ?? 0), 0),
   }
 }
+
+/**
+ * Uma linha como a função `indicacao_minhas_indicacoes()` devolve.
+ *
+ * O nome da coluna de prêmio é `premio` no SQL e `commission_per_sale` no
+ * cupom. O adaptador abaixo existe para que uma renomeação no banco quebre um
+ * TESTE, e não a tela: a falha silenciosa aqui seria a área da pessoa mostrar
+ * R$ 0 a receber, que é o pior jeito de descobrir.
+ */
+export type LinhaDaIndicacao = {
+  coupon_number: string
+  primeiro_nome: string
+  status: string
+  verified: boolean
+  premio: number | null
+  criado_em: string
+  usado_em: string | null
+}
+
+export function resumoDasIndicacoes(linhas: LinhaDaIndicacao[]): ResumoDoIndicador {
+  return resumoDoIndicador(
+    linhas.map((l) => ({
+      status: l.status,
+      verified: l.verified,
+      commission_per_sale: l.premio,
+    }))
+  )
+}
