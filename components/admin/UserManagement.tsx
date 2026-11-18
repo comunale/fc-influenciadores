@@ -18,6 +18,8 @@ const ROLE_HINT: Record<Role, string> = {
   // Nao aparece neste seletor: conta de influenciador nasce pela tela de
   // Influencers, que amarra o vinculo. Existe aqui so para o tipo fechar.
   influencer: ' — portal do influenciador',
+  // Tambem nao aparece aqui: nasce pelo autocadastro em /indique.
+  indicador: ' — área do Programa de Indicação',
 }
 
 interface UserProfile {

@@ -17,4 +17,7 @@ export const CAMPOS_POR_PAPEL: Record<Role, string[]> = {
   moderator: [],
   // O influenciador nao edita cupom nenhum: o portal dele e so leitura.
   influencer: [],
+  // Nem o participante do Programa de Indicacao: a area dele e so leitura, e
+  // ele nao alcanca /api/admin/coupons de jeito nenhum.
+  indicador: [],
 }

@@ -16,6 +16,10 @@ const ALLOWED_BY_ROLE: Record<string, RouteRule[]> = {
     // Lê contrato para saber se pode pagar. Não edita — a página de um
     // contrato só abre para admin.
     { path: '/admin/contratos' },
+    // Programa de Indicacao: o Financeiro edita teto, encerra beneficio e
+    // exporta quem tem a receber (decisao 9 da spec de 17/11).
+    { path: '/admin/indicadores' },
+    { path: '/admin/financeiro' },
   ],
   moderator: [
     { path: '/admin/validar' },

@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'finance' | 'moderator' | 'influencer'
+export type Role = 'admin' | 'finance' | 'moderator' | 'influencer' | 'indicador'
 
 /**
  * Os papeis INTERNOS -- os que aparecem no seletor de Configuracoes e os unicos
@@ -18,6 +18,9 @@ export const ROLE_LABELS: Record<Role, string> = {
   finance: 'Financeiro',
   moderator: 'Lojista',
   influencer: 'Influenciador',
+  // Programa de Indicacao (036). Nao e papel interno: nao entra em ROLES, e
+  // can() responde false para ele em tudo -- a area dele e separada.
+  indicador: 'Participante do Programa de Indicação',
 }
 
 export type Action =
@@ -34,6 +37,7 @@ export type Action =
   | 'influencers.payment'
   | 'campaigns.edit'
   | 'settings'
+  | 'indicadores.edit'
 
 /**
  * O que cada papel pode no sistema interno.
@@ -61,6 +65,9 @@ const MATRIX: Record<Action, Role[]> = {
   'influencers.payment': ['admin', 'finance'],
   'campaigns.edit':   ['admin'],
   'settings':         ['admin'],
+  // Teto de usos e encerramento do beneficio: o Financeiro e o gestor desse
+  // programa, junto com o admin (decisao 9 da spec de 17/11).
+  'indicadores.edit': ['admin', 'finance'],
 }
 
 export function can(role: string | null | undefined, action: Action): boolean {

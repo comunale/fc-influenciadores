@@ -671,6 +671,10 @@ export type Database = {
         Args: Record<string, never>
         Returns: string | null
       }
+      indicacao_cliques_por_indicador: {
+        Args: Record<string, never>
+        Returns: { indicador_id: string; cliques: number }[]
+      }
       indicacao_meus_cliques: {
         Args: Record<string, never>
         Returns: number
