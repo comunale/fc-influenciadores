@@ -107,7 +107,7 @@ export function CuponsTable({
     setEditForm({
       status: c.status,
       customer_name: c.customer_name,
-      customer_email: c.customer_email,
+      customer_email: c.customer_email ?? '',
       customer_phone: c.customer_phone,
       customer_cpf: c.customer_cpf,
     })

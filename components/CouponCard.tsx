@@ -10,9 +10,19 @@ interface CouponCardProps {
   coupon: Coupon & {
     // O desconto vem do RETRATO no proprio cupom (migration 008). Os textos vem
     // da PARCERIA em que o cupom nasceu (migration 010).
-    influencers: Pick<Influencer, 'name' | 'instagram_handle'>
+    //
+    // Desde a migration 036 um cupom tem UM dono, e pode ser um indicador em vez
+    // de um influenciador -- entao os dois sao nulaveis. Antes disso este tipo
+    // exigia `influencers`, e a tela quebrava no cupom do Programa de Indicacao.
+    influencers: Pick<Influencer, 'name' | 'instagram_handle'> | null
+    indicadores: { nome: string } | null
     partnerships: { coupon_title: string | null; coupon_description: string | null } | null
   }
+}
+
+/** O primeiro nome, para nao expor o sobrenome de quem indicou no papel. */
+function primeiroNome(nome: string): string {
+  return nome.trim().split(/\s+/)[0] || nome
 }
 
 export function CouponCard({ coupon }: CouponCardProps) {
@@ -187,12 +197,18 @@ export function CouponCard({ coupon }: CouponCardProps) {
           </div>
 
           {/* Indicação */}
-          <div className="text-center">
-            <span className="text-xs text-gray-500">
-              Indicado por{' '}
-              <span className="text-[#00ff87]">{coupon.influencers.instagram_handle}</span>
-            </span>
-          </div>
+          {(coupon.influencers || coupon.indicadores) && (
+            <div className="text-center">
+              <span className="text-xs text-gray-500">
+                Indicado por{' '}
+                <span className="text-[#00ff87]">
+                  {coupon.influencers
+                    ? coupon.influencers.instagram_handle
+                    : primeiroNome(coupon.indicadores!.nome)}
+                </span>
+              </span>
+            </div>
+          )}
 
           {/* Descrição */}
           <div className="text-xs text-gray-500 text-center leading-relaxed border-t border-[#1e1e1e] pt-3">

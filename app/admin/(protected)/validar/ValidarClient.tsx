@@ -22,10 +22,14 @@ export interface CouponData {
   customer_phone: string
   customer_email: string
   status: 'pending' | 'used' | 'expired' | 'cancelled'
-  expires_at: string
+  expires_at: string | null
   used_at: string | null
   used_by_admin: string | null
-  influencers: { name: string; instagram_handle: string }
+  // Desde a migration 036 o cupom tem UM dono: influenciador OU indicador do
+  // Programa de Indicacao. Os dois sao nulaveis, e o vendedor precisa saber de
+  // qual programa e o cupom que ele esta validando.
+  influencers: { name: string; instagram_handle: string } | null
+  indicadores: { nome: string } | null
   campaigns: { name: string; discount_value: number; discount_type: string; coupon_title: string }
 }
 
@@ -326,11 +330,19 @@ export function ValidarClient({
               </div>
               <div>
                 <div className="text-xs text-gray-500">Válido até</div>
-                <div className="text-white text-sm">{formatDate(coupon.expires_at)}</div>
+                <div className="text-white text-sm">
+                  {coupon.expires_at ? formatDate(coupon.expires_at) : 'Sem vencimento'}
+                </div>
               </div>
               <div>
                 <div className="text-xs text-gray-500">Indicado por</div>
-                <div className="text-white text-sm">{coupon.influencers.instagram_handle}</div>
+                <div className="text-white text-sm">
+                  {coupon.influencers
+                    ? coupon.influencers.instagram_handle
+                    : coupon.indicadores
+                      ? `Indicacao · ${coupon.indicadores.nome}`
+                      : '—'}
+                </div>
               </div>
             </div>
             <div className="border-t border-[#2a2a2a] pt-3 flex flex-col gap-1">

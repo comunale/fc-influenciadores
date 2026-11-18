@@ -16,10 +16,15 @@ export default async function AdminDashboard() {
     { data: recentCoupons },
     { data: influencers },
     { data: vencendoCupons },
+    { count: totalIndicacao },
+    { count: usadosIndicacao },
   ] = await Promise.all([
-    supabase.from('coupons').select('*', { count: 'exact', head: true }),
-    supabase.from('coupons').select('*', { count: 'exact', head: true }).eq('status', 'used'),
-    supabase.from('coupons').select('*', { count: 'exact', head: true }).eq('status', 'expired'),
+    // As tres contagens abaixo sao do programa de PARCERIA. Desde a migration
+    // 036 a tabela tambem guarda cupom do Programa de Indicacao, e somar os
+    // dois faria a taxa de conversao do influenciador parecer outra coisa.
+    supabase.from('coupons').select('*', { count: 'exact', head: true }).is('indicador_id', null),
+    supabase.from('coupons').select('*', { count: 'exact', head: true }).eq('status', 'used').is('indicador_id', null),
+    supabase.from('coupons').select('*', { count: 'exact', head: true }).eq('status', 'expired').is('indicador_id', null),
     supabase.from('coupons')
       .select('*, influencers(name, instagram_handle)')
       .order('created_at', { ascending: false })
@@ -35,6 +40,9 @@ export default async function AdminDashboard() {
       .gte('expires_at', janelaDeVencimento(15).de)
       .lte('expires_at', janelaDeVencimento(15).ate)
       .order('expires_at'),
+    // Programa de Indicacao, contado separado -- nunca somado ao de parceria.
+    supabase.from('coupons').select('*', { count: 'exact', head: true }).not('indicador_id', 'is', null),
+    supabase.from('coupons').select('*', { count: 'exact', head: true }).not('indicador_id', 'is', null).eq('status', 'used'),
   ])
 
   const total = totalCoupons || 0
@@ -66,6 +74,11 @@ export default async function AdminDashboard() {
     influencers: { instagram_handle: string } | null
   }[]
   const em7 = cuponsVencendo.filter((c) => diasAteVencer(c.expires_at) <= 7)
+
+  // Os números do Programa de Indicação ficam na própria linha. Somar com os de
+  // parceria misturaria dois negócios: um paga comissão por contrato, o outro
+  // paga prêmio por fora, e a taxa de conversão de um não explica o outro.
+  const indicacao = { total: totalIndicacao || 0, usados: usadosIndicacao || 0 }
 
   const metrics = [
     { label: 'Cupons Gerados', value: total, color: 'text-white' },
@@ -144,15 +157,53 @@ export default async function AdminDashboard() {
         </div>
       )}
 
-      {/* Métricas */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {metrics.map((m) => (
-          <div key={m.label} className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-5">
-            <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">{m.label}</div>
-            <div className={`text-3xl font-black ${m.color}`}>{m.value}</div>
-          </div>
-        ))}
+      {/* Métricas das PARCERIAS. O rótulo diz isso desde a migration 036: a
+          tabela passou a guardar também cupom do Programa de Indicação, e um
+          número sem dono é um número que engana. */}
+      <div>
+        <h2 className="text-gray-500 text-xs uppercase tracking-wider mb-3">
+          Parcerias de influenciador
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {metrics.map((m) => (
+            <div key={m.label} className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-5">
+              <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">{m.label}</div>
+              <div className={`text-3xl font-black ${m.color}`}>{m.value}</div>
+            </div>
+          ))}
+        </div>
       </div>
+
+      {indicacao.total > 0 && (
+        <div>
+          <h2 className="text-gray-500 text-xs uppercase tracking-wider mb-3">
+            Programa de Indicação
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-5">
+              <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">
+                Cupons Gerados
+              </div>
+              <div className="text-3xl font-black text-white">{indicacao.total}</div>
+            </div>
+            <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-5">
+              <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">
+                Vendas Realizadas
+              </div>
+              <div className="text-3xl font-black text-[#00ff87]">{indicacao.usados}</div>
+            </div>
+            <Link
+              href="/admin/indicadores"
+              className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-5 hover:border-[#2a2a2a] transition-colors flex flex-col justify-center"
+            >
+              <div className="text-[#00ff87] text-sm font-semibold">Ver indicadores</div>
+              <div className="text-gray-500 text-xs mt-1">
+                Teto, situação e exportação para premiar
+              </div>
+            </Link>
+          </div>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Ranking influencers */}

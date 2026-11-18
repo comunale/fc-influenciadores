@@ -40,6 +40,13 @@ export function CuponsFilters({
         <option value="cancelled">Cancelado</option>
       </select>
 
+      {/* Origem: a lista mistura dois programas desde a migration 036. */}
+      <select name="origem" defaultValue={filters.origem} className={INPUT}>
+        <option value="">Origem: todas</option>
+        <option value="parceria">Parceria de influenciador</option>
+        <option value="indicacao">Programa de Indicação</option>
+      </select>
+
       <select name="influencer_id" defaultValue={filters.influencer_id} className={INPUT}>
         <option value="">Todos os influencers</option>
         {influencers.map((i) => (

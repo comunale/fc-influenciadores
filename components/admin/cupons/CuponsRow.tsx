@@ -6,7 +6,15 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { can, type Role } from '@/lib/auth/roles'
-import { type CouponRow, STATUS, formatCpf, discountLabel } from './types'
+import {
+  type CouponRow,
+  STATUS,
+  formatCpf,
+  discountLabel,
+  origemDoCupom,
+  ORIGEM_LABEL,
+  quemIndicou,
+} from './types'
 
 export function CuponsRowItem({
   c,
@@ -122,12 +130,13 @@ export function CuponsRowItem({
               >⚠</span>
             )}
           </div>
-          <div className="text-gray-500 text-xs">{c.customer_email}</div>
+          <div className="text-gray-500 text-xs">{c.customer_email ?? ''}</div>
         </td>
         {/* Origem: quem indicou e quem vendeu. Eram duas colunas ate 18/08 e
             criavam barra horizontal -- os dois fatos continuam lado a lado. */}
         <td className="px-4 py-3 whitespace-nowrap cursor-pointer" onClick={toggle}>
-          <div className="text-gray-300">{c.influencers?.instagram_handle ?? '—'}</div>
+          <div className="text-gray-300">{quemIndicou(c)}</div>
+          <div className="text-gray-500 text-xs">{ORIGEM_LABEL[origemDoCupom(c)]}</div>
           {c.sellers?.name && (
             <div className="text-gray-500 text-xs">vend. {c.sellers.name}</div>
           )}
@@ -263,8 +272,15 @@ export function CuponsRowItem({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
               <Campo rotulo="CPF" valor={formatCpf(c.customer_cpf)} mono />
               <Campo rotulo="Telefone" valor={c.customer_phone} />
-              <Campo rotulo="Válido até" valor={formatDate(c.expires_at)} />
-              <Campo rotulo="Influencer" valor={c.influencers?.name ?? '—'} />
+              <Campo
+                rotulo="Válido até"
+                valor={c.expires_at ? formatDate(c.expires_at) : 'Sem vencimento'}
+              />
+              <Campo rotulo="Origem" valor={ORIGEM_LABEL[origemDoCupom(c)]} />
+              <Campo
+                rotulo={c.indicadores ? 'Quem indicou' : 'Influencer'}
+                valor={c.influencers?.name ?? c.indicadores?.nome ?? '—'}
+              />
               {c.used_at && <Campo rotulo="Usado em" valor={formatDateTime(c.used_at)} />}
               {/* Os dois lado a lado de propósito: o login que operou o sistema
                   e o nome que a pessoa reivindicou no balcão são fatos diferentes. */}

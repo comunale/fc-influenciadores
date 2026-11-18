@@ -175,6 +175,13 @@ export type Database = {
             referencedRelation: "influencers"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "admin_profiles_indicador_id_fkey"
+            columns: ["indicador_id"]
+            isOneToOne: false
+            referencedRelation: "indicadores"
+            referencedColumns: ["id"]
+          },
         ]
       }
       app_settings: {
@@ -346,6 +353,13 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupons_indicador_id_fkey"
+            columns: ["indicador_id"]
+            isOneToOne: false
+            referencedRelation: "indicadores"
             referencedColumns: ["id"]
           },
           {

@@ -41,7 +41,12 @@ export function ExpressSuccess({ coupon, onReset }: { coupon: CouponData; onRese
           </div>
           <div>
             <div className="text-xs text-gray-500">Indicado por</div>
-            <div className="text-white">@{coupon.influencers.instagram_handle}</div>
+            {/* O cupom express e sempre de influenciador: a rota do balcao nao
+                participa do Programa de Indicacao. O fallback existe so porque o
+                tipo passou a ser nulavel na migration 036. */}
+            <div className="text-white">
+              {coupon.influencers ? `@${coupon.influencers.instagram_handle}` : '—'}
+            </div>
           </div>
           <div>
             <div className="text-xs text-gray-500">CPF</div>

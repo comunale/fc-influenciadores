@@ -1,11 +1,19 @@
 import { regiaoDoDDD } from '@/lib/validators/telefone'
 import { formatDate, formatDateTime } from '@/lib/utils'
-import { type CouponRow, STATUS, formatCpf, discountLabel } from './types'
+import {
+  type CouponRow,
+  STATUS,
+  formatCpf,
+  discountLabel,
+  origemDoCupom,
+  ORIGEM_LABEL,
+  quemIndicou,
+} from './types'
 
 // Uniao das colunas das duas tabelas antigas (Cupons e Participantes) mais os
 // campos de conferencia financeira e o vendedor do balcao.
 const HEADERS = [
-  'Código', 'Data', 'Cliente', 'CPF', 'Telefone', 'Região (pelo DDD)', 'Email', 'Influencer',
+  'Código', 'Data', 'Cliente', 'CPF', 'Telefone', 'Região (pelo DDD)', 'Email', 'Origem', 'Quem indicou',
   'Status', 'Desconto', 'Validade', 'Usado em', 'Login que validou', 'Vendedor',
   'NF', 'Conferido', 'Conferido por', 'Pago', 'Data pgto', 'Pago por',
 ]
@@ -24,11 +32,12 @@ export async function exportCuponsXLS(rows: CouponRow[]) {
     // A loja é presencial: quem está longe não vem, e a lista precisa dizer
     // isso antes de o time gastar o dia ligando.
     regiaoDoDDD(c.customer_phone),
-    c.customer_email,
-    c.influencers?.instagram_handle ?? '',
+    c.customer_email ?? '',
+    ORIGEM_LABEL[origemDoCupom(c)],
+    quemIndicou(c),
     STATUS[c.status as keyof typeof STATUS]?.label ?? c.status,
     discountLabel(c),
-    formatDate(c.expires_at),
+    c.expires_at ? formatDate(c.expires_at) : 'Sem vencimento',
     c.used_at ? formatDateTime(c.used_at) : '',
     c.used_by_admin ?? '',
     c.sellers?.name ?? '',

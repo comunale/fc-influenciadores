@@ -9,6 +9,8 @@ import { janelaDeVencimento } from '@/lib/coupons/vencimento'
 interface SearchParams {
   status?: string
   influencer_id?: string
+  /** 'parceria' | 'indicacao' — de qual programa e o cupom (migration 036). */
+  origem?: string
   q?: string
   from?: string
   to?: string
@@ -39,11 +41,15 @@ export default async function CuponsPage({
   let query = supabase
     .from('coupons')
     .select(
-      '*, influencers(id, name, instagram_handle), campaigns(name), sellers(id, name, store_name), settlement_items(settlements(status))'
+      '*, influencers(id, name, instagram_handle), indicadores(id, nome), campaigns(name), sellers(id, name, store_name), settlement_items(settlements(status))'
     )
 
   if (params.status) query = query.eq('status', params.status)
   if (params.influencer_id) query = query.eq('influencer_id', params.influencer_id)
+  // Origem: desde a migration 036 a lista mistura dois programas, e o Financeiro
+  // precisa poder ver um de cada vez.
+  if (params.origem === 'parceria') query = query.not('influencer_id', 'is', null)
+  if (params.origem === 'indicacao') query = query.not('indicador_id', 'is', null)
   // Cupom pendente com a data chegando: a venda que ainda dá para salvar.
   if (params.vence_em) {
     const dias = Number(params.vence_em) || 15

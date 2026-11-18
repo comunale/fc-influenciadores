@@ -8,10 +8,11 @@ export type CouponRow = {
   customer_name: string
   customer_cpf: string
   customer_phone: string
-  customer_email: string
+  customer_email: string | null
   status: string
   created_at: string
-  expires_at: string
+  // Nulo no cupom do Programa de Indicacao: ele nao vence (migration 036).
+  expires_at: string | null
   used_at: string | null
   used_by_admin: string | null
   // Conferência financeira
@@ -30,7 +31,9 @@ export type CouponRow = {
   discount_value: number | null
   commission_per_sale: number | null
   sellers: { id: string; name: string; store_name: string } | null
+  // UM dono por cupom (migration 036): influenciador OU indicador.
   influencers: { id: string; name: string; instagram_handle: string } | null
+  indicadores: { id: string; nome: string } | null
   campaigns: { name: string } | null
   // Lancamento do Financeiro a que o cupom pertence (PostgREST devolve objeto
   // ou lista, conforme a cardinalidade inferida). Ausente/nulo = em nenhum.
@@ -58,4 +61,30 @@ export function formatCpf(cpf: string) {
 export function discountLabel(c: CouponRow) {
   if (c.discount_type == null || c.discount_value == null) return '—'
   return c.discount_type === 'fixed' ? `R$ ${c.discount_value}` : `${c.discount_value}%`
+}
+
+/**
+ * De qual programa o cupom veio.
+ *
+ * Existe porque, desde a migration 036, "Influencer: —" na lista deixou de
+ * significar "dado faltando" e passou a significar "é de outro programa". Sem
+ * nomear a origem, quem lê a tela não tem como saber qual dos dois é.
+ */
+export function origemDoCupom(c: CouponRow): 'parceria' | 'indicacao' | 'desconhecida' {
+  if (c.influencers) return 'parceria'
+  if (c.indicadores) return 'indicacao'
+  return 'desconhecida'
+}
+
+export const ORIGEM_LABEL: Record<ReturnType<typeof origemDoCupom>, string> = {
+  parceria: 'Parceria',
+  indicacao: 'Indicação',
+  desconhecida: '—',
+}
+
+/** Quem indicou, qualquer que seja o programa. */
+export function quemIndicou(c: CouponRow): string {
+  if (c.influencers) return c.influencers.instagram_handle
+  if (c.indicadores) return c.indicadores.nome
+  return '—'
 }
