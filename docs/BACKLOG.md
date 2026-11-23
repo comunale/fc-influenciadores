@@ -671,15 +671,26 @@ Spec `docs/superpowers/specs/2026-11-17-programa-de-indicacao-design.md`,
 plano `docs/superpowers/plans/2026-11-18-programa-de-indicacao.md`, 7 tarefas,
 branch `programa-de-indicacao`.
 
-**Migrações 036 e 037 já estão aplicadas em produção.** O código ainda não.
-Enquanto o deploy não sair, nada quebra: as colunas novas são nuláveis e
-ninguém as escreve. Mas as duas telas novas (`/indique`, `/admin/indicadores`)
-só existem no branch.
+**No ar desde 23/11/2026.** O branch `programa-de-indicacao` virou `master`
+(37 commits, `4eaad29`) e levou junto o que estava pendente da entrega de
+fechamentos — correção do descumprimento, rotas de lançamento,
+`/admin/financeiro`. As migrações 036, 037 e 038 já estavam aplicadas; o
+código alcançou o banco.
+
+**O preview nunca chegou a ser testado.** As variáveis do Supabase na Vercel
+estão marcadas só para *Production*, então todo deployment de preview sobe e
+morre no primeiro acesso ao banco: `Your project's URL and Key are required to
+create a Supabase client`. O conector da Vercel desta máquina recusa a área de
+variáveis (403) e a CLI não está instalada, então não dá para consertar daqui.
+Foi por isso que esta entrega foi direto para a produção.
 
 ### O que precisa de você
 
-- **Deploy.** Sobe junto o que estava pendente da entrega de fechamentos
-  (correção do descumprimento, rotas de lançamento, `/admin/financeiro`).
+- **Variáveis de ambiente do preview.** Settings → Environment Variables, e
+  marcar também a caixa **Preview** em `NEXT_PUBLIC_SUPABASE_URL`,
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` e
+  `NEXT_PUBLIC_SITE_URL`. Sem isso não existe ambiente de teste separado da
+  produção, e toda entrega futura estreia direto no ar.
 - **Apagar um índice duplicado.** A 036 criou `coupons_invoice_number_key`
   sem saber que `coupons_invoice_number_unico` já existia e é melhor (exclui
   string vazia também). O harness recusou o `DROP INDEX` sem confirmação, então
