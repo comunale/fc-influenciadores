@@ -37,11 +37,18 @@ function isAllowed(role: string, pathname: string): boolean {
 
 export async function proxy(request: NextRequest) {
   // Redireciona domínio legado Vercel → domínio customizado (301 permanente)
+  //
+  // SÓ em produção. Deployment de preview mora num `*.vercel.app` por desenho:
+  // sem este `if`, abrir qualquer rota do matcher num preview manda a pessoa
+  // para o domínio oficial, que está rodando OUTRA versão do código — e a
+  // página que ela queria testar aparece como 404. Descoberto em 23/11/2026,
+  // ao subir o preview do Programa de Indicação.
+  const emProducao = process.env.VERCEL_ENV === 'production' || !process.env.VERCEL_ENV
   const customDomain = process.env.NEXT_PUBLIC_SITE_URL
     ? new URL(process.env.NEXT_PUBLIC_SITE_URL).hostname
     : null
   const currentHost = request.headers.get('host') || ''
-  if (customDomain && currentHost !== customDomain && currentHost.includes('vercel.app')) {
+  if (emProducao && customDomain && currentHost !== customDomain && currentHost.includes('vercel.app')) {
     const target = new URL(request.url)
     target.hostname = customDomain
     target.protocol = 'https:'
